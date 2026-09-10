@@ -1,0 +1,21 @@
+# 编译产物
+x64/
+Debug/
+Release/
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.idb
+*.log
+*.tlog
+*.recipe
+*.lastbuildstate
+
+# Visual Studio 缓存
+.vs/
+*.user
+*.suo
+
+# 其他
+*.tmp
