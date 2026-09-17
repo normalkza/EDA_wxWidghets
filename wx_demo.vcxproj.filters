@@ -24,6 +24,12 @@
     <ClCompile Include="wx_demo\MyApp.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="wx_demo\MenuBar.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\ToolBar.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wx_demo\MainFrame.h">
@@ -32,5 +38,52 @@
     <ClInclude Include="wx_demo\MyApp.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="wx_demo\MenuBar.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\ToolBar.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="x64\Debug\res\and.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="x64\Debug\res\delete.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="x64\Debug\res\input.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="x64\Debug\res\nand.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="x64\Debug\res\nor.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="x64\Debug\res\not.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="x64\Debug\res\or.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="x64\Debug\res\output.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="x64\Debug\res\probe.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="x64\Debug\res\select.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="x64\Debug\res\text.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="x64\Debug\res\wire.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="x64\Debug\res\xor.png">
+      <Filter>资源文件</Filter>
+    </Image>
   </ItemGroup>
 </Project>

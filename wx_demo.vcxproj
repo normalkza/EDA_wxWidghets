@@ -21,11 +21,30 @@
   <ItemGroup>
     <ClCompile Include="wx_demo\main.cpp" />
     <ClCompile Include="wx_demo\MainFrame.cpp" />
+    <ClCompile Include="wx_demo\MenuBar.cpp" />
     <ClCompile Include="wx_demo\MyApp.cpp" />
+    <ClCompile Include="wx_demo\ToolBar.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wx_demo\MainFrame.h" />
+    <ClInclude Include="wx_demo\MenuBar.h" />
     <ClInclude Include="wx_demo\MyApp.h" />
+    <ClInclude Include="wx_demo\ToolBar.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="x64\Debug\res\and.png" />
+    <Image Include="x64\Debug\res\delete.png" />
+    <Image Include="x64\Debug\res\input.png" />
+    <Image Include="x64\Debug\res\nand.png" />
+    <Image Include="x64\Debug\res\nor.png" />
+    <Image Include="x64\Debug\res\not.png" />
+    <Image Include="x64\Debug\res\or.png" />
+    <Image Include="x64\Debug\res\output.png" />
+    <Image Include="x64\Debug\res\probe.png" />
+    <Image Include="x64\Debug\res\select.png" />
+    <Image Include="x64\Debug\res\text.png" />
+    <Image Include="x64\Debug\res\wire.png" />
+    <Image Include="x64\Debug\res\xor.png" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
@@ -83,6 +102,9 @@
     <Import Project="D:\wxWidgets-3.3.3\wxwidgets.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -99,6 +121,9 @@
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Command>xcopy /Y /E /I "$(ProjectDir)wx_demo\res" "$(OutDir)res"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -118,6 +143,9 @@
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Command>xcopy /Y /E /I "$(ProjectDir)wx_demo\res" "$(OutDir)res"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -135,6 +163,9 @@
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Command>xcopy /Y /E /I "$(ProjectDir)wx_demo\res" "$(OutDir)res"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -154,6 +185,9 @@
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Command>xcopy /Y /E /I "$(ProjectDir)res\*" "$(OutDir)res\"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
