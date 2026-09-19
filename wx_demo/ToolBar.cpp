@@ -1,4 +1,6 @@
-#include "ToolBar.h"
+
+
+#include "Toolbox.h"
 #include <wx/stdpaths.h>
 #include <wx/filename.h>
 
