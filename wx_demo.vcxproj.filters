@@ -44,6 +44,15 @@
     <ClInclude Include="wx_demo\ToolBar.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="LogicValue.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Pin.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Component.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="x64\Debug\res\and.png">

@@ -26,6 +26,9 @@
     <ClCompile Include="wx_demo\ToolBar.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Component.h" />
+    <ClInclude Include="LogicValue.h" />
+    <ClInclude Include="Pin.h" />
     <ClInclude Include="wx_demo\MainFrame.h" />
     <ClInclude Include="wx_demo\MenuBar.h" />
     <ClInclude Include="wx_demo\MyApp.h" />
