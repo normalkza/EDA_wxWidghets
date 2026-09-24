@@ -25,6 +25,12 @@
     <ClCompile Include="wx_demo\MenuBar.cpp" />
     <ClCompile Include="wx_demo\MyApp.cpp" />
     <ClCompile Include="wx_demo\ToolBar.cpp" />
+    <ClCompile Include="wx_demo\Toolbox.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wx_demo\Component.h" />
@@ -34,6 +40,7 @@
     <ClInclude Include="wx_demo\MyApp.h" />
     <ClInclude Include="wx_demo\Pin.h" />
     <ClInclude Include="wx_demo\ToolBar.h" />
+    <ClInclude Include="wx_demo\Toolbox.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="x64\Debug\res\and.png" />
@@ -117,6 +124,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>D:\wxWidgets-3.3.3\include;D:\wxWidgets-3.3.3\lib\vc_x64_lib\mswud;D:\wxWidgets-3.3.3\include\msvc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -139,6 +147,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>D:\wxWidgets-3.3.3\include;D:\wxWidgets-3.3.3\lib\vc_x64_lib\mswud;D:\wxWidgets-3.3.3\include\msvc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -159,6 +168,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>D:\wxWidgets-3.3.3\include;D:\wxWidgets-3.3.3\include\mscv;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -181,6 +191,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>D:\wxWidgets-3.3.3\include;D:\wxWidgets-3.3.3\include\mscv;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
