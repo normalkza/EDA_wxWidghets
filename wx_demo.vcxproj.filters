@@ -33,6 +33,9 @@
     <ClCompile Include="wx_demo\Toolbox.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="wx_demo\Canvas.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wx_demo\MainFrame.h">
@@ -48,6 +51,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="wx_demo\Toolbox.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\Canvas.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

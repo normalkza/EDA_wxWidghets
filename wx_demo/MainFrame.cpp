@@ -2,7 +2,7 @@
 #include "MenuBar.h"
 #include "ToolBar.h"
 #include "Toolbox.h"
-
+#include "Canvas.h"
 MainFrame::MainFrame()
     : wxFrame(
         nullptr,
@@ -25,7 +25,7 @@ MainFrame::MainFrame()
     // 在panel上创建了子面板anvas,
     // 并使用wxBoxSizer管理它们的布局
     wxPanel* panel = new wxPanel(this);
-    wxPanel* canvas = new wxPanel(panel);
+    Canvas* canvas = new Canvas(panel);
     wxBoxSizer* sizer = new wxBoxSizer(wxHORIZONTAL);//创建sizer管理区域大小
 
     Toolbox* toolbox = new Toolbox(panel);//内部还有各种内容，故设置为自定义类
