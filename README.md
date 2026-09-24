@@ -7,15 +7,17 @@ toolbox(树状结构)和canvas的分区
 
 toolbar和menubar模块
 
-## 需要完成:
+toolbox树状结构分区
 
-toolbox的树状结构分区
+仿真电路逻辑后端
+
+## 需要完成:
 
 拖拽与或非门和输入输出端口
 
 连接导线
 
-逻辑运算
+
 
 
 

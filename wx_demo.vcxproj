@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="wx_demo\logic_test.cpp" />
     <ClCompile Include="wx_demo\main.cpp" />
     <ClCompile Include="wx_demo\MainFrame.cpp" />
     <ClCompile Include="wx_demo\MenuBar.cpp" />
@@ -26,12 +27,12 @@
     <ClCompile Include="wx_demo\ToolBar.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Component.h" />
-    <ClInclude Include="LogicValue.h" />
-    <ClInclude Include="Pin.h" />
+    <ClInclude Include="wx_demo\Component.h" />
+    <ClInclude Include="wx_demo\LogicValue.h" />
     <ClInclude Include="wx_demo\MainFrame.h" />
     <ClInclude Include="wx_demo\MenuBar.h" />
     <ClInclude Include="wx_demo\MyApp.h" />
+    <ClInclude Include="wx_demo\Pin.h" />
     <ClInclude Include="wx_demo\ToolBar.h" />
   </ItemGroup>
   <ItemGroup>
