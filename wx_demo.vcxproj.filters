@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="wx_demo\main.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="wx_demo\MainFrame.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -30,10 +27,10 @@
     <ClCompile Include="wx_demo\ToolBar.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="wx_demo\Toolbox.cpp">
+    <ClCompile Include="wx_demo\logic_test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="wx_demo\Canvas.cpp">
+    <ClCompile Include="wx_demo\main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -50,10 +47,13 @@
     <ClInclude Include="wx_demo\ToolBar.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="wx_demo\Toolbox.h">
+    <ClInclude Include="wx_demo\Component.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="wx_demo\Canvas.h">
+    <ClInclude Include="wx_demo\LogicValue.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\Pin.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
