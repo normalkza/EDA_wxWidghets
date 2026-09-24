@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="wx_demo\Canvas.cpp" />
     <ClCompile Include="wx_demo\main.cpp" />
     <ClCompile Include="wx_demo\MainFrame.cpp" />
     <ClCompile Include="wx_demo\MenuBar.cpp" />
@@ -32,6 +33,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="wx_demo\Canvas.h" />
     <ClInclude Include="wx_demo\MainFrame.h" />
     <ClInclude Include="wx_demo\MenuBar.h" />
     <ClInclude Include="wx_demo\MyApp.h" />
