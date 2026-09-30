@@ -2,11 +2,11 @@
 
 #include "Component.h"
 
-class OrGate : public Component
+class XorGate : public Component
 {
 public:
-    OrGate()
-        : Component("OR")
+    XorGate()
+        : Component("XOR")
     {
         inputs.emplace_back("A", PinType::Input);
         inputs.emplace_back("B", PinType::Input);
@@ -15,14 +15,13 @@ public:
 
     void Evaluate() override
     {
-        if (inputs[0].value == LogicValue::Low &&
-            inputs[1].value == LogicValue::Low)
+        if (inputs[0].value != inputs[1].value)
         {
-            outputs[0].value = LogicValue::Low;
+            outputs[0].value = LogicValue::High;
         }
         else
         {
-            outputs[0].value = LogicValue::High;
+            outputs[0].value = LogicValue::Low;
         }
     }
 };

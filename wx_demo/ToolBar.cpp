@@ -1,8 +1,21 @@
 
-
+#include "SelectionState.h" 
 #include "Toolbox.h"
 #include <wx/stdpaths.h>
 #include <wx/filename.h>
+
+
+// 自定义工具 ID
+enum {
+    ID_TB_SELECT = wxID_HIGHEST + 1,
+    ID_TB_WIRE,
+    ID_TB_TEXT,
+    ID_TB_INPUT,
+    ID_TB_OUTPUT,
+    ID_TB_AND,
+    ID_TB_OR,
+    ID_TB_NOT
+};
 
 //用一个函数来获取资源文件的路径
 namespace
@@ -31,17 +44,31 @@ wxToolBar* CreateMainToolBar(wxFrame* frame)
     wxBitmap orBitmap(ResPath("or.png"), wxBITMAP_TYPE_PNG);
     wxBitmap notBitmap(ResPath("not.png"), wxBITMAP_TYPE_PNG);
 
-    toolBar->AddTool(wxID_ANY, "选择", selectBitmap);
-    toolBar->AddTool(wxID_ANY, "连线", wireBitmap);
-    toolBar->AddTool(wxID_ANY, "文字", textBitmap);
-    toolBar->AddTool(wxID_ANY, "输入", inputBitmap);
-    toolBar->AddTool(wxID_ANY, "输出", outputBitmap);
-    toolBar->AddTool(wxID_ANY, "与门", andBitmap);
-    toolBar->AddTool(wxID_ANY, "或门", orBitmap);
-    toolBar->AddTool(wxID_ANY, "非门", notBitmap);
+    toolBar->AddTool(ID_TB_SELECT, "选择", selectBitmap);
+    toolBar->AddTool(ID_TB_WIRE, "连线", wireBitmap);
+    toolBar->AddTool(ID_TB_TEXT, "文字", textBitmap);
+    toolBar->AddTool(ID_TB_INPUT, "输入", inputBitmap);
+    toolBar->AddTool(ID_TB_OUTPUT, "输出", outputBitmap);
+    toolBar->AddTool(ID_TB_AND, "与门", andBitmap);
+    toolBar->AddTool(ID_TB_OR, "或门", orBitmap);
+    toolBar->AddTool(ID_TB_NOT, "非门", notBitmap);
 
     toolBar->AddSeparator();
     toolBar->Realize();
+
+    // 绑定工具按钮点击事件
+    frame->Bind(wxEVT_TOOL, [](wxCommandEvent& e) {
+        switch (e.GetId()) {
+        case ID_TB_SELECT: g_selectedType = "";       break;
+        case ID_TB_WIRE:   g_selectedType = "WIRE";   break;
+        case ID_TB_TEXT:   g_selectedType = "TEXT";   break;
+        case ID_TB_INPUT:  g_selectedType = "INPUT";  break;
+        case ID_TB_OUTPUT: g_selectedType = "OUTPUT"; break;
+        case ID_TB_AND:    g_selectedType = "AND";    break;
+        case ID_TB_OR:     g_selectedType = "OR";     break;
+        case ID_TB_NOT:    g_selectedType = "NOT";    break;
+        }
+        });
 
     return toolBar;
 }

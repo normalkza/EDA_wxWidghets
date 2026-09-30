@@ -2,11 +2,11 @@
 
 #include "Component.h"
 
-class OrGate : public Component
+class NorGate : public Component
 {
 public:
-    OrGate()
-        : Component("OR")
+    NorGate()
+        : Component("NOR")
     {
         inputs.emplace_back("A", PinType::Input);
         inputs.emplace_back("B", PinType::Input);
@@ -18,11 +18,11 @@ public:
         if (inputs[0].value == LogicValue::Low &&
             inputs[1].value == LogicValue::Low)
         {
-            outputs[0].value = LogicValue::Low;
+            outputs[0].value = LogicValue::High;
         }
         else
         {
-            outputs[0].value = LogicValue::High;
+            outputs[0].value = LogicValue::Low;
         }
     }
 };

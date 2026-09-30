@@ -19,11 +19,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="wx_demo\Canvas.cpp" />
     <ClCompile Include="wx_demo\logic_test.cpp" />
     <ClCompile Include="wx_demo\main.cpp" />
     <ClCompile Include="wx_demo\MainFrame.cpp" />
     <ClCompile Include="wx_demo\MenuBar.cpp" />
     <ClCompile Include="wx_demo\MyApp.cpp" />
+    <ClCompile Include="wx_demo\SelectionState.cpp" />
     <ClCompile Include="wx_demo\ToolBar.cpp" />
     <ClCompile Include="wx_demo\Toolbox.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
@@ -33,14 +35,22 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="NandGate.h" />
+    <ClInclude Include="wx_demo\AndGate.h" />
+    <ClInclude Include="wx_demo\Canvas.h" />
     <ClInclude Include="wx_demo\Component.h" />
     <ClInclude Include="wx_demo\LogicValue.h" />
     <ClInclude Include="wx_demo\MainFrame.h" />
     <ClInclude Include="wx_demo\MenuBar.h" />
     <ClInclude Include="wx_demo\MyApp.h" />
+    <ClInclude Include="wx_demo\NorGate.h" />
+    <ClInclude Include="wx_demo\NotGate.h" />
+    <ClInclude Include="wx_demo\OrGate.h" />
     <ClInclude Include="wx_demo\Pin.h" />
+    <ClInclude Include="wx_demo\SelectionState.h" />
     <ClInclude Include="wx_demo\ToolBar.h" />
     <ClInclude Include="wx_demo\Toolbox.h" />
+    <ClInclude Include="XorGate.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="x64\Debug\res\and.png" />

@@ -2,11 +2,11 @@
 
 #include "Component.h"
 
-class OrGate : public Component
+class NandGate : public Component
 {
 public:
-    OrGate()
-        : Component("OR")
+    NandGate()
+        : Component("NAND")
     {
         inputs.emplace_back("A", PinType::Input);
         inputs.emplace_back("B", PinType::Input);
@@ -15,8 +15,8 @@ public:
 
     void Evaluate() override
     {
-        if (inputs[0].value == LogicValue::Low &&
-            inputs[1].value == LogicValue::Low)
+        if (inputs[0].value == LogicValue::High &&
+            inputs[1].value == LogicValue::High)
         {
             outputs[0].value = LogicValue::Low;
         }

@@ -4,15 +4,22 @@
 #include <wx/treectrl.h>
 #include <wx/imaglist.h>
 
-class Toolbox : public wxPanel//Toolbox是自定义的类，拥有wxPanel所有功能
+class Toolbox : public wxPanel
 {
 public:
-    Toolbox(wxWindow* parent);//构造函数
-private:
-    wxTreeCtrl* m_treeCtrl;// 树状图控件
-    wxImageList* m_imageList;// 图标列表
+    Toolbox(wxWindow* parent);
 
-    // 所有图标的索引（在 LoadIcons 里赋值，在 BuildTree 里使用）
+    // 获取当前选中的元件类型（"AND" / "OR" / "NOT"，空表示未选中）
+    wxString GetSelectedType() const { return m_selectedType; }
+
+private:
+    wxTreeCtrl* m_treeCtrl;
+    wxImageList* m_imageList;
+
+    // 当前选中的元件类型
+    wxString m_selectedType;
+
+    // 图标索引
     int m_imgFolder;
     int m_imgAdder;
     int m_imgAnd;
@@ -42,7 +49,7 @@ private:
     int m_imgWire;
     int m_imgXor;
 
-    void LoadIcons();// 加载所有图标
-
-    void BuildTree();// 构建树结构
+    void LoadIcons();
+    void BuildTree();
+    void OnTreeSelect(wxTreeEvent& event);
 };

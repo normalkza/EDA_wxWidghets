@@ -1,8 +1,9 @@
 #include "Toolbox.h"
+#include "SelectionState.h"
+
 #include <wx/stdpaths.h>
 #include <wx/filename.h>
 
-// 获取 exe 所在目录下的 res 文件夹里的文件路径
 namespace
 {
     wxString ResPath(const wxString& file)
@@ -14,15 +15,14 @@ namespace
     }
 }
 
-Toolbox::Toolbox(wxWindow* parent)//构造函数
-    : wxPanel(parent, wxID_ANY)//成员初始化列表
+Toolbox::Toolbox(wxWindow* parent)
+    : wxPanel(parent, wxID_ANY)
 {
-    this->SetBackgroundColour(wxColour(240, 240, 240));//设置背景色
+    this->SetBackgroundColour(wxColour(240, 240, 240));
 
-    m_imageList = new wxImageList(16, 16, true);//创建图标列表
-    LoadIcons();//加载所有图标
+    m_imageList = new wxImageList(16, 16, true);
+    LoadIcons();
 
-    // 创建树状图控件
     m_treeCtrl = new wxTreeCtrl(
         this,
         wxID_ANY,
@@ -31,18 +31,35 @@ Toolbox::Toolbox(wxWindow* parent)//构造函数
         wxTR_DEFAULT_STYLE | wxTR_HAS_BUTTONS
     );
 
-    m_treeCtrl->AssignImageList(m_imageList);// 绑定图标列表
+    m_treeCtrl->AssignImageList(m_imageList);
+    BuildTree();
 
-    BuildTree();// 构建树结构
+    // 绑定树节点选中事件
+    m_treeCtrl->Bind(wxEVT_TREE_SEL_CHANGED, &Toolbox::OnTreeSelect, this);
 
-    // 内部布局：树状图填满整个面板
-    wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);//创建垂直布局管理器
-    sizer->Add(m_treeCtrl, 1, wxEXPAND | wxALL, 2);//把树状图加入布局
-    this->SetSizer(sizer);//把布局应用到 Toolbox 面板
+    wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+    sizer->Add(m_treeCtrl, 1, wxEXPAND | wxALL, 2);
+    this->SetSizer(sizer);
 }
 
+// 点击树节点：只记录选中的元件类型
+void Toolbox::OnTreeSelect(wxTreeEvent& event)
+{
+    wxTreeItemId item = event.GetItem();
+    if (!item.IsOk()) return;
 
-// 加载所有图标到 m_imageList
+    if (m_treeCtrl->ItemHasChildren(item)) return;
+
+    wxString text = m_treeCtrl->GetItemText(item);
+
+    if (text == wxT("与门"))        g_selectedType = "AND";
+    else if (text == wxT("或门"))   g_selectedType = "OR";
+    else if (text == wxT("非门"))   g_selectedType = "NOT";
+    else if (text == wxT("与非门")) g_selectedType = "NAND";
+    else if (text == wxT("或非门")) g_selectedType = "NOR";
+    else if (text == wxT("异或门")) g_selectedType = "XOR";
+    else                            g_selectedType = "";
+}
 void Toolbox::LoadIcons()
 {
     auto Load = [&](const wxString& name) -> int {
@@ -54,7 +71,6 @@ void Toolbox::LoadIcons()
         }
         return -1;
         };
-
 
     m_imgFolder = Load("folder");
     m_imgAdder = Load("adder");
@@ -86,7 +102,6 @@ void Toolbox::LoadIcons()
     m_imgXor = Load("xor");
 }
 
-// 构建树结构
 void Toolbox::BuildTree()
 {
     wxTreeItemId rootId = m_treeCtrl->AddRoot(wxT("电路元件"));
@@ -138,6 +153,4 @@ void Toolbox::BuildTree()
     m_treeCtrl->AppendItem(baseId, wxT("选择工具"), m_imgSelect, m_imgSelect);
     m_treeCtrl->AppendItem(baseId, wxT("文本工具"), m_imgText, m_imgText);
     m_treeCtrl->AppendItem(baseId, wxT("删除工具"), m_imgDelete, m_imgDelete);
-
-
 }

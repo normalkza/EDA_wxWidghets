@@ -6,7 +6,7 @@ class NotGate : public Component
 {
 public:
     NotGate()
-        : Component("Not")
+        : Component("NOT")
     {
         inputs.emplace_back("IN", PinType::Input);
         outputs.emplace_back("OUT", PinType::Output);

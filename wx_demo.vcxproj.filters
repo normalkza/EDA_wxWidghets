@@ -33,6 +33,15 @@
     <ClCompile Include="wx_demo\main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="wx_demo\Toolbox.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\Canvas.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\SelectionState.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wx_demo\MainFrame.h">
@@ -54,6 +63,33 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="wx_demo\Pin.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\Toolbox.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\Canvas.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\NotGate.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\OrGate.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\AndGate.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="NandGate.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="XorGate.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\NorGate.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\SelectionState.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
