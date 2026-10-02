@@ -25,10 +25,29 @@ Canvas::Canvas(wxWindow* parent)
     SetBackgroundStyle(wxBG_STYLE_PAINT);
 
     Bind(wxEVT_LEFT_DOWN, &Canvas::OnLeftDown, this);
+    Bind(wxEVT_LEFT_UP, &Canvas::OnLeftUp, this);
+    Bind(wxEVT_MOTION, &Canvas::OnMouseMove, this);
 }
 
 void Canvas::OnLeftDown(wxMouseEvent& event)
 {
+    const wxPoint mouse = event.GetPosition();
+    const int hit = HitTest(mouse.x, mouse.y);
+
+    if (hit >= 0)
+    {
+        m_selectedIndex = hit;
+        m_dragging = true;
+        m_dragOffset = mouse - wxPoint(m_components[hit].x, m_components[hit].y);
+        if (m_selectionCallback)
+            m_selectionCallback(m_components[hit].comp, m_components[hit].x, m_components[hit].y);
+        CaptureMouse();
+        Refresh();
+        return;
+    }
+
+    m_selectedIndex = -1;
+    if (m_selectionCallback) m_selectionCallback(nullptr, 0, 0);
     wxString type = g_selectedType;
     if (type.IsEmpty()) return;
 
@@ -48,6 +67,53 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
         m_components.push_back({ comp, x, y });
         Refresh();
     }
+}
+
+void Canvas::OnLeftUp(wxMouseEvent& event)
+{
+    if (m_dragging)
+    {
+        m_dragging = false;
+        if (HasCapture()) ReleaseMouse();
+        Refresh();
+    }
+    event.Skip();
+}
+
+void Canvas::OnMouseMove(wxMouseEvent& event)
+{
+    if (!m_dragging || m_selectedIndex < 0 || !event.LeftIsDown())
+    {
+        event.Skip();
+        return;
+    }
+
+    const wxPoint mouse = event.GetPosition();
+    auto& pc = m_components[m_selectedIndex];
+    pc.x = SnapToGrid(mouse.x - m_dragOffset.x);
+    pc.y = SnapToGrid(mouse.y - m_dragOffset.y);
+    if (m_selectionCallback) m_selectionCallback(pc.comp, pc.x, pc.y);
+    Refresh();
+}
+
+int Canvas::HitTest(int x, int y) const
+{
+    for (int i = static_cast<int>(m_components.size()) - 1; i >= 0; --i)
+    {
+        if (GetComponentRect(m_components[i]).Contains(x, y))
+            return i;
+    }
+    return -1;
+}
+
+wxRect Canvas::GetComponentRect(const PlacedComponent& pc) const
+{
+    if (!pc.comp) return wxRect();
+
+    // 包围盒覆盖当前已实现的六种门电路，并留出拖拽余量。
+    const int width = (pc.comp->name == "NOT") ? 50 :
+        ((pc.comp->name == "AND" || pc.comp->name == "NAND") ? 75 : 95);
+    return wxRect(pc.x - 5, pc.y - 5, width, 70);
 }
 
 void Canvas::OnPaint(wxPaintEvent& event)
@@ -75,6 +141,13 @@ void Canvas::OnPaint(wxPaintEvent& event)
         else if (pc.comp->name == "NOR")  DrawNorGate(dc, pc.x, pc.y);
         else if (pc.comp->name == "XOR")  DrawXorGate(dc, pc.x, pc.y);
 
+    }
+
+    if (m_selectedIndex >= 0 && m_selectedIndex < static_cast<int>(m_components.size()))
+    {
+        dc.SetPen(wxPen(wxColour(30, 120, 220), 2, wxPENSTYLE_DOT));
+        dc.SetBrush(*wxTRANSPARENT_BRUSH);
+        dc.DrawRectangle(GetComponentRect(m_components[m_selectedIndex]));
     }
 }
 
@@ -146,7 +219,7 @@ void Canvas::DrawOrGate(wxDC& dc, int x, int y)
     }
     dc.DrawLines(N + 1, left);
 
-     wxPoint upper[N + 1];
+    wxPoint upper[N + 1];
     double x0 = x + 6, y0 = y;
     double x1 = x + w * 0.65, y1 = y + 1;
     double x2 = x + w, y2 = midY;
@@ -161,7 +234,7 @@ void Canvas::DrawOrGate(wxDC& dc, int x, int y)
     }
     dc.DrawLines(N + 1, upper);
 
-   
+
     wxPoint lower[N + 1];
     double y3 = y + h;
     double y4 = y + h - 1;

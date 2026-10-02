@@ -42,6 +42,9 @@
     <ClCompile Include="wx_demo\SelectionState.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="wx_demo\PropertyPanel.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wx_demo\MainFrame.h">
@@ -90,6 +93,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="wx_demo\SelectionState.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\PropertyPanel.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

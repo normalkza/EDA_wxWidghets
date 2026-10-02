@@ -25,6 +25,7 @@
     <ClCompile Include="wx_demo\MainFrame.cpp" />
     <ClCompile Include="wx_demo\MenuBar.cpp" />
     <ClCompile Include="wx_demo\MyApp.cpp" />
+    <ClCompile Include="wx_demo\PropertyPanel.cpp" />
     <ClCompile Include="wx_demo\SelectionState.cpp" />
     <ClCompile Include="wx_demo\ToolBar.cpp" />
     <ClCompile Include="wx_demo\Toolbox.cpp">
@@ -47,6 +48,7 @@
     <ClInclude Include="wx_demo\NotGate.h" />
     <ClInclude Include="wx_demo\OrGate.h" />
     <ClInclude Include="wx_demo\Pin.h" />
+    <ClInclude Include="wx_demo\PropertyPanel.h" />
     <ClInclude Include="wx_demo\SelectionState.h" />
     <ClInclude Include="wx_demo\ToolBar.h" />
     <ClInclude Include="wx_demo\Toolbox.h" />

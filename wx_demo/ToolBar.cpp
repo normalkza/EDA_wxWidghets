@@ -30,7 +30,7 @@ namespace
 }
 
 // 创建主工具栏
-wxToolBar* CreateMainToolBar(wxFrame* frame)
+wxToolBar* CreateMainToolBar(wxFrame* frame, std::function<void(const wxString&)> selectionCallback)
 {
     wxToolBar* toolBar = new wxToolBar(frame, wxID_ANY);
     toolBar->SetToolBitmapSize(wxSize(24, 24));
@@ -57,7 +57,7 @@ wxToolBar* CreateMainToolBar(wxFrame* frame)
     toolBar->Realize();
 
     // 绑定工具按钮点击事件
-    frame->Bind(wxEVT_TOOL, [](wxCommandEvent& e) {
+    frame->Bind(wxEVT_TOOL, [selectionCallback](wxCommandEvent& e) {
         switch (e.GetId()) {
         case ID_TB_SELECT: g_selectedType = "";       break;
         case ID_TB_WIRE:   g_selectedType = "WIRE";   break;
@@ -68,6 +68,7 @@ wxToolBar* CreateMainToolBar(wxFrame* frame)
         case ID_TB_OR:     g_selectedType = "OR";     break;
         case ID_TB_NOT:    g_selectedType = "NOT";    break;
         }
+        if (selectionCallback) selectionCallback(g_selectedType);
         });
 
     return toolBar;

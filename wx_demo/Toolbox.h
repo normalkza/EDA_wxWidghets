@@ -3,6 +3,7 @@
 #include <wx/wx.h>
 #include <wx/treectrl.h>
 #include <wx/imaglist.h>
+#include <functional>
 
 class Toolbox : public wxPanel
 {
@@ -11,6 +12,7 @@ public:
 
     // 获取当前选中的元件类型（"AND" / "OR" / "NOT"，空表示未选中）
     wxString GetSelectedType() const { return m_selectedType; }
+    void SetSelectionCallback(std::function<void(const wxString&)> cb) { m_selectionCallback = std::move(cb); }
 
 private:
     wxTreeCtrl* m_treeCtrl;
@@ -18,6 +20,7 @@ private:
 
     // 当前选中的元件类型
     wxString m_selectedType;
+    std::function<void(const wxString&)> m_selectionCallback;
 
     // 图标索引
     int m_imgFolder;

@@ -52,13 +52,36 @@ void Toolbox::OnTreeSelect(wxTreeEvent& event)
 
     wxString text = m_treeCtrl->GetItemText(item);
 
-    if (text == wxT("与门"))        g_selectedType = "AND";
+    if (text == wxT("输入引脚"))    g_selectedType = "INPUT";
+    else if (text == wxT("输出引脚")) g_selectedType = "OUTPUT";
+    else if (text == wxT("引脚"))    g_selectedType = "INPUT";
+    else if (text == wxT("导线"))   g_selectedType = "WIRE";
+    else if (text == wxT("分线器")) g_selectedType = "SPLITTER";
+    else if (text == wxT("探针"))   g_selectedType = "PROBE";
+    else if (text == wxT("时钟"))   g_selectedType = "CLOCK";
+    else if (text == wxT("常量"))   g_selectedType = "CONSTANT";
+    else if (text == wxT("数据选择器")) g_selectedType = "MUX";
+    else if (text == wxT("解复用器"))   g_selectedType = "DEMUX";
+    else if (text == wxT("加法器"))     g_selectedType = "ADDER";
+    else if (text == wxT("减法器"))     g_selectedType = "SUBTRACTOR";
+    else if (text == wxT("比较器"))     g_selectedType = "COMPARATOR";
+    else if (text == wxT("D触发器"))    g_selectedType = "DFF";
+    else if (text == wxT("寄存器"))     g_selectedType = "REGISTER";
+    else if (text == wxT("计数器"))     g_selectedType = "COUNTER";
+    else if (text == wxT("按钮"))       g_selectedType = "BUTTON";
+    else if (text == wxT("发光二极管")) g_selectedType = "LED";
+    else if (text == wxT("选择工具"))   g_selectedType = "";
+    else if (text == wxT("文本工具"))   g_selectedType = "TEXT";
+    else if (text == wxT("删除工具"))   g_selectedType = "DELETE";
+    else if (text == wxT("与门"))   g_selectedType = "AND";
     else if (text == wxT("或门"))   g_selectedType = "OR";
     else if (text == wxT("非门"))   g_selectedType = "NOT";
     else if (text == wxT("与非门")) g_selectedType = "NAND";
     else if (text == wxT("或非门")) g_selectedType = "NOR";
     else if (text == wxT("异或门")) g_selectedType = "XOR";
     else                            g_selectedType = "";
+    m_selectedType = g_selectedType;
+    if (m_selectionCallback) m_selectionCallback(g_selectedType);
 }
 void Toolbox::LoadIcons()
 {

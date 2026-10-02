@@ -5,17 +5,25 @@
 #include <vector>
 
 #include "Component.h"
+#include <functional>
+#include <utility>
 
 
 class Canvas : public wxPanel
 {
 public:
     Canvas(wxWindow* parent);
+    void SetSelectionCallback(std::function<void(const Component*, int, int)> callback)
+    {
+        m_selectionCallback = std::move(callback);
+    }
 
 
 private:
     void OnPaint(wxPaintEvent& event);
     void OnLeftDown(wxMouseEvent& event);
+    void OnLeftUp(wxMouseEvent& event);
+    void OnMouseMove(wxMouseEvent& event);
 
     // 把坐标对齐到网格点
     int SnapToGrid(int value) const { return (value / m_gridSize) * m_gridSize; }
@@ -34,7 +42,13 @@ private:
         Component* comp;
         int x, y;
     };
+    int HitTest(int x, int y) const;
+    wxRect GetComponentRect(const PlacedComponent& pc) const;
     std::vector<PlacedComponent> m_components;
+    int m_selectedIndex = -1;
+    bool m_dragging = false;
+    wxPoint m_dragOffset;
+    std::function<void(const Component*, int, int)> m_selectionCallback;
 
 
     // 网格
