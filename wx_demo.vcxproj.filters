@@ -62,6 +62,9 @@
     <ClInclude Include="wx_demo\Component.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="wx_demo\IOComponent.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
     <ClInclude Include="wx_demo\LogicValue.h">
       <Filter>头文件</Filter>
     </ClInclude>

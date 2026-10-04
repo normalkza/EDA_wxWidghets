@@ -11,6 +11,7 @@
 #include "NandGate.h"
 #include "NorGate.h"
 #include "XorGate.h"
+#include "IOComponent.h"
 
 
 wxBEGIN_EVENT_TABLE(Canvas, wxPanel)
@@ -27,17 +28,35 @@ Canvas::Canvas(wxWindow* parent)
     Bind(wxEVT_LEFT_DOWN, &Canvas::OnLeftDown, this);
     Bind(wxEVT_LEFT_UP, &Canvas::OnLeftUp, this);
     Bind(wxEVT_MOTION, &Canvas::OnMouseMove, this);
+    Bind(wxEVT_MOUSE_CAPTURE_LOST, &Canvas::OnCaptureLost, this);
+    Bind(wxEVT_CHAR_HOOK, &Canvas::OnKeyDown, this);
+    Bind(wxEVT_RIGHT_DOWN, [this](wxMouseEvent&) { CancelMouseInteraction(); });
+    Bind(wxEVT_KILL_FOCUS, [this](wxFocusEvent& event) {
+        CancelMouseInteraction();
+        event.Skip();
+    });
 }
 
 void Canvas::OnLeftDown(wxMouseEvent& event)
 {
+    CancelMouseInteraction();
+    SetFocus();
+    // 连线模式预留给引脚操作，不触发切换或元件拖动。
+    if (g_selectedType == "WIRE") return;
+
     const wxPoint mouse = event.GetPosition();
     const int hit = HitTest(mouse.x, mouse.y);
 
     if (hit >= 0)
     {
         m_selectedIndex = hit;
-        m_dragging = true;
+        m_pressedIndex = hit;
+        m_pressPosition = mouse;
+        m_dragging = false;
+        const auto& pc = m_components[hit];
+        m_togglePending = pc.comp->name == "INPUT" &&
+            g_selectedType != "DELETE" && g_selectedType != "TEXT" &&
+            wxRect(pc.x, pc.y, 40, 40).Contains(mouse);
         m_dragOffset = mouse - wxPoint(m_components[hit].x, m_components[hit].y);
         if (m_selectionCallback)
             m_selectionCallback(m_components[hit].comp, m_components[hit].x, m_components[hit].y);
@@ -61,39 +80,93 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
     else if (type == "NAND") comp = new NandGate();
     else if (type == "NOR")  comp = new NorGate();
     else if (type == "XOR")  comp = new XorGate();
+    else if (type == "INPUT")  comp = new InputComponent();
+    else if (type == "OUTPUT") comp = new OutputComponent();
 
     if (comp)
     {
         m_components.push_back({ comp, x, y });
+        m_selectedIndex = static_cast<int>(m_components.size()) - 1;
+        if (m_selectionCallback) m_selectionCallback(comp, x, y);
         Refresh();
     }
 }
 
 void Canvas::OnLeftUp(wxMouseEvent& event)
 {
-    if (m_dragging)
+    if (m_pressedIndex >= 0 && m_pressedIndex < static_cast<int>(m_components.size()))
     {
-        m_dragging = false;
-        if (HasCapture()) ReleaseMouse();
-        Refresh();
+        auto& pc = m_components[m_pressedIndex];
+        const wxPoint mouse = event.GetPosition();
+        const wxPoint delta = mouse - m_pressPosition;
+        const bool releasedWithoutMoving = std::abs(delta.x) < m_dragThreshold &&
+            std::abs(delta.y) < m_dragThreshold;
+        if (m_togglePending && !m_dragging && releasedWithoutMoving &&
+            g_selectedType != "WIRE" && g_selectedType != "DELETE" &&
+            g_selectedType != "TEXT" &&
+            HitTest(mouse.x, mouse.y) == m_pressedIndex &&
+            wxRect(pc.x, pc.y, 40, 40).Contains(mouse))
+        {
+            auto& value = pc.comp->outputs[0].value;
+            value = value == LogicValue::Low ? LogicValue::High : LogicValue::Low;
+            if (m_selectionCallback) m_selectionCallback(pc.comp, pc.x, pc.y);
+        }
     }
+    CancelMouseInteraction();
     event.Skip();
 }
 
 void Canvas::OnMouseMove(wxMouseEvent& event)
 {
-    if (!m_dragging || m_selectedIndex < 0 || !event.LeftIsDown())
+    if (m_pressedIndex < 0 || m_pressedIndex >= static_cast<int>(m_components.size()))
     {
         event.Skip();
         return;
     }
 
+    if (!event.LeftIsDown())
+    {
+        CancelMouseInteraction();
+        event.Skip();
+        return;
+    }
+
     const wxPoint mouse = event.GetPosition();
-    auto& pc = m_components[m_selectedIndex];
+    const wxPoint delta = mouse - m_pressPosition;
+    if (!m_dragging)
+    {
+        if (std::abs(delta.x) < m_dragThreshold && std::abs(delta.y) < m_dragThreshold)
+            return;
+        m_dragging = true;
+        m_togglePending = false;
+    }
+    auto& pc = m_components[m_pressedIndex];
     pc.x = SnapToGrid(mouse.x - m_dragOffset.x);
     pc.y = SnapToGrid(mouse.y - m_dragOffset.y);
     if (m_selectionCallback) m_selectionCallback(pc.comp, pc.x, pc.y);
     Refresh();
+}
+
+void Canvas::CancelMouseInteraction()
+{
+    m_pressedIndex = -1;
+    m_dragging = false;
+    m_togglePending = false;
+    if (HasCapture()) ReleaseMouse();
+    Refresh();
+}
+
+void Canvas::OnCaptureLost(wxMouseCaptureLostEvent&)
+{
+    CancelMouseInteraction();
+}
+
+void Canvas::OnKeyDown(wxKeyEvent& event)
+{
+    if (event.GetKeyCode() == WXK_ESCAPE)
+        CancelMouseInteraction();
+    else
+        event.Skip();
 }
 
 int Canvas::HitTest(int x, int y) const
@@ -109,6 +182,10 @@ int Canvas::HitTest(int x, int y) const
 wxRect Canvas::GetComponentRect(const PlacedComponent& pc) const
 {
     if (!pc.comp) return wxRect();
+
+    // 输入/输出的本体及引线占 60 x 40，四周留出 5 像素命中余量。
+    if (pc.comp->name == "INPUT" || pc.comp->name == "OUTPUT")
+        return wxRect(pc.x - 5, pc.y - 5, 70, 50);
 
     // 包围盒覆盖当前已实现的六种门电路，并留出拖拽余量。
     const int width = (pc.comp->name == "NOT") ? 50 :
@@ -140,6 +217,10 @@ void Canvas::OnPaint(wxPaintEvent& event)
         else if (pc.comp->name == "NAND") DrawNandGate(dc, pc.x, pc.y);
         else if (pc.comp->name == "NOR")  DrawNorGate(dc, pc.x, pc.y);
         else if (pc.comp->name == "XOR")  DrawXorGate(dc, pc.x, pc.y);
+        else if (pc.comp->name == "INPUT")
+            DrawInput(dc, pc.x, pc.y, pc.comp->outputs[0].value);
+        else if (pc.comp->name == "OUTPUT")
+            DrawOutput(dc, pc.x, pc.y, pc.comp->inputs[0].value);
 
     }
 
@@ -151,6 +232,30 @@ void Canvas::OnPaint(wxPaintEvent& event)
     }
 }
 
+
+// 输入：方框 + 右侧输出引线，连接端落在 (x + 60, y + 20)。
+void Canvas::DrawInput(wxDC& dc, int x, int y, LogicValue value)
+{
+    dc.SetPen(wxPen(*wxBLACK, 2));
+    dc.SetBrush(*wxWHITE_BRUSH);
+    dc.SetTextForeground(*wxBLACK);
+    dc.DrawRectangle(x, y, 40, 40);
+    dc.DrawLine(x + 40, y + 20, x + 60, y + 20);
+    dc.DrawLabel(value == LogicValue::High ? wxT("1") : wxT("0"),
+        wxRect(x, y, 40, 40), wxALIGN_CENTER);
+}
+
+// 输出：圆框 + 左侧输入引线，连接端落在 (x, y + 20)。
+void Canvas::DrawOutput(wxDC& dc, int x, int y, LogicValue value)
+{
+    dc.SetPen(wxPen(*wxBLACK, 2));
+    dc.SetBrush(*wxWHITE_BRUSH);
+    dc.SetTextForeground(*wxBLACK);
+    dc.DrawCircle(x + 40, y + 20, 20);
+    dc.DrawLine(x, y + 20, x + 20, y + 20);
+    dc.DrawLabel(value == LogicValue::High ? wxT("1") : wxT("0"),
+        wxRect(x + 20, y, 40, 40), wxALIGN_CENTER);
+}
 
 // 非门 NOT：三角形 + 输出端小圆
 void Canvas::DrawNotGate(wxDC& dc, int x, int y)

@@ -1,19 +1,166 @@
 #include "PropertyPanel.h"
-#ifdef _MSC_VER
-#pragma execution_character_set("utf-8")
-#endif
-PropertyPanel::PropertyPanel(wxWindow* p) :wxPanel(p, wxID_ANY) { SetBackgroundColour(wxColour(245, 245, 245));auto* r = new wxBoxSizer(wxVERTICAL);m_title = new wxStaticText(this, wxID_ANY, wxT("属性"), wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL);m_title->SetFont(wxFontInfo(11).Bold());r->Add(m_title, 0, wxEXPAND | wxALL, 5);m_grid = new wxFlexGridSizer(2, 0, 0);m_grid->AddGrowableCol(1, 1);r->Add(m_grid, 1, wxEXPAND | wxLEFT | wxRIGHT, 4);SetSizer(r);Clear(); }
-void PropertyPanel::SetRows(const wxString& t, const std::vector<std::pair<wxString, wxString>>& rows) { m_title->SetLabel(t);m_grid->Clear(true);for (const auto& x : rows) { m_grid->Add(new wxStaticText(this, wxID_ANY, x.first), 0, wxALL, 4);m_grid->Add(new wxStaticText(this, wxID_ANY, x.second), 1, wxEXPAND | wxALL, 4); }Layout(); }
-void PropertyPanel::ShowTool(const wxString& t) { if (t == wxT("BUTTON"))SetRows(wxT("按钮 (Button)"), { {wxT("方向"),wxT("右")},{wxT("颜色"),wxT("#ffffff")},{wxT("标签"),wxT("")},{wxT("标签位置"),wxT("中心")},{wxT("标签字体"),wxT("SansSerif 常规 12")},{wxT("标签颜色"),wxT("#000000")} });else if (t == wxT("LED"))SetRows(wxT("发光二极管 (LED)"), { {wxT("方向"),wxT("左")},{wxT("开启时颜色"),wxT("#f00000")},{wxT("关闭时颜色"),wxT("#404040")},{wxT("高电平激活"),wxT("是")},{wxT("标签"),wxT("")},{wxT("标签位置"),wxT("中心")},{wxT("标签字体"),wxT("SansSerif 常规 12")},{wxT("标签颜色"),wxT("#000000")} });else if (t == wxT("DFF"))SetRows(wxT("D触发器 (D Flip-Flop)"), { {wxT("触发方式"),wxT("上升沿")},{wxT("标签"),wxT("")},{wxT("标签字体"),wxT("SansSerif 常规 12")} });else if (t == wxT("REGISTER"))SetRows(wxT("寄存器 (Register)"), { {wxT("数据位宽"),wxT("8")},{wxT("触发方式"),wxT("上升沿")},{wxT("标签"),wxT("")},{wxT("标签字体"),wxT("SansSerif 常规 12")} });else if (t == wxT("COUNTER"))SetRows(wxT("计数器 (Counter)"), { {wxT("数据位宽"),wxT("8")},{wxT("最大值"),wxT("0xff")},{wxT("溢出时操作"),wxT("重新计数")},{wxT("触发方式"),wxT("上升沿")},{wxT("标签"),wxT("")},{wxT("标签字体"),wxT("SansSerif 常规 12")} });else if (t == wxT("ADDER") || t == wxT("SUBTRACTOR")) { SetRows(t == wxT("ADDER") ? wxT("加法器 (Adder)") : wxT("减法器 (Subtractor)"), { {wxT("数据位宽"),wxT("8")} }); } else if (t == wxT("COMPARATOR")) { SetRows(wxT("比较器 (Comparator)"), { {wxT("数据位宽"),wxT("8")},{wxT("数字类型"),wxT("关于2的补码")} }); } else if (t == wxT("MUX") || t == wxT("DEMUX")) { bool d = t == wxT("DEMUX");SetRows(d ? wxT("选中：解复用器 (Demultiplexer)") : wxT("数据选择器 (Multiplexer)"), { {wxT("方向"),wxT("右")},{wxT("选择端位置"),wxT("底部/左侧")},{wxT("选择数据长度"),wxT("1")},{wxT("数据位宽"),wxT("1")},{wxT("三态"),d ? wxT("否") : wxT("")},{wxT("禁用时的输出"),wxT("未定义")},{wxT("包括使能端"),wxT("是")} }); } else if (t == wxT("WIRE"))SetRows(wxT("导线 (Wire)"), { {wxT("方向"),wxT("自动")},{wxT("数据位宽"),wxT("1")},{wxT("颜色"),wxT("黑色")} });else if (t == wxT("SPLITTER"))SetRows(wxT("分线器 (Splitter)"), { {wxT("输入数量"),wxT("1")},{wxT("输出数量"),wxT("2")},{wxT("数据位宽"),wxT("1")} });else if (t == wxT("PROBE"))SetRows(wxT("探针 (Probe)"), { {wxT("显示格式"),wxT("0/1")},{wxT("字体"),wxT("SansSerif 常规 12")} });else if (t == wxT("CLOCK"))SetRows(wxT("选中：时钟 (Clock)"), { {wxT("方向"),wxT("右")},{wxT("高电平时长"),wxT("1 时钟")},{wxT("低电平时长"),wxT("1 时钟")},{wxT("标签"),wxT("")},{wxT("标签位置"),wxT("左")},{wxT("标签字体"),wxT("SansSerif 常规 12")} });else if (t == wxT("CONSTANT"))SetRows(wxT("常量 (Constant)"), { {wxT("数值"),wxT("0")},{wxT("数据位宽"),wxT("1")} });else if (t == wxT("TEXT"))SetRows(wxT("文本工具"), { {wxT("文本"),wxT("")},{wxT("字体"),wxT("SansSerif 常规 12")},{wxT("水平对齐（关于创建点）"),wxT("中心")},{wxT("竖直对齐（关于创建点）"),wxT("基线")} });else if (t == wxT("INPUT") || t == wxT("OUTPUT")) { bool o = t == wxT("OUTPUT");SetRows(wxT("引脚 (Pin)"), { {wxT("方向"),o ? wxT("左") : wxT("右")},{wxT("输出"),o ? wxT("是") : wxT("否")},{wxT("数据位宽"),wxT("1")},{wxT("三态"),o ? wxT("是") : wxT("否")},{wxT("未定义处理"),wxT("不变")},{wxT("标签"),wxT("")},{wxT("标签位置"),o ? wxT("右") : wxT("左")},{wxT("标签字体"),wxT("SansSerif 常规 12")} }); } else if (t == wxT("NOT"))SetRows(wxT("非门 (NOT Gate)"), { {wxT("方向"),wxT("右")},{wxT("数据位宽"),wxT("1")},{wxT("尺寸"),wxT("大")},{wxT("输出值"),wxT("0/1")},{wxT("标签"),wxT("")},{wxT("标签字体"),wxT("SansSerif 常规 12")} });else if (t == wxT("AND") || t == wxT("OR") || t == wxT("NAND") || t == wxT("NOR") || t == wxT("XOR")) { std::vector<std::pair<wxString, wxString>> r = { {wxT("方向"),wxT("右")},{wxT("数据位宽"),wxT("1")},{wxT("尺寸"),wxT("中")},{wxT("输入引脚数量"),wxT("5")},{wxT("输出值"),wxT("0/1")},{wxT("标签"),wxT("")},{wxT("标签字体"),wxT("SansSerif 常规 12")} }; if (t == wxT("XOR")) r.insert(r.begin() + 5, { wxT("多输入行为"),wxT("当一个输入为1时输出1") });for (int i = 1;i <= 5;i++) { wxString s = wxString::Format(wxT("反转%d"), i);if (i == 1)s += wxT("（顶端）");else if (i == 5)s += wxT("（底端）");r.push_back({ s,wxT("否") }); }wxString title = wxT("与门 (AND Gate)"); if (t == wxT("OR")) title = wxT("或门 (OR Gate)"); else if (t == wxT("NAND")) title = wxT("与非门 (NAND Gate)"); else if (t == wxT("NOR")) title = wxT("或非门 (NOR Gate)"); else if (t == wxT("XOR")) title = wxT("异或门 (XOR Gate)"); SetRows(title, r); } else Clear(); }
-void PropertyPanel::ShowComponent(const Component* c, int, int) { if (c)ShowTool(wxString::FromUTF8(c->name.c_str()));else Clear(); }void PropertyPanel::Clear() { m_title->SetLabel(wxT(""));m_grid->Clear(true);Layout(); }
 
+namespace
+{
+    wxString DisplayName(const wxString& type)
+    {
+        if (type == "INPUT") return wxT("输入 (INPUT)");
+        if (type == "OUTPUT") return wxT("输出 (OUTPUT)");
+        if (type == "AND") return wxT("与门 (AND)");
+        if (type == "OR") return wxT("或门 (OR)");
+        if (type == "NOT") return wxT("非门 (NOT)");
+        if (type == "NAND") return wxT("与非门 (NAND)");
+        if (type == "NOR") return wxT("或非门 (NOR)");
+        if (type == "XOR") return wxT("异或门 (XOR)");
+        if (type == "BUTTON") return wxT("按钮 (BUTTON)");
+        if (type == "LED") return wxT("发光二极管 (LED)");
+        if (type == "DFF") return wxT("D 触发器 (DFF)");
+        if (type == "REGISTER") return wxT("寄存器 (REGISTER)");
+        if (type == "COUNTER") return wxT("计数器 (COUNTER)");
+        if (type == "ADDER") return wxT("加法器 (ADDER)");
+        if (type == "SUBTRACTOR") return wxT("减法器 (SUBTRACTOR)");
+        if (type == "COMPARATOR") return wxT("比较器 (COMPARATOR)");
+        if (type == "MUX") return wxT("数据选择器 (MUX)");
+        if (type == "DEMUX") return wxT("解复用器 (DEMUX)");
+        if (type == "SPLITTER") return wxT("分线器 (SPLITTER)");
+        if (type == "PROBE") return wxT("探针 (PROBE)");
+        if (type == "CLOCK") return wxT("时钟 (CLOCK)");
+        if (type == "CONSTANT") return wxT("常量 (CONSTANT)");
+        return type;
+    }
+}
 
+PropertyPanel::PropertyPanel(wxWindow* parent)
+    : wxPanel(parent, wxID_ANY)
+{
+    SetBackgroundColour(wxColour(245, 245, 245));
+    auto* root = new wxBoxSizer(wxVERTICAL);
+    auto* heading = new wxStaticText(this, wxID_ANY, wxT("当前元件状态"));
+    heading->SetFont(wxFontInfo(11).Bold());
+    root->Add(heading, 0, wxEXPAND | wxALL, FromDIP(8));
+    m_title = new wxStaticText(this, wxID_ANY, wxEmptyString);
+    root->Add(m_title, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(8));
+    m_content = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition,
+        wxDefaultSize, wxHSCROLL | wxVSCROLL);
+    m_content->SetBackgroundColour(GetBackgroundColour());
+    m_content->SetScrollRate(FromDIP(8), FromDIP(8));
+    m_grid = new wxFlexGridSizer(2, FromDIP(4), FromDIP(8));
+    m_grid->AddGrowableCol(1, 1);
+    auto* contentSizer = new wxBoxSizer(wxVERTICAL);
+    contentSizer->Add(m_grid, 0, wxEXPAND | wxALL, FromDIP(8));
+    m_content->SetSizer(contentSizer);
+    root->Add(m_content, 1, wxEXPAND);
+    SetSizer(root);
+    Clear();
+}
 
+void PropertyPanel::SetRows(const wxString& title,
+    const std::vector<std::pair<wxString, wxString>>& rows)
+{
+    bool sameRows = title == m_title->GetLabel() && rows.size() == m_rowNames.size();
+    for (std::size_t i = 0; sameRows && i < rows.size(); ++i)
+        sameRows = rows[i].first == m_rowNames[i];
+    Freeze();
+    m_title->SetLabel(title);
+    if (!sameRows)
+    {
+        m_grid->Clear(true);
+        m_rowNames.clear();
+        m_valueLabels.clear();
+        for (const auto& row : rows)
+        {
+            auto* name = new wxStaticText(m_content, wxID_ANY, row.first);
+            auto* value = new wxStaticText(m_content, wxID_ANY, row.second);
+            m_grid->Add(name, 0, wxALIGN_TOP | wxTOP | wxBOTTOM, FromDIP(3));
+            m_grid->Add(value, 0, wxEXPAND | wxTOP | wxBOTTOM, FromDIP(3));
+            m_rowNames.push_back(row.first);
+            m_valueLabels.push_back(value);
+        }
+        m_content->Scroll(0, 0);
+    }
+    else
+    {
+        // 原位更新坐标和电平，保留滚动位置，避免拖动时反复销毁控件。
+        for (std::size_t i = 0; i < rows.size(); ++i)
+        {
+            if (m_valueLabels[i]->GetLabel() != rows[i].second)
+                m_valueLabels[i]->SetLabel(rows[i].second);
+        }
+    }
+    Layout();
+    m_content->Layout();
+    m_content->FitInside();
+    Thaw();
+}
 
+void PropertyPanel::ShowTool(const wxString& type)
+{
+    if (type.IsEmpty())
+    {
+        SetRows(wxT("选择工具"), {
+            {wxT("状态"), wxT("未选中元件")},
+            {wxT("操作"), wxT("点击画布中的元件")}
+        });
+        return;
+    }
+    if (type == "WIRE" || type == "TEXT" || type == "DELETE")
+    {
+        const wxString title = type == "WIRE" ? wxT("连线工具") :
+            (type == "TEXT" ? wxT("文本工具") : wxT("删除工具"));
+        SetRows(title, {{wxT("状态"), wxT("当前工具尚未实现")}});
+        return;
+    }
+    const bool gate = type == "AND" || type == "OR" || type == "NOT" ||
+        type == "NAND" || type == "NOR" || type == "XOR";
+    if (gate || type == "INPUT" || type == "OUTPUT")
+    {
+        const int inputs = type == "INPUT" ? 0 :
+            ((type == "OUTPUT" || type == "NOT") ? 1 : 2);
+        const int outputs = type == "OUTPUT" ? 0 : 1;
+        SetRows(DisplayName(type), {
+            {wxT("状态"), wxT("待放置")},
+            {wxT("输入引脚"), wxString::Format("%d", inputs)},
+            {wxT("输出引脚"), wxString::Format("%d", outputs)},
+            {wxT("数据位宽"), wxT("1")},
+            {wxT("操作"), wxT("点击画布空白处放置")}
+        });
+        return;
+    }
+    SetRows(DisplayName(type), {{wxT("状态"), wxT("此元件尚不能放置")}});
+}
 
+void PropertyPanel::ShowComponent(const Component* component, int x, int y)
+{
+    if (!component)
+    {
+        Clear();
+        return;
+    }
+    std::vector<std::pair<wxString, wxString>> rows = {
+        {wxT("状态"), wxT("已选中")},
+        {wxT("X 坐标"), wxString::Format("%d", x)},
+        {wxT("Y 坐标"), wxString::Format("%d", y)},
+        {wxT("输入引脚"), wxString::Format("%llu", static_cast<unsigned long long>(component->inputs.size()))},
+        {wxT("输出引脚"), wxString::Format("%llu", static_cast<unsigned long long>(component->outputs.size()))}
+    };
+    const wxString type = wxString::FromUTF8(component->name.c_str());
+    if (type == "INPUT" && !component->outputs.empty())
+        rows.push_back({wxT("当前值"), component->outputs[0].value == LogicValue::High ? wxT("1") : wxT("0")});
+    if (type == "OUTPUT" && !component->inputs.empty())
+        rows.push_back({wxT("当前值"), component->inputs[0].value == LogicValue::High ? wxT("1") : wxT("0")});
+    for (const auto& pin : component->inputs)
+        rows.push_back({wxT("输入 ") + wxString::FromUTF8(pin.name.c_str()),
+            pin.value == LogicValue::High ? wxT("1") : wxT("0")});
+    for (const auto& pin : component->outputs)
+        rows.push_back({wxT("输出 ") + wxString::FromUTF8(pin.name.c_str()),
+            pin.value == LogicValue::High ? wxT("1") : wxT("0")});
+    SetRows(DisplayName(type), rows);
+}
 
-
-
-
-
-
+void PropertyPanel::Clear()
+{
+    SetRows(wxT("未选中元件"), {
+        {wxT("状态"), wxT("等待选择")},
+        {wxT("操作"), wxT("选择工具或画布元件")}
+    });
+}

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <wx/wx.h>
+#include <wx/scrolwin.h>
 #include "Component.h"
 #include <vector>
 #include <utility>
@@ -16,5 +17,8 @@ public:
 private:
     wxFlexGridSizer* m_grid;
     wxStaticText* m_title;
+    wxScrolledWindow* m_content;
+    std::vector<wxString> m_rowNames;
+    std::vector<wxStaticText*> m_valueLabels;
     void SetRows(const wxString& title, const std::vector<std::pair<wxString, wxString>>& rows);
 };

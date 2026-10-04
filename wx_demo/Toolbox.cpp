@@ -48,7 +48,13 @@ void Toolbox::OnTreeSelect(wxTreeEvent& event)
     wxTreeItemId item = event.GetItem();
     if (!item.IsOk()) return;
 
-    if (m_treeCtrl->ItemHasChildren(item)) return;
+    if (m_treeCtrl->ItemHasChildren(item))
+    {
+        g_selectedType = "";
+        m_selectedType = "";
+        if (m_selectionCallback) m_selectionCallback(g_selectedType);
+        return;
+    }
 
     wxString text = m_treeCtrl->GetItemText(item);
 
