@@ -50,6 +50,24 @@ PropertyPanel::PropertyPanel(wxWindow* parent)
     contentSizer->Add(m_grid, 0, wxEXPAND | wxALL, FromDIP(8));
     m_content->SetSizer(contentSizer);
     root->Add(m_content, 1, wxEXPAND);
+    m_textSettings = new wxPanel(this);
+    auto* textSizer = new wxBoxSizer(wxHORIZONTAL);
+    textSizer->Add(new wxStaticText(m_textSettings, wxID_ANY, wxT("字号 (pt)")),
+        0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(8));
+    m_fontSize = new wxSpinCtrl(m_textSettings, wxID_ANY, wxEmptyString,
+        wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 6, 96, 14);
+    textSizer->Add(m_fontSize, 1, wxEXPAND);
+    m_textSettings->SetSizer(textSizer);
+    root->Add(m_textSettings, 0, wxEXPAND | wxALL, FromDIP(8));
+    m_fontSize->Bind(wxEVT_SPINCTRL, [this](wxSpinEvent&) {
+        if (m_textFontSizeCallback) m_textFontSizeCallback(m_fontSize->GetValue());
+    });
+    m_fontSize->Bind(wxEVT_TEXT, [this](wxCommandEvent& event) {
+        long value;
+        if (event.GetString().ToLong(&value) && value >= 6 && value <= 96 &&
+            m_textFontSizeCallback)
+            m_textFontSizeCallback(static_cast<int>(value));
+    });
     SetSizer(root);
     Clear();
 }
@@ -93,8 +111,20 @@ void PropertyPanel::SetRows(const wxString& title,
     Thaw();
 }
 
-void PropertyPanel::ShowTool(const wxString& type)
+void PropertyPanel::ShowTool(const wxString& type, int textPointSize)
 {
+    m_textSettings->Hide();
+    if (type == "TEXT")
+    {
+        ShowTextSettings(textPointSize);
+        SetRows(wxT("文本工具"), {
+            {wxT("状态"), wxT("等待绘制文本框")},
+            {wxT("操作"), wxT("按住鼠标拖出文本框")},
+            {wxT("外观"), wxT("透明背景，选中显示范围")},
+            {wxT("位置"), wxT("自由放置，不对齐网格")}
+        });
+        return;
+    }
     if (type.IsEmpty())
     {
         SetRows(wxT("选择工具"), {
@@ -103,10 +133,9 @@ void PropertyPanel::ShowTool(const wxString& type)
         });
         return;
     }
-    if (type == "WIRE" || type == "TEXT" || type == "DELETE")
+    if (type == "WIRE" || type == "DELETE")
     {
-        const wxString title = type == "WIRE" ? wxT("连线工具") :
-            (type == "TEXT" ? wxT("文本工具") : wxT("删除工具"));
+        const wxString title = type == "WIRE" ? wxT("连线工具") : wxT("删除工具");
         SetRows(title, {{wxT("状态"), wxT("当前工具尚未实现")}});
         return;
     }
@@ -131,6 +160,7 @@ void PropertyPanel::ShowTool(const wxString& type)
 
 void PropertyPanel::ShowComponent(const Component* component, int x, int y)
 {
+    m_textSettings->Hide();
     if (!component)
     {
         Clear();
@@ -159,8 +189,32 @@ void PropertyPanel::ShowComponent(const Component* component, int x, int y)
 
 void PropertyPanel::Clear()
 {
+    m_textSettings->Hide();
     SetRows(wxT("未选中元件"), {
         {wxT("状态"), wxT("等待选择")},
         {wxT("操作"), wxT("选择工具或画布元件")}
+    });
+}
+
+void PropertyPanel::ShowTextSettings(int pointSize)
+{
+    if (m_fontSize->GetValue() != pointSize) m_fontSize->SetValue(pointSize);
+    m_textSettings->Show();
+}
+
+void PropertyPanel::ShowTextBox(const wxRect& rect, int pointSize)
+{
+    ShowTextSettings(pointSize);
+    SetRows(wxT("文本框"), {
+        {wxT("状态"), wxT("已选中")},
+        {wxT("X 坐标"), wxString::Format("%d", rect.x)},
+        {wxT("Y 坐标"), wxString::Format("%d", rect.y)},
+        {wxT("宽度"), wxString::Format("%d", rect.width)},
+        {wxT("高度"), wxString::Format("%d", rect.height)},
+        {wxT("外观"), wxT("透明背景，选中显示范围")},
+        {wxT("移动"), wxT("拖动边框；选择工具可拖框内")},
+        {wxT("缩放"), wxT("拖动四角或边上的小方块")},
+        {wxT("编辑"), wxT("双击；文本工具可单击输入")},
+        {wxT("完成"), wxT("Ctrl+Enter 或点击框外")}
     });
 }

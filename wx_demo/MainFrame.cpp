@@ -31,12 +31,21 @@ MainFrame::MainFrame()
     workspace->Bind(wxEVT_SPLITTER_DOUBLECLICKED, [](wxSplitterEvent& event) { event.Veto(); });
     sidebar->Bind(wxEVT_SPLITTER_DOUBLECLICKED, [](wxSplitterEvent& event) { event.Veto(); });
 
-    auto showTool = [properties](const wxString& type) { properties->ShowTool(type); };
+    auto showTool = [properties, canvas](const wxString& type) {
+        canvas->OnToolChanged();
+        properties->ShowTool(type, canvas->GetTextFontSize());
+    };
     if (auto* toolbar = CreateMainToolBar(this, showTool)) SetToolBar(toolbar);
     toolbox->SetSelectionCallback(showTool);
-    canvas->SetSelectionCallback([properties](const Component* component, int x, int y) {
+    canvas->SetSelectionCallback([properties, canvas](const Component* component, int x, int y) {
         if (component) properties->ShowComponent(component, x, y);
-        else properties->ShowTool(g_selectedType);
+        else properties->ShowTool(g_selectedType, canvas->GetTextFontSize());
+    });
+    canvas->SetTextSelectionCallback([properties](const wxRect& rect, int pointSize) {
+        properties->ShowTextBox(rect, pointSize);
+    });
+    properties->SetTextFontSizeCallback([canvas](int pointSize) {
+        canvas->SetTextFontSize(pointSize);
     });
     auto* root = new wxBoxSizer(wxVERTICAL);
     root->Add(workspace, 1, wxEXPAND);
