@@ -1,5 +1,4 @@
 #include "PropertyPanel.h"
-#include <wx/dcbuffer.h>
 
 namespace
 {
@@ -39,16 +38,17 @@ PropertyPanel::PropertyPanel(wxWindow* parent)
     auto* heading = new wxStaticText(this, wxID_ANY, wxT("当前元件状态"));
     heading->SetFont(wxFontInfo(11).Bold());
     root->Add(heading, 0, wxEXPAND | wxALL, FromDIP(8));
+    m_title = new wxStaticText(this, wxID_ANY, wxEmptyString);
+    root->Add(m_title, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(8));
     m_content = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition,
         wxDefaultSize, wxHSCROLL | wxVSCROLL);
-    m_content->SetBackgroundColour(*wxWHITE);
-    m_content->SetBackgroundStyle(wxBG_STYLE_PAINT);
+    m_content->SetBackgroundColour(GetBackgroundColour());
     m_content->SetScrollRate(FromDIP(8), FromDIP(8));
-    m_content->Bind(wxEVT_PAINT, &PropertyPanel::PaintTable, this);
-    m_content->Bind(wxEVT_SIZE, [this](wxSizeEvent& event) {
-        UpdateTableSize();
-        event.Skip();
-    });
+    m_grid = new wxFlexGridSizer(2, FromDIP(4), FromDIP(8));
+    m_grid->AddGrowableCol(1, 1);
+    auto* contentSizer = new wxBoxSizer(wxVERTICAL);
+    contentSizer->Add(m_grid, 0, wxEXPAND | wxALL, FromDIP(8));
+    m_content->SetSizer(contentSizer);
     root->Add(m_content, 1, wxEXPAND);
     m_textSettings = new wxPanel(this);
     auto* textSizer = new wxBoxSizer(wxHORIZONTAL);
@@ -75,88 +75,40 @@ PropertyPanel::PropertyPanel(wxWindow* parent)
 void PropertyPanel::SetRows(const wxString& title,
     const std::vector<std::pair<wxString, wxString>>& rows)
 {
-    if (m_title == title && m_rows == rows)
-    {
-        Layout();
-        return;
-    }
-
-    bool sameRows = m_title == title && m_rows.size() == rows.size();
+    bool sameRows = title == m_title->GetLabel() && rows.size() == m_rowNames.size();
     for (std::size_t i = 0; sameRows && i < rows.size(); ++i)
-        sameRows = m_rows[i].first == rows[i].first;
-
-    m_title = title;
-    m_rows = rows;
-    if (!sameRows) m_content->Scroll(0, 0);
-    UpdateTableSize();
+        sameRows = rows[i].first == m_rowNames[i];
+    Freeze();
+    m_title->SetLabel(title);
+    if (!sameRows)
+    {
+        m_grid->Clear(true);
+        m_rowNames.clear();
+        m_valueLabels.clear();
+        for (const auto& row : rows)
+        {
+            auto* name = new wxStaticText(m_content, wxID_ANY, row.first);
+            auto* value = new wxStaticText(m_content, wxID_ANY, row.second);
+            m_grid->Add(name, 0, wxALIGN_TOP | wxTOP | wxBOTTOM, FromDIP(3));
+            m_grid->Add(value, 0, wxEXPAND | wxTOP | wxBOTTOM, FromDIP(3));
+            m_rowNames.push_back(row.first);
+            m_valueLabels.push_back(value);
+        }
+        m_content->Scroll(0, 0);
+    }
+    else
+    {
+        // 原位更新坐标和电平，保留滚动位置，避免拖动时反复销毁控件。
+        for (std::size_t i = 0; i < rows.size(); ++i)
+        {
+            if (m_valueLabels[i]->GetLabel() != rows[i].second)
+                m_valueLabels[i]->SetLabel(rows[i].second);
+        }
+    }
     Layout();
-}
-
-void PropertyPanel::UpdateTableSize()
-{
-    if (!m_content) return;
-    wxClientDC dc(m_content);
-    dc.SetFont(m_content->GetFont());
-    const int padding = FromDIP(6);
-    const int minimumColumn = FromDIP(120);
-    int nameWidth = minimumColumn;
-    int valueWidth = minimumColumn;
-    for (const auto& row : m_rows)
-    {
-        nameWidth = wxMax(nameWidth, dc.GetTextExtent(row.first).GetWidth() + 2 * padding);
-        valueWidth = wxMax(valueWidth, dc.GetTextExtent(row.second).GetWidth() + 2 * padding);
-    }
-    m_tableWidth = wxMax(m_content->GetClientSize().GetWidth(),
-        wxMax(nameWidth + valueWidth, 2 * nameWidth));
-    m_nameWidth = wxMax(nameWidth, wxMin(m_tableWidth / 2, m_tableWidth - valueWidth));
-    m_headerHeight = wxMax(FromDIP(28), dc.GetCharHeight() + 2 * padding);
-    m_rowHeight = wxMax(FromDIP(29), dc.GetCharHeight() + 2 * padding);
-    m_content->SetVirtualSize(m_tableWidth,
-        m_headerHeight + static_cast<int>(m_rows.size()) * m_rowHeight + 1);
-    m_content->Refresh();
-}
-
-void PropertyPanel::PaintTable(wxPaintEvent&)
-{
-    wxAutoBufferedPaintDC dc(m_content);
-    m_content->PrepareDC(dc);
-    dc.SetBackground(*wxWHITE_BRUSH);
-    dc.Clear();
-
-    const int bottom = m_headerHeight + static_cast<int>(m_rows.size()) * m_rowHeight;
-    dc.SetPen(wxPen(wxColour(145, 145, 145)));
-    dc.SetBrush(wxBrush(wxColour(238, 238, 238)));
-    dc.DrawRectangle(0, 0, m_tableWidth, m_headerHeight);
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    dc.DrawRectangle(0, m_headerHeight, m_tableWidth, bottom - m_headerHeight + 1);
-    dc.DrawLine(m_nameWidth, m_headerHeight, m_nameWidth, bottom);
-    for (std::size_t i = 1; i < m_rows.size(); ++i)
-    {
-        const int y = m_headerHeight + static_cast<int>(i) * m_rowHeight;
-        dc.DrawLine(0, y, m_tableWidth, y);
-    }
-
-    dc.SetFont(m_content->GetFont());
-    dc.SetTextForeground(*wxBLACK);
-    const wxSize titleSize = dc.GetTextExtent(m_title);
-    dc.DrawText(m_title, wxMax(FromDIP(6), (m_tableWidth - titleSize.GetWidth()) / 2),
-        (m_headerHeight - titleSize.GetHeight()) / 2);
-
-    const int padding = FromDIP(6);
-    for (std::size_t i = 0; i < m_rows.size(); ++i)
-    {
-        const int y = m_headerHeight + static_cast<int>(i) * m_rowHeight;
-        const auto& row = m_rows[i];
-        dc.SetClippingRegion(padding, y + 1, m_nameWidth - 2 * padding, m_rowHeight - 2);
-        dc.DrawText(row.first, padding,
-            y + (m_rowHeight - dc.GetTextExtent(row.first).GetHeight()) / 2);
-        dc.DestroyClippingRegion();
-        dc.SetClippingRegion(m_nameWidth + padding, y + 1,
-            m_tableWidth - m_nameWidth - 2 * padding, m_rowHeight - 2);
-        dc.DrawText(row.second, m_nameWidth + padding,
-            y + (m_rowHeight - dc.GetTextExtent(row.second).GetHeight()) / 2);
-        dc.DestroyClippingRegion();
-    }
+    m_content->Layout();
+    m_content->FitInside();
+    Thaw();
 }
 
 void PropertyPanel::ShowTool(const wxString& type, int textPointSize)
