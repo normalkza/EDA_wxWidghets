@@ -20,6 +20,12 @@ MainFrame::MainFrame()
     auto* toolbox = new Toolbox(sidebar);
     auto* properties = new PropertyPanel(sidebar);
     auto* canvas = new Canvas(workspace);
+    for (const int command : {wxID_CUT, wxID_COPY, wxID_PASTE, wxID_DELETE})
+    {
+        Bind(wxEVT_MENU, [canvas](wxCommandEvent& event) {
+            canvas->HandleEditCommand(event.GetId());
+        }, command);
+    }
 
     // 左栏加宽，状态区不再按全部内容高度挤压树状列表。
     workspace->SetMinimumPaneSize(FromDIP(220));

@@ -17,7 +17,10 @@ wxMenuBar* CreateMainMenuBar()
     wxMenu* editMenu = new wxMenu();
     editMenu->Append(wxID_UNDO, wxT("撤销"));
     editMenu->AppendSeparator();
-    editMenu->Append(wxID_DELETE, wxT("删除"));   
+    editMenu->Append(wxID_CUT, wxT("剪切\tCtrl+X"));
+    editMenu->Append(wxID_COPY, wxT("复制\tCtrl+C"));
+    editMenu->Append(wxID_PASTE, wxT("粘贴\tCtrl+V"));
+    editMenu->Append(wxID_DELETE, wxT("删除"));
     menuBar->Append(editMenu, wxT("编辑"));
 
     wxMenu* drawMenu = new wxMenu();

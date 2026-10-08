@@ -133,10 +133,18 @@ void PropertyPanel::ShowTool(const wxString& type, int textPointSize)
         });
         return;
     }
-    if (type == "WIRE" || type == "DELETE")
+    if (type == "DELETE")
     {
-        const wxString title = type == "WIRE" ? wxT("连线工具") : wxT("删除工具");
-        SetRows(title, {{wxT("状态"), wxT("当前工具尚未实现")}});
+        SetRows(wxT("删除工具"), {
+            {wxT("状态"), wxT("等待删除")},
+            {wxT("操作"), wxT("点击元件或文本框删除")},
+            {wxT("模式"), wxT("可连续删除，选择工具可退出")}
+        });
+        return;
+    }
+    if (type == "WIRE")
+    {
+        SetRows(wxT("连线工具"), {{wxT("状态"), wxT("当前工具尚未实现")}});
         return;
     }
     const bool gate = type == "AND" || type == "OR" || type == "NOT" ||

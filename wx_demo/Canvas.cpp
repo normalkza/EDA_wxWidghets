@@ -4,6 +4,11 @@
 #include <wx/dcbuffer.h>
 #include <cmath>
 #include <algorithm>
+#include <wx/clipbrd.h>
+#include <wx/dataobj.h>
+#include <sstream>
+#include <iomanip>
+#include <memory>
 #ifdef __WXMSW__
 #include <wx/msw/wrapwin.h>
 #include <imm.h>
@@ -19,14 +24,35 @@
 #include "XorGate.h"
 #include "IOComponent.h"
 
+namespace
+{
+    Component* CreateComponent(const wxString& type)
+    {
+        if (type == "AND") return new AndGate();
+        if (type == "OR") return new OrGate();
+        if (type == "NOT") return new NotGate();
+        if (type == "NAND") return new NandGate();
+        if (type == "NOR") return new NorGate();
+        if (type == "XOR") return new XorGate();
+        if (type == "INPUT") return new InputComponent();
+        if (type == "OUTPUT") return new OutputComponent();
+        return nullptr;
+    }
+
+    wxDataFormat CanvasClipboardFormat()
+    {
+        return wxDataFormat("wx_demo.canvas.object.v1");
+    }
+}
 
 wxBEGIN_EVENT_TABLE(Canvas, wxPanel)
 EVT_PAINT(Canvas::OnPaint)
 wxEND_EVENT_TABLE()
 
-Canvas::Canvas(wxWindow* parent)
+Canvas::Canvas(wxWindow* parent, wxClipboard* clipboard)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-        wxFULL_REPAINT_ON_RESIZE), m_dragTimer(this), m_textTimer(this)
+        wxFULL_REPAINT_ON_RESIZE), m_dragTimer(this),
+        m_clipboard(clipboard ? clipboard : wxTheClipboard), m_textTimer(this)
 {
     SetBackgroundColour(*wxWHITE);
     SetBackgroundStyle(wxBG_STYLE_PAINT);
@@ -50,11 +76,16 @@ Canvas::Canvas(wxWindow* parent)
 void Canvas::OnLeftDown(wxMouseEvent& event)
 {
     CancelMouseInteraction();
-    SetFocus();
+    SetFocusIgnoringChildren();
     // 连线模式预留给引脚操作，不触发切换或元件拖动。
     if (g_selectedType == "WIRE") return;
 
     const wxPoint mouse = event.GetPosition();
+    if (g_selectedType == "DELETE")
+    {
+        DeleteAtPoint(mouse);
+        return;
+    }
     if (g_selectedType != "DELETE")
     {
         const int handle = HitTestTextHandle(mouse);
@@ -117,15 +148,7 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
     int x = SnapToGrid(event.GetX());
     int y = SnapToGrid(event.GetY());
 
-    Component* comp = nullptr;
-    if (type == "AND")       comp = new AndGate();
-    else if (type == "OR")   comp = new OrGate();
-    else if (type == "NOT")  comp = new NotGate();
-    else if (type == "NAND") comp = new NandGate();
-    else if (type == "NOR")  comp = new NorGate();
-    else if (type == "XOR")  comp = new XorGate();
-    else if (type == "INPUT")  comp = new InputComponent();
-    else if (type == "OUTPUT") comp = new OutputComponent();
+    Component* comp = CreateComponent(type);
 
     if (comp)
     {
@@ -138,6 +161,33 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
         if (m_selectionCallback) m_selectionCallback(comp, x, y);
         Refresh();
     }
+}
+
+void Canvas::DeleteAtPoint(const wxPoint& point)
+{
+    // 与普通选择保持一致：重叠时优先命中最上面的元件。
+    const int componentIndex = HitTest(point.x, point.y);
+    const int textIndex = componentIndex < 0 ? HitTestText(point, true) : -1;
+    DeleteItem(componentIndex, textIndex);
+}
+
+void Canvas::DeleteItem(int componentIndex, int textIndex)
+{
+    m_selectedIndex = -1;
+    m_selectedTextIndex = -1;
+    if (componentIndex >= 0)
+    {
+        delete m_components[componentIndex].comp;
+        m_components.erase(m_components.begin() + componentIndex);
+    }
+    else if (textIndex >= 0)
+    {
+        auto* editor = m_textBoxes[textIndex].editor;
+        m_textBoxes.erase(m_textBoxes.begin() + textIndex);
+        editor->Destroy();
+    }
+    if (m_selectionCallback) m_selectionCallback(nullptr, 0, 0);
+    Refresh(false);
 }
 
 void Canvas::OnLeftUp(wxMouseEvent& event)
@@ -303,13 +353,206 @@ void Canvas::OnKeyDown(wxKeyEvent& event)
     if (event.GetKeyCode() == WXK_ESCAPE)
     {
         CancelMouseInteraction(true);
-        SetFocus();
+        SetFocusIgnoringChildren();
     }
     else if (event.GetKeyCode() == WXK_RETURN && event.ControlDown() &&
         m_selectedTextIndex >= 0)
-        SetFocus();
+        SetFocusIgnoringChildren();
+    else if (IsEditingText())
+        event.Skip(); // 编辑文字时，交给原生控件处理剪贴板和退格。
+    else if (event.ControlDown() && !event.AltDown() && !event.ShiftDown() &&
+        (event.GetKeyCode() == 'C' || event.GetKeyCode() == 'V' || event.GetKeyCode() == 'X'))
+    {
+        const int command = event.GetKeyCode() == 'C' ? wxID_COPY :
+            (event.GetKeyCode() == 'V' ? wxID_PASTE : wxID_CUT);
+        HandleEditCommand(command);
+    }
+    else if (event.GetKeyCode() == WXK_BACK && !event.HasModifiers())
+        DeleteSelection();
     else
         event.Skip();
+}
+
+bool Canvas::IsEditingText() const
+{
+    const wxWindow* focus = wxWindow::FindFocus();
+    return std::any_of(m_textBoxes.begin(), m_textBoxes.end(),
+        [focus](const TextBox& box) { return box.editor == focus; });
+}
+
+bool Canvas::HandleEditCommand(int command)
+{
+    // 菜单快捷键也必须保留文字编辑控件的正常行为。
+    if (IsEditingText())
+    {
+        auto* editor = static_cast<wxTextCtrl*>(wxWindow::FindFocus());
+        if (command == wxID_COPY) editor->Copy();
+        else if (command == wxID_CUT) editor->Cut();
+        else if (command == wxID_PASTE) editor->Paste();
+        else if (command == wxID_DELETE)
+        {
+            long from, to;
+            editor->GetSelection(&from, &to);
+            if (from != to) editor->Remove(from, to);
+        }
+        else return false;
+        return true;
+    }
+    if (command == wxID_COPY) return CopySelection();
+    if (command == wxID_CUT) return CutSelection();
+    if (command == wxID_PASTE) return PasteSelection();
+    if (command == wxID_DELETE) return DeleteSelection();
+    return false;
+}
+
+bool Canvas::DeleteSelection()
+{
+    const int component = m_selectedIndex;
+    const int text = m_selectedTextIndex;
+    if (component < 0 && text < 0) return false;
+    CancelMouseInteraction();
+    DeleteItem(component, text);
+    return true;
+}
+
+bool Canvas::CopySelection()
+{
+    CancelMouseInteraction();
+    std::ostringstream stream;
+    wxString plainText;
+    bool text = false;
+    stream << "WX_DEMO_1 ";
+    if (m_selectedIndex >= 0 && m_selectedIndex < static_cast<int>(m_components.size()))
+    {
+        const auto& pc = m_components[m_selectedIndex];
+        std::string inputs, outputs;
+        for (const auto& pin : pc.comp->inputs) inputs += pin.value == LogicValue::High ? '1' : '0';
+        for (const auto& pin : pc.comp->outputs) outputs += pin.value == LogicValue::High ? '1' : '0';
+        stream << "COMPONENT " << std::quoted(pc.comp->name) << ' ' << pc.x << ' ' << pc.y
+            << ' ' << std::quoted(inputs) << ' ' << std::quoted(outputs);
+    }
+    else if (m_selectedTextIndex >= 0 && m_selectedTextIndex < static_cast<int>(m_textBoxes.size()))
+    {
+        const auto& box = m_textBoxes[m_selectedTextIndex];
+        plainText = box.editor->GetValue();
+        text = true;
+        stream << "TEXT " << box.rect.x << ' ' << box.rect.y << ' ' << box.rect.width << ' '
+            << box.rect.height << ' ' << box.pointSize << ' ' << box.scrollY << ' '
+            << std::quoted(plainText.ToStdString(wxConvUTF8));
+    }
+    else return false;
+    wxClipboardLocker locker(m_clipboard);
+    if (!locker) return false;
+    auto* data = new wxDataObjectComposite();
+    auto* object = new wxCustomDataObject(CanvasClipboardFormat());
+    const std::string payload = stream.str();
+    object->SetData(payload.size(), payload.data());
+    data->Add(object, true);
+    if (text) data->Add(new wxTextDataObject(plainText));
+    if (!m_clipboard->SetData(data)) return false;
+    m_clipboard->Flush();
+    m_pasteCount = 0;
+    return true;
+}
+
+bool Canvas::CutSelection()
+{
+    // 写入剪贴板成功之后才移除原对象。
+    return CopySelection() && DeleteSelection();
+}
+
+bool Canvas::PasteSelection()
+{
+    std::string payload;
+    {
+        wxClipboardLocker locker(m_clipboard);
+        if (!locker) return false;
+        if (m_clipboard->IsSupported(CanvasClipboardFormat()))
+        {
+            wxCustomDataObject data(CanvasClipboardFormat());
+            if (!m_clipboard->GetData(data) || data.GetSize() == 0 ||
+                data.GetSize() > 16 * 1024 * 1024) return false;
+            payload.assign(static_cast<const char*>(data.GetData()), data.GetSize());
+        }
+        else
+        {
+            wxTextDataObject data;
+            if (!m_clipboard->GetData(data) || data.GetText().empty()) return false;
+            std::ostringstream stream;
+            stream << "WX_DEMO_1 TEXT 0 0 240 100 " << m_defaultTextPointSize << " 0 "
+                << std::quoted(data.GetText().ToStdString(wxConvUTF8));
+            payload = stream.str();
+        }
+    }
+    std::istringstream stream(payload);
+    std::string magic, kind, type, inputs, outputs, text;
+    int x = 0, y = 0, width = 0, height = 0, pointSize = 14, scrollY = 0;
+    if (!(stream >> magic >> kind) || magic != "WX_DEMO_1") return false;
+    std::unique_ptr<Component> component;
+    if (kind == "COMPONENT")
+    {
+        if (!(stream >> std::quoted(type) >> x >> y >> std::quoted(inputs) >> std::quoted(outputs)))
+            return false;
+        component.reset(CreateComponent(wxString::FromUTF8(type)));
+        if (!component || inputs.size() != component->inputs.size() ||
+            outputs.size() != component->outputs.size() ||
+            inputs.find_first_not_of("01") != std::string::npos ||
+            outputs.find_first_not_of("01") != std::string::npos) return false;
+        for (std::size_t i = 0; i < inputs.size(); ++i)
+            component->inputs[i].value = inputs[i] == '1' ? LogicValue::High : LogicValue::Low;
+        for (std::size_t i = 0; i < outputs.size(); ++i)
+            component->outputs[i].value = outputs[i] == '1' ? LogicValue::High : LogicValue::Low;
+        width = 95;
+        height = 70;
+    }
+    else if (kind == "TEXT")
+    {
+        if (!(stream >> x >> y >> width >> height >> pointSize >> scrollY >> std::quoted(text)) ||
+            width < 1 || width > 10000 || height < 1 || height > 10000 ||
+            pointSize < 6 || pointSize > 96 || scrollY < 0 || scrollY > 1000000) return false;
+    }
+    else return false;
+    stream >> std::ws;
+    if (!stream.eof() || x < -1000000 || x > 1000000 || y < -1000000 || y > 1000000) return false;
+    if (payload != m_lastPastePayload) m_pasteCount = 0;
+    const int pasteCount = std::min(m_pasteCount + 1, 1000);
+    const int offset = pasteCount * m_gridSize;
+    const wxSize size = GetClientSize();
+    x = std::clamp(x + offset, 0, std::max(0, size.x - width));
+    y = std::clamp(y + offset, 0, std::max(0, size.y - height));
+    CancelMouseInteraction(true);
+    if (component)
+    {
+        x = SnapToGrid(x);
+        y = SnapToGrid(y);
+        m_components.push_back({ component.get(), x, y });
+        component.release();
+        m_selectedIndex = static_cast<int>(m_components.size()) - 1;
+        m_selectedTextIndex = -1;
+    }
+    else
+    {
+        CreateTextBox(wxRect(x, y, width, height));
+        auto& box = m_textBoxes.back();
+        box.pointSize = pointSize;
+        box.editor->SetFont(wxFontInfo(pointSize).Family(wxFONTFAMILY_SWISS));
+        box.editor->ChangeValue(wxString::FromUTF8(text));
+        box.scrollY = scrollY;
+    }
+    m_lastPastePayload = payload;
+    m_pasteCount = pasteCount;
+    g_selectedType.Clear();
+    SetCursor(wxCursor(wxCURSOR_ARROW));
+    if (m_componentPlacedCallback) m_componentPlacedCallback();
+    SetFocusIgnoringChildren();
+    if (m_selectedIndex >= 0 && m_selectionCallback)
+    {
+        const auto& pc = m_components[m_selectedIndex];
+        m_selectionCallback(pc.comp, pc.x, pc.y);
+    }
+    else NotifyTextSelection();
+    Refresh(false);
+    return true;
 }
 
 wxRect Canvas::GetPendingTextRect() const
@@ -329,8 +572,16 @@ void Canvas::CreateTextBox(const wxRect& rect)
     editor->SetToolTip(wxT("在框内输入文字，Ctrl+Enter 完成编辑"));
     const int index = static_cast<int>(m_textBoxes.size());
     m_textBoxes.push_back({ editor, m_defaultTextPointSize, rect });
-    editor->Bind(wxEVT_SET_FOCUS, [this, index](wxFocusEvent& event) {
-        m_selectedTextIndex = index;
+    editor->Bind(wxEVT_SET_FOCUS, [this, editor](wxFocusEvent& event) {
+        // 删除文本框后索引会变化；按编辑控件查找当前索引。
+        const auto box = std::find_if(m_textBoxes.begin(), m_textBoxes.end(),
+            [editor](const TextBox& text) { return text.editor == editor; });
+        if (box == m_textBoxes.end())
+        {
+            event.Skip();
+            return;
+        }
+        m_selectedTextIndex = static_cast<int>(box - m_textBoxes.begin());
         m_selectedIndex = -1;
         NotifyTextSelection();
         Refresh();
@@ -392,7 +643,7 @@ void Canvas::OnToolChanged()
     SetCursor(wxCursor(g_selectedType == "TEXT" ? wxCURSOR_CROSS : wxCURSOR_ARROW));
     // 切换工具时结束框内编辑，但保留树状列表的键盘焦点。
     wxWindow* focus = wxWindow::FindFocus();
-    if (focus && IsDescendant(focus)) SetFocus();
+    if (focus && IsDescendant(focus)) SetFocusIgnoringChildren();
 }
 
 int Canvas::HitTest(int x, int y) const

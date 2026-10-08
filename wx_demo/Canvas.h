@@ -9,12 +9,16 @@
 #include "Component.h"
 #include <functional>
 #include <utility>
+#include <string>
+
+class wxClipboard;
 
 
 class Canvas : public wxPanel
 {
 public:
-    Canvas(wxWindow* parent);
+    Canvas(wxWindow* parent, wxClipboard* clipboard = nullptr);
+    bool HandleEditCommand(int command);
     void OnToolChanged();
     void SetTextFontSize(int pointSize);
     int GetTextFontSize() const;
@@ -42,6 +46,13 @@ private:
     void MoveDraggedComponent(const wxPoint& mouse, bool snap);
     void OnCaptureLost(wxMouseCaptureLostEvent& event);
     void OnKeyDown(wxKeyEvent& event);
+    void DeleteAtPoint(const wxPoint& point);
+    void DeleteItem(int componentIndex, int textIndex);
+    bool DeleteSelection();
+    bool CopySelection();
+    bool PasteSelection();
+    bool CutSelection();
+    bool IsEditingText() const;
     void CancelMouseInteraction(bool restoreText = false);
     void CreateTextBox(const wxRect& rect);
     void NotifyTextSelection();
@@ -94,6 +105,9 @@ private:
     int m_dragFrame = 0;
     std::function<void(const Component*, int, int)> m_selectionCallback;
     std::function<void()> m_componentPlacedCallback;
+    wxClipboard* m_clipboard;
+    std::string m_lastPastePayload;
+    int m_pasteCount = 0;
     struct TextBox
     {
         // 原生控件只负责键盘、剪贴板和输入法，放在画布外；画布绘制透明文字。

@@ -15,7 +15,8 @@ enum {
     ID_TB_OUTPUT,
     ID_TB_AND,
     ID_TB_OR,
-    ID_TB_NOT
+    ID_TB_NOT,
+    ID_TB_DELETE
 };
 
 //用一个函数来获取资源文件的路径
@@ -104,6 +105,7 @@ wxToolBar* CreateMainToolBar(wxFrame* frame, std::function<void(const wxString&)
     toolBar->AddChoice(ID_TB_AND, wxT("与门"), "and.png", "AND");
     toolBar->AddChoice(ID_TB_OR, wxT("或门"), "or.png", "OR");
     toolBar->AddChoice(ID_TB_NOT, wxT("非门"), "not.png", "NOT");
+    toolBar->AddChoice(ID_TB_DELETE, wxT("删除"), "delete.png", "DELETE");
     toolBar->AddSeparator();
     toolBar->Realize();
     toolBar->SelectTool(g_selectedType);
@@ -118,6 +120,7 @@ wxToolBar* CreateMainToolBar(wxFrame* frame, std::function<void(const wxString&)
         case ID_TB_AND:    g_selectedType = "AND";    break;
         case ID_TB_OR:     g_selectedType = "OR";     break;
         case ID_TB_NOT:    g_selectedType = "NOT";    break;
+        case ID_TB_DELETE: g_selectedType = "DELETE"; break;
         default: e.Skip(); return;
         }
         toolBar->SelectTool(g_selectedType);
