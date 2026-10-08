@@ -22,14 +22,18 @@ public:
     void Clear();
 
 private:
-    wxFlexGridSizer* m_grid;
-    wxStaticText* m_title;
     wxScrolledWindow* m_content;
-    std::vector<wxString> m_rowNames;
-    std::vector<wxStaticText*> m_valueLabels;
+    wxString m_title;
+    std::vector<std::pair<wxString, wxString>> m_rows;
+    int m_tableWidth = 0;
+    int m_nameWidth = 0;
+    int m_headerHeight = 0;
+    int m_rowHeight = 0;
     wxPanel* m_textSettings;
     wxSpinCtrl* m_fontSize;
     std::function<void(int)> m_textFontSizeCallback;
     void ShowTextSettings(int pointSize);
     void SetRows(const wxString& title, const std::vector<std::pair<wxString, wxString>>& rows);
+    void UpdateTableSize();
+    void PaintTable(wxPaintEvent& event);
 };
