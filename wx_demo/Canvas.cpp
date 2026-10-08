@@ -1037,78 +1037,88 @@ void Canvas::DrawOutput(wxDC& dc, int x, int y, LogicValue value)
         wxRect(x + 20, y, 40, 40), wxALIGN_CENTER);
 }
 
-// 非门 NOT：三角形 + 输出端小圆
+// 非门 NOT
+// ============================================================
 void Canvas::DrawNotGate(wxDC& dc, int x, int y)
 {
     dc.SetPen(wxPen(*wxBLACK, 2));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
 
-    int w = 36;
-    int h = 36;
+    int w = 40;
+    int h = 40;
 
     dc.DrawLine(x, y, x, y + h);
     dc.DrawLine(x, y, x + w, y + h / 2);
     dc.DrawLine(x, y + h, x + w, y + h / 2);
-
     dc.DrawCircle(x + w + 5, y + h / 2, 4);
+
+    dc.SetBrush(*wxBLUE_BRUSH);
+    dc.SetPen(wxPen(*wxBLUE, 1));
+    dc.DrawCircle(x, y + h / 2, 3);
+
+    dc.SetBrush(*wxRED_BRUSH);
+    dc.SetPen(wxPen(*wxRED, 1));
+    dc.DrawCircle(x + w + 10, y + h / 2, 3);
 }
 
-// 与门 AND：左边竖线 + 右半圆（放大版）
+
+// ============================================================
+// 与门 AND
+// ============================================================
 void Canvas::DrawAndGate(wxDC& dc, int x, int y)
 {
     dc.SetPen(wxPen(*wxBLACK, 2));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
 
-    int h = 60;   // 高度
+    int h = 80;   // 4 格高
     int r = h / 2;
 
-    // 左边竖线
     dc.DrawLine(x, y, x, y + h);
-
-    // 上下两条横线，从左边到右半圆起点
     dc.DrawLine(x, y, x + r, y);
     dc.DrawLine(x, y + h, x + r, y + h);
-
-    // 右半圆：包围盒 (x, y)，宽高都等于 h，从 270° 到 90°
     dc.DrawEllipticArc(x, y, h, h, 270, 90);
+
+    dc.SetBrush(*wxBLUE_BRUSH);
+    dc.SetPen(wxPen(*wxBLUE, 1));
+    int ys[5] = { 0, 20, 40, 60, 80 };
+    for (int i = 0; i < 5; ++i)
+        dc.DrawCircle(x, y + ys[i], 3);
+
+    // 红点：右半圆最右端
+    dc.SetBrush(*wxRED_BRUSH);
+    dc.SetPen(wxPen(*wxRED, 1));
+    dc.DrawCircle(x + h, y + h / 2, 3);
 }
 
-
-
-
-
-
-
-
-//或门
+// ============================================================
+// 或门 OR
+// ============================================================
 void Canvas::DrawOrGate(wxDC& dc, int x, int y)
 {
     dc.SetPen(wxPen(*wxBLACK, 2));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
 
-    int w = 80;    // 总宽
-    int h = 60;    // 总高
+    int w = 80;
+    int h = 120;
     int midY = y + h / 2;
 
-    const int N = 60;
+    const int N = 80;
 
     wxPoint left[N + 1];
     for (int i = 0; i <= N; ++i)
     {
         double t = (double)i / N;
         double py = y + t * h;
-        // 使用 sin 让凸起集中在中间，最大约 8 像素
-        double bulge = 8.0 * std::sin(t * 3.1415926);
-        double px = (x + 6) + bulge;   // 注意这里是“加”，因为要向右凸
+        double bulge = 10.0 * std::sin(t * 3.1415926);
+        double px = x + bulge;
         left[i] = wxPoint((int)px, (int)py);
     }
     dc.DrawLines(N + 1, left);
 
     wxPoint upper[N + 1];
-    double x0 = x + 6, y0 = y;
+    double x0 = x, y0 = y;
     double x1 = x + w * 0.65, y1 = y + 1;
     double x2 = x + w, y2 = midY;
-
     for (int i = 0; i <= N; ++i)
     {
         double t = (double)i / N;
@@ -1119,11 +1129,9 @@ void Canvas::DrawOrGate(wxDC& dc, int x, int y)
     }
     dc.DrawLines(N + 1, upper);
 
-
     wxPoint lower[N + 1];
     double y3 = y + h;
     double y4 = y + h - 1;
-
     for (int i = 0; i <= N; ++i)
     {
         double t = (double)i / N;
@@ -1133,56 +1141,235 @@ void Canvas::DrawOrGate(wxDC& dc, int x, int y)
         lower[i] = wxPoint((int)px, (int)py);
     }
     dc.DrawLines(N + 1, lower);
+
+    // 5 条短横线 + 5 个蓝点
+    dc.SetPen(wxPen(*wxBLACK, 2));
+    int ys[5] = { 20, 40, 60, 80, 100 };
+    for (int i = 0; i < 5; ++i)
+        dc.DrawLine(x, y + ys[i], x + 8, y + ys[i]);
+
+    dc.SetBrush(*wxBLUE_BRUSH);
+    dc.SetPen(wxPen(*wxBLUE, 1));
+    for (int i = 0; i < 5; ++i)
+        dc.DrawCircle(x, y + ys[i], 3);
+
+    // 输出红点
+    dc.SetBrush(*wxRED_BRUSH);
+    dc.SetPen(wxPen(*wxRED, 1));
+    dc.DrawCircle(x + w, y + h / 2, 3);
 }
 
-
-
-
-
-
-
-
-
-// 与非门 NAND = 与门 + 输出端小圆
+// ============================================================
+// 与非门 NAND
+// ============================================================
 void Canvas::DrawNandGate(wxDC& dc, int x, int y)
 {
-    DrawAndGate(dc, x, y);
-
     dc.SetPen(wxPen(*wxBLACK, 2));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    dc.DrawCircle(x + 60 + 5, y + 30, 6);
+
+    int h = 80;   // 与 AND 保持一致
+    int r = h / 2;
+
+    // 与门本体
+    dc.DrawLine(x, y, x, y + h);
+    dc.DrawLine(x, y, x + r, y);
+    dc.DrawLine(x, y + h, x + r, y + h);
+    dc.DrawEllipticArc(x, y, h, h, 270, 90);
+
+    // 5 个蓝点：y+0/20/40/60/80，全部压在格点上
+    dc.SetBrush(*wxBLUE_BRUSH);
+    dc.SetPen(wxPen(*wxBLUE, 1));
+    int ys[5] = { 0, 20, 40, 60, 80 };
+    for (int i = 0; i < 5; ++i)
+        dc.DrawCircle(x, y + ys[i], 3);
+
+    // 黑小圆（贴在与门右端）
+    dc.SetPen(wxPen(*wxBLACK, 2));
+    dc.SetBrush(*wxTRANSPARENT_BRUSH);
+    dc.DrawCircle(x + h + 5, y + h / 2, 6);
+
+    // 短横线：从黑小圆右缘画到红点位置
+    dc.DrawLine(x + h + 11, y + h / 2, x + h + 17, y + h / 2);
+
+    // 红点（位置保持不变）
+    dc.SetBrush(*wxRED_BRUSH);
+    dc.SetPen(wxPen(*wxRED, 1));
+    dc.DrawCircle(x + h + 17, y + h / 2, 3);
 }
 
-// 或非门 NOR = 或门 + 输出端小圆
+//或非门
 void Canvas::DrawNorGate(wxDC& dc, int x, int y)
 {
-    DrawOrGate(dc, x, y);
-
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    dc.DrawCircle(x + 80 + 5, y + 30, 6);
-}
-
-// 异或门 XOR = 或门 + 左侧多一条弧线
-void Canvas::DrawXorGate(wxDC& dc, int x, int y)
-{
-    // 先画出或门本体
-    DrawOrGate(dc, x, y);
-
     dc.SetPen(wxPen(*wxBLACK, 2));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
 
-    int h = 60;
-    const int N = 60;
+    int w = 80;
+    int h = 120;
+    int midY = y + h / 2;
 
+    const int N = 80;
+
+    // 左侧短弧
     wxPoint left[N + 1];
     for (int i = 0; i <= N; ++i)
     {
         double t = (double)i / N;
         double py = y + t * h;
-        double bulge = 8.0 * std::sin(t * 3.1415926);
-        double px = (x + 6 - 8) + bulge;  // 在或门左弧基础上整体左移 8 像素
+        double bulge = 10.0 * std::sin(t * 3.1415926);
+        double px = (x - 10) + bulge;
         left[i] = wxPoint((int)px, (int)py);
     }
     dc.DrawLines(N + 1, left);
+
+    // 上弧
+    wxPoint upper[N + 1];
+    double x0 = x - 10, y0 = y;
+    double x1 = x + w * 0.55, y1 = y + 1;
+    double x2 = x + w, y2 = midY;
+    for (int i = 0; i <= N; ++i)
+    {
+        double t = (double)i / N;
+        double mt = 1 - t;
+        double px = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2;
+        double py = mt * mt * y0 + 2 * mt * t * y1 + t * t * y2;
+        upper[i] = wxPoint((int)px, (int)py);
+    }
+    dc.DrawLines(N + 1, upper);
+
+    // 下弧
+    wxPoint lower[N + 1];
+    double y3 = y + h;
+    double y4 = y + h - 1;
+    for (int i = 0; i <= N; ++i)
+    {
+        double t = (double)i / N;
+        double mt = 1 - t;
+        double px = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2;
+        double py = mt * mt * y3 + 2 * mt * t * y4 + t * t * y2;
+        lower[i] = wxPoint((int)px, (int)py);
+    }
+    dc.DrawLines(N + 1, lower);
+
+    // 5 条短横线 + 5 个蓝点，终点动态计算弧线 x 坐标
+    dc.SetPen(wxPen(*wxBLACK, 2));
+    int ys[5] = { 20, 40, 60, 80, 100 };
+    for (int i = 0; i < 5; ++i)
+    {
+        double t = (double)ys[i] / h;
+        double bulge = 10.0 * std::sin(t * 3.1415926);
+        double arcX = (x - 10) + bulge;   // 弧线在该 y 处的 x 坐标
+
+        // 从蓝点到弧线，画横线
+        dc.DrawLine(x - 20, y + ys[i], (int)arcX, y + ys[i]);
+
+        // 蓝点
+        dc.SetBrush(*wxBLUE_BRUSH);
+        dc.SetPen(wxPen(*wxBLUE, 1));
+        dc.DrawCircle(x - 20, y + ys[i], 3);
+
+        dc.SetPen(wxPen(*wxBLACK, 2));   // 恢复黑色画笔
+    }
+
+    // 输出：黑圆圈
+    dc.SetPen(wxPen(*wxBLACK, 2));
+    dc.SetBrush(*wxTRANSPARENT_BRUSH);
+    dc.DrawCircle(x + w + 5, y + h / 2, 6);
+
+    // 短横线：从黑圈连到红点
+    dc.DrawLine(x + w + 11, y + h / 2, x + w + 17, y + h / 2);
+
+    // 红点
+    dc.SetBrush(*wxRED_BRUSH);
+    dc.SetPen(wxPen(*wxRED, 1));
+    dc.DrawCircle(x + w + 17, y + h / 2, 3);
+}
+// ============================================================
+// 异或门 XOR
+// ============================================================
+void Canvas::DrawXorGate(wxDC& dc, int x, int y)
+{
+    dc.SetPen(wxPen(*wxBLACK, 2));
+    dc.SetBrush(*wxTRANSPARENT_BRUSH);
+
+    int w = 80;
+    int h = 120;
+    int midY = y + h / 2;
+
+    const int N = 80;
+
+    // 左侧额外弧（异或门特征）：外凸最大处为 x - 18
+    wxPoint left[N + 1];
+    for (int i = 0; i <= N; ++i)
+    {
+        double t = (double)i / N;
+        double py = y + t * h;
+        double bulge = 10.0 * std::sin(t * 3.1415926);
+        double px = (x - 10 - 8) + bulge;   // 起点 x-18，最凸处 x-8
+        left[i] = wxPoint((int)px, (int)py);
+    }
+    dc.DrawLines(N + 1, left);
+
+    // 左侧内弧（或门左弧）：外凸最大处为 x
+    wxPoint left2[N + 1];
+    for (int i = 0; i <= N; ++i)
+    {
+        double t = (double)i / N;
+        double py = y + t * h;
+        double bulge = 10.0 * std::sin(t * 3.1415926);
+        double px = (x - 10) + bulge;
+        left2[i] = wxPoint((int)px, (int)py);
+    }
+    dc.DrawLines(N + 1, left2);
+
+    // 上弧
+    wxPoint upper[N + 1];
+    double x0 = x - 10, y0 = y;
+    double x1 = x + w * 0.55, y1 = y + 1;
+    double x2 = x + w, y2 = midY;
+    for (int i = 0; i <= N; ++i)
+    {
+        double t = (double)i / N;
+        double mt = 1 - t;
+        double px = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2;
+        double py = mt * mt * y0 + 2 * mt * t * y1 + t * t * y2;
+        upper[i] = wxPoint((int)px, (int)py);
+    }
+    dc.DrawLines(N + 1, upper);
+
+    // 下弧
+    wxPoint lower[N + 1];
+    double y3 = y + h;
+    double y4 = y + h - 1;
+    for (int i = 0; i <= N; ++i)
+    {
+        double t = (double)i / N;
+        double mt = 1 - t;
+        double px = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2;
+        double py = mt * mt * y3 + 2 * mt * t * y4 + t * t * y2;
+        lower[i] = wxPoint((int)px, (int)py);
+    }
+    dc.DrawLines(N + 1, lower);
+
+    // 5 条短横线 + 5 个蓝点：连到额外左弧上
+    dc.SetPen(wxPen(*wxBLACK, 2));
+    int ys[5] = { 20, 40, 60, 80, 100 };
+    for (int i = 0; i < 5; ++i)
+    {
+        double t = (double)ys[i] / h;
+        double bulge = 10.0 * std::sin(t * 3.1415926);
+        double arcX = (x - 10 - 8) + bulge;   // 额外弧在该 y 处的 x
+
+        dc.DrawLine(x - 20, y + ys[i], (int)arcX, y + ys[i]);
+
+        dc.SetBrush(*wxBLUE_BRUSH);
+        dc.SetPen(wxPen(*wxBLUE, 1));
+        dc.DrawCircle(x - 20, y + ys[i], 3);
+
+        dc.SetPen(wxPen(*wxBLACK, 2));
+    }
+
+    // 输出红点
+    dc.SetBrush(*wxRED_BRUSH);
+    dc.SetPen(wxPen(*wxRED, 1));
+    dc.DrawCircle(x + w, y + h / 2, 3);
 }
