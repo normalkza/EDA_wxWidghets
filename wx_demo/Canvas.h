@@ -34,14 +34,17 @@ private:
     void OnLeftUp(wxMouseEvent& event);
     void OnDoubleClick(wxMouseEvent& event);
     void OnMouseMove(wxMouseEvent& event);
+    void OnDragTimer(wxTimerEvent& event);
+    void MoveDraggedComponent(const wxPoint& mouse, bool snap);
     void OnCaptureLost(wxMouseCaptureLostEvent& event);
     void OnKeyDown(wxKeyEvent& event);
     void CancelMouseInteraction(bool restoreText = false);
     void CreateTextBox(const wxRect& rect);
     void NotifyTextSelection();
     wxRect GetPendingTextRect() const;
-    void DrawCanvas(wxDC& dc);
-    void DrawTextBoxes(wxDC& dc);
+    void DrawCanvas(wxDC& dc, const wxRect& updateRect);
+    void DrawTextBoxes(wxDC& dc, const wxRect& updateRect);
+    void UpdateGridBitmap();
     int HitTestText(const wxPoint& point, bool entireBox) const;
     void EditTextBox(int index, const wxPoint& point);
     void UpdateTextInput();
@@ -82,6 +85,9 @@ private:
     wxPoint m_pressPosition;
     static constexpr int m_dragThreshold = 4;
     wxPoint m_dragOffset;
+    wxPoint m_dragPosition;
+    wxTimer m_dragTimer;
+    int m_dragFrame = 0;
     std::function<void(const Component*, int, int)> m_selectionCallback;
     struct TextBox
     {
@@ -118,6 +124,7 @@ private:
     // 网格
     int m_gridSize = 20;
     wxColour m_gridColour = wxColour(220, 220, 220);
+    wxBitmap m_gridBitmap;
 
     wxDECLARE_EVENT_TABLE();
 };

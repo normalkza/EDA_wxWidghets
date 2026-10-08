@@ -1,0 +1,10 @@
+# Keep repository text normalized; use Windows line endings for Visual Studio files.
+* text=auto
+*.cpp text eol=crlf
+*.h text eol=crlf
+*.hpp text eol=crlf
+*.slnx text eol=crlf
+*.vcxproj text eol=crlf
+*.vcxproj.filters text eol=crlf
+.gitattributes text eol=lf
+*.png binary

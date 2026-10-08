@@ -31,7 +31,9 @@ MainFrame::MainFrame()
     workspace->Bind(wxEVT_SPLITTER_DOUBLECLICKED, [](wxSplitterEvent& event) { event.Veto(); });
     sidebar->Bind(wxEVT_SPLITTER_DOUBLECLICKED, [](wxSplitterEvent& event) { event.Veto(); });
 
-    auto showTool = [properties, canvas](const wxString& type) {
+    auto showTool = [this, properties, canvas, toolbox](const wxString& type) {
+        toolbox->SelectTool(type);
+        UpdateMainToolBarSelection(GetToolBar(), type);
         canvas->OnToolChanged();
         properties->ShowTool(type, canvas->GetTextFontSize());
     };

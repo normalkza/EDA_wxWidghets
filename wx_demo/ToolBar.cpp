@@ -3,6 +3,7 @@
 #include "Toolbox.h"
 #include <wx/stdpaths.h>
 #include <wx/filename.h>
+#include <vector>
 
 
 // 自定义工具 ID
@@ -29,35 +30,85 @@ namespace
     }
 }
 
-// 创建主工具栏
+// 同时保留原生按下状态和显式的粗边框，失去焦点后仍能识别当前工具。
+class ActiveToolBar : public wxToolBar
+{
+public:
+    explicit ActiveToolBar(wxFrame* frame) : wxToolBar(frame, wxID_ANY)
+    {
+        SetToolBitmapSize(wxSize(32, 32));
+    }
+
+    void AddChoice(int id, const wxString& label, const wxString& file, const wxString& type)
+    {
+        wxImage image;
+        const bool loaded = image.LoadFile(ResPath(file), wxBITMAP_TYPE_PNG);
+        wxBitmap normal(32, 32);
+        {
+            wxMemoryDC dc(normal);
+            dc.SetBackground(wxBrush(GetBackgroundColour()));
+            dc.Clear();
+            if (loaded)
+            {
+                image.Rescale(24, 24, wxIMAGE_QUALITY_HIGH);
+                dc.DrawBitmap(wxBitmap(image), 4, 4, true);
+            }
+        }
+        wxBitmap active(normal.ConvertToImage());
+        {
+            wxMemoryDC dc(active);
+            dc.SetPen(wxPen(wxColour(30, 120, 220), 3));
+            dc.SetBrush(*wxTRANSPARENT_BRUSH);
+            dc.DrawRectangle(2, 2, 28, 28);
+        }
+        AddCheckTool(id, label, normal, wxNullBitmap, label);
+        m_choices.push_back({id, type, normal, active});
+    }
+
+    void SelectTool(const wxString& type)
+    {
+        for (const auto& choice : m_choices)
+        {
+            const bool selected = choice.type == type;
+            // 点击 check tool 会先切换原生状态，所以每次重新统一状态及位图。
+            ToggleTool(choice.id, selected);
+            SetToolNormalBitmap(choice.id, selected ? choice.active : choice.normal);
+        }
+        Refresh(false);
+    }
+
+private:
+    struct Choice
+    {
+        int id;
+        wxString type;
+        wxBitmap normal;
+        wxBitmap active;
+    };
+    std::vector<Choice> m_choices;
+};
+
+void UpdateMainToolBarSelection(wxToolBar* toolbar, const wxString& type)
+{
+    if (toolbar) static_cast<ActiveToolBar*>(toolbar)->SelectTool(type);
+}
+
 wxToolBar* CreateMainToolBar(wxFrame* frame, std::function<void(const wxString&)> selectionCallback)
 {
-    wxToolBar* toolBar = new wxToolBar(frame, wxID_ANY);
-    toolBar->SetToolBitmapSize(wxSize(24, 24));
-
-    wxBitmap selectBitmap(ResPath("select.png"), wxBITMAP_TYPE_PNG);
-    wxBitmap wireBitmap(ResPath("wire.png"), wxBITMAP_TYPE_PNG);
-    wxBitmap textBitmap(ResPath("text.png"), wxBITMAP_TYPE_PNG);
-    wxBitmap inputBitmap(ResPath("input.png"), wxBITMAP_TYPE_PNG);
-    wxBitmap outputBitmap(ResPath("output.png"), wxBITMAP_TYPE_PNG);
-    wxBitmap andBitmap(ResPath("and.png"), wxBITMAP_TYPE_PNG);
-    wxBitmap orBitmap(ResPath("or.png"), wxBITMAP_TYPE_PNG);
-    wxBitmap notBitmap(ResPath("not.png"), wxBITMAP_TYPE_PNG);
-
-    toolBar->AddTool(ID_TB_SELECT, "选择", selectBitmap);
-    toolBar->AddTool(ID_TB_WIRE, "连线", wireBitmap);
-    toolBar->AddTool(ID_TB_TEXT, "文字", textBitmap);
-    toolBar->AddTool(ID_TB_INPUT, "输入", inputBitmap);
-    toolBar->AddTool(ID_TB_OUTPUT, "输出", outputBitmap);
-    toolBar->AddTool(ID_TB_AND, "与门", andBitmap);
-    toolBar->AddTool(ID_TB_OR, "或门", orBitmap);
-    toolBar->AddTool(ID_TB_NOT, "非门", notBitmap);
-
+    auto* toolBar = new ActiveToolBar(frame);
+    toolBar->AddChoice(ID_TB_SELECT, wxT("选择"), "select.png", "");
+    toolBar->AddChoice(ID_TB_WIRE, wxT("连线"), "wire.png", "WIRE");
+    toolBar->AddChoice(ID_TB_TEXT, wxT("文字"), "text.png", "TEXT");
+    toolBar->AddChoice(ID_TB_INPUT, wxT("输入"), "input.png", "INPUT");
+    toolBar->AddChoice(ID_TB_OUTPUT, wxT("输出"), "output.png", "OUTPUT");
+    toolBar->AddChoice(ID_TB_AND, wxT("与门"), "and.png", "AND");
+    toolBar->AddChoice(ID_TB_OR, wxT("或门"), "or.png", "OR");
+    toolBar->AddChoice(ID_TB_NOT, wxT("非门"), "not.png", "NOT");
     toolBar->AddSeparator();
     toolBar->Realize();
+    toolBar->SelectTool(g_selectedType);
 
-    // 绑定工具按钮点击事件
-    frame->Bind(wxEVT_TOOL, [selectionCallback](wxCommandEvent& e) {
+    frame->Bind(wxEVT_TOOL, [toolBar, selectionCallback](wxCommandEvent& e) {
         switch (e.GetId()) {
         case ID_TB_SELECT: g_selectedType = "";       break;
         case ID_TB_WIRE:   g_selectedType = "WIRE";   break;
@@ -67,9 +118,10 @@ wxToolBar* CreateMainToolBar(wxFrame* frame, std::function<void(const wxString&)
         case ID_TB_AND:    g_selectedType = "AND";    break;
         case ID_TB_OR:     g_selectedType = "OR";     break;
         case ID_TB_NOT:    g_selectedType = "NOT";    break;
+        default: e.Skip(); return;
         }
+        toolBar->SelectTool(g_selectedType);
         if (selectionCallback) selectionCallback(g_selectedType);
-        });
-
+    });
     return toolBar;
 }

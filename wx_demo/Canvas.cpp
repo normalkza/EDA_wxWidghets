@@ -26,7 +26,7 @@ wxEND_EVENT_TABLE()
 
 Canvas::Canvas(wxWindow* parent)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-        wxFULL_REPAINT_ON_RESIZE), m_textTimer(this)
+        wxFULL_REPAINT_ON_RESIZE), m_dragTimer(this), m_textTimer(this)
 {
     SetBackgroundColour(*wxWHITE);
     SetBackgroundStyle(wxBG_STYLE_PAINT);
@@ -42,7 +42,8 @@ Canvas::Canvas(wxWindow* parent)
         CancelMouseInteraction(true);
         event.Skip();
     });
-    Bind(wxEVT_TIMER, [this](wxTimerEvent&) { UpdateTextInput(); });
+    Bind(wxEVT_TIMER, [this](wxTimerEvent&) { UpdateTextInput(); }, m_textTimer.GetId());
+    Bind(wxEVT_TIMER, &Canvas::OnDragTimer, this, m_dragTimer.GetId());
     m_textTimer.Start(150);
 }
 
@@ -161,6 +162,13 @@ void Canvas::OnLeftUp(wxMouseEvent& event)
         const wxPoint delta = mouse - m_pressPosition;
         const bool releasedWithoutMoving = std::abs(delta.x) < m_dragThreshold &&
             std::abs(delta.y) < m_dragThreshold;
+        // 松开时处理最后一个鼠标位置，避免定时器尚未绘制最后一帧。
+        if (m_dragging || !releasedWithoutMoving)
+        {
+            m_dragging = true;
+            m_togglePending = false;
+            MoveDraggedComponent(mouse, true);
+        }
         if (m_togglePending && !m_dragging && releasedWithoutMoving &&
             g_selectedType != "WIRE" && g_selectedType != "DELETE" &&
             g_selectedType != "TEXT" &&
@@ -217,16 +225,51 @@ void Canvas::OnMouseMove(wxMouseEvent& event)
             return;
         m_dragging = true;
         m_togglePending = false;
+        m_dragFrame = 0;
+        m_dragTimer.Start(16);
     }
+    // 合并高频鼠标事件；绘制按约 60 帧/秒处理最新位置。
+    m_dragPosition = mouse;
+}
+
+void Canvas::MoveDraggedComponent(const wxPoint& mouse, bool snap)
+{
+    if (m_pressedIndex < 0 || m_pressedIndex >= static_cast<int>(m_components.size())) return;
     auto& pc = m_components[m_pressedIndex];
-    pc.x = SnapToGrid(mouse.x - m_dragOffset.x);
-    pc.y = SnapToGrid(mouse.y - m_dragOffset.y);
-    if (m_selectionCallback) m_selectionCallback(pc.comp, pc.x, pc.y);
-    Refresh();
+    const int x = snap ? SnapToGrid(mouse.x - m_dragOffset.x) : mouse.x - m_dragOffset.x;
+    const int y = snap ? SnapToGrid(mouse.y - m_dragOffset.y) : mouse.y - m_dragOffset.y;
+    if (pc.x == x && pc.y == y) return;
+    const wxRect oldRect = GetComponentRect(pc);
+    pc.x = x;
+    pc.y = y;
+    wxRect dirty = oldRect.Union(GetComponentRect(pc));
+    dirty.Inflate(3); // 包含选中虚线和画笔边缘，清除旧位置的残影。
+    RefreshRect(dirty, false);
+}
+
+void Canvas::OnDragTimer(wxTimerEvent&)
+{
+    if (!m_dragging || m_pressedIndex < 0) return;
+    MoveDraggedComponent(m_dragPosition, false);
+    // 属性区约 20 次/秒更新，避免布局计算阻塞每一帧。
+    if (++m_dragFrame % 3 == 0 && m_selectionCallback)
+    {
+        const auto& pc = m_components[m_pressedIndex];
+        m_selectionCallback(pc.comp, pc.x, pc.y);
+    }
+    Update();
 }
 
 void Canvas::CancelMouseInteraction(bool restoreText)
 {
+    m_dragTimer.Stop();
+    if (m_dragging && m_pressedIndex >= 0 &&
+        m_pressedIndex < static_cast<int>(m_components.size()))
+    {
+        auto& pc = m_components[m_pressedIndex];
+        MoveDraggedComponent(wxPoint(pc.x, pc.y) + m_dragOffset, true);
+        if (m_selectionCallback) m_selectionCallback(pc.comp, pc.x, pc.y);
+    }
     if (restoreText && m_textTransformIndex >= 0)
     {
         auto& box = m_textBoxes[m_textTransformIndex];
@@ -374,26 +417,38 @@ wxRect Canvas::GetComponentRect(const PlacedComponent& pc) const
 
 void Canvas::OnPaint(wxPaintEvent& event)
 {
-    wxBufferedPaintDC dc(this);
-    DrawCanvas(dc);
+    const wxRect updateRect = GetUpdateRegion().GetBox();
+    wxAutoBufferedPaintDC dc(this);
+    wxDCClipper clip(dc, updateRect);
+    DrawCanvas(dc, updateRect);
 }
 
-void Canvas::DrawCanvas(wxDC& dc)
+void Canvas::UpdateGridBitmap()
 {
-    dc.SetBackground(*wxWHITE_BRUSH);
-    dc.Clear();
-
-    // 网格
-    wxSize size = GetClientSize();
-    dc.SetPen(wxPen(wxColour(200, 200, 200), 1, wxPENSTYLE_SOLID));
+    const wxSize size = GetClientSize();
+    if (size.x <= 0 || size.y <= 0) return;
+    if (m_gridBitmap.IsOk() && m_gridBitmap.GetSize() == size) return;
+    m_gridBitmap = wxBitmap(size.x, size.y);
+    wxMemoryDC gridDC(m_gridBitmap);
+    gridDC.SetBackground(*wxWHITE_BRUSH);
+    gridDC.Clear();
+    gridDC.SetPen(wxPen(wxColour(200, 200, 200), 1, wxPENSTYLE_SOLID));
+    gridDC.SetBrush(*wxWHITE_BRUSH);
     for (int x = 0; x <= size.GetWidth(); x += m_gridSize)
         for (int y = 0; y <= size.GetHeight(); y += m_gridSize)
-            dc.DrawCircle(x, y, 1);
+            gridDC.DrawCircle(x, y, 1);
+}
+
+void Canvas::DrawCanvas(wxDC& dc, const wxRect& updateRect)
+{
+    // 网格仅在画布尺寸改变时生成；拖动时直接复制缓存。
+    UpdateGridBitmap();
+    if (m_gridBitmap.IsOk()) dc.DrawBitmap(m_gridBitmap, 0, 0);
 
     // 元件
     for (const auto& pc : m_components)
     {
-        if (!pc.comp) continue;
+        if (!pc.comp || !GetComponentRect(pc).Intersects(updateRect)) continue;
 
         if (pc.comp->name == "AND")       DrawAndGate(dc, pc.x, pc.y);
         else if (pc.comp->name == "OR")   DrawOrGate(dc, pc.x, pc.y);
@@ -420,7 +475,7 @@ void Canvas::DrawCanvas(wxDC& dc)
         dc.SetBrush(*wxTRANSPARENT_BRUSH);
         dc.DrawRectangle(GetPendingTextRect());
     }
-    DrawTextBoxes(dc);
+    DrawTextBoxes(dc, updateRect);
     DrawTextSelection(dc);
 }
 
@@ -665,12 +720,13 @@ void Canvas::UpdateTextInput()
     Refresh();
 }
 
-void Canvas::DrawTextBoxes(wxDC& dc)
+void Canvas::DrawTextBoxes(wxDC& dc, const wxRect& updateRect)
 {
     dc.SetBackgroundMode(wxTRANSPARENT);
     dc.SetTextForeground(*wxBLACK);
     for (const auto& box : m_textBoxes)
     {
+        if (!box.rect.Intersects(updateRect)) continue;
         wxDCClipper clip(dc, box.rect);
         const auto lines = LayoutText(box, dc);
         long from, to;
