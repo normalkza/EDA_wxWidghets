@@ -26,6 +26,10 @@ public:
     {
         m_selectionCallback = std::move(callback);
     }
+    void SetComponentPlacedCallback(std::function<void()> callback)
+    {
+        m_componentPlacedCallback = std::move(callback);
+    }
 
 
 private:
@@ -89,6 +93,7 @@ private:
     wxTimer m_dragTimer;
     int m_dragFrame = 0;
     std::function<void(const Component*, int, int)> m_selectionCallback;
+    std::function<void()> m_componentPlacedCallback;
     struct TextBox
     {
         // 原生控件只负责键盘、剪贴板和输入法，放在画布外；画布绘制透明文字。

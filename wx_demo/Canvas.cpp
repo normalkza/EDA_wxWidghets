@@ -131,6 +131,10 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
     {
         m_components.push_back({ comp, x, y });
         m_selectedIndex = static_cast<int>(m_components.size()) - 1;
+        // 单次放置后恢复选择/拖动模式，同时保留新元件的选中状态。
+        g_selectedType.Clear();
+        SetCursor(wxCursor(wxCURSOR_ARROW));
+        if (m_componentPlacedCallback) m_componentPlacedCallback();
         if (m_selectionCallback) m_selectionCallback(comp, x, y);
         Refresh();
     }

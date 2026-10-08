@@ -39,6 +39,10 @@ MainFrame::MainFrame()
     };
     if (auto* toolbar = CreateMainToolBar(this, showTool)) SetToolBar(toolbar);
     toolbox->SetSelectionCallback(showTool);
+    canvas->SetComponentPlacedCallback([this, toolbox] {
+        toolbox->SelectTool(wxEmptyString);
+        UpdateMainToolBarSelection(GetToolBar(), wxEmptyString);
+    });
     canvas->SetSelectionCallback([properties, canvas](const Component* component, int x, int y) {
         if (component) properties->ShowComponent(component, x, y);
         else properties->ShowTool(g_selectedType, canvas->GetTextFontSize());
