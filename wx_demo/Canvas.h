@@ -7,6 +7,9 @@
 #include <array>
 
 #include "Component.h"
+#include "Circuit.h"
+#include "Wire.h"
+#include <optional>
 #include <functional>
 #include <utility>
 #include <string>
@@ -18,10 +21,21 @@ class Canvas : public wxPanel
 {
 public:
     Canvas(wxWindow* parent, wxClipboard* clipboard = nullptr);
+    ~Canvas() override;
     bool HandleEditCommand(int command);
     void OnToolChanged();
     void SetTextFontSize(int pointSize);
     int GetTextFontSize() const;
+    void SetGateInputCount(int count);
+    int GetGateInputCount() const;
+    void SetStatusCallback(std::function<void(const wxString&)> callback)
+    {
+        m_statusCallback = std::move(callback);
+    }
+    void SetWireSelectionCallback(std::function<void(const WireConnection*)> callback)
+    {
+        m_wireSelectionCallback = std::move(callback);
+    }
     void SetTextSelectionCallback(std::function<void(const wxRect&, int)> callback)
     {
         m_textSelectionCallback = std::move(callback);
@@ -37,6 +51,7 @@ public:
 
 
 private:
+    friend struct CanvasRegressionAccess;
     void OnPaint(wxPaintEvent& event);
     void OnLeftDown(wxMouseEvent& event);
     void OnLeftUp(wxMouseEvent& event);
@@ -74,13 +89,8 @@ private:
     // 把坐标对齐到网格点
     int SnapToGrid(int value) const { return (value / m_gridSize) * m_gridSize; }
 
-    // 六种门电路的绘制函数
-    void DrawAndGate(wxDC& dc, int x, int y);
-    void DrawOrGate(wxDC& dc, int x, int y);
-    void DrawNotGate(wxDC& dc, int x, int y);
-    void DrawNandGate(wxDC& dc, int x, int y);
-    void DrawNorGate(wxDC& dc, int x, int y);
-    void DrawXorGate(wxDC& dc, int x, int y);
+    static constexpr int m_portSize = 40;
+    void DrawPort(wxDC& dc, int x, int y, LogicValue value, PinType direction);
     void DrawInput(wxDC& dc, int x, int y, LogicValue value);
     void DrawOutput(wxDC& dc, int x, int y, LogicValue value);
 
@@ -90,10 +100,37 @@ private:
         Component* comp;
         int x, y;
     };
+    // 绘制、点击判定和局部刷新统一使用同一份几何信息。
+    struct GateGeometry
+    {
+        int width, height, left, outputX;
+        std::vector<wxPoint> inputs;
+    };
+    GateGeometry GetGateGeometry(const Component& component) const;
+    void DrawGate(wxDC& dc, const PlacedComponent& pc);
     int HitTest(int x, int y) const;
     wxRect GetComponentRect(const PlacedComponent& pc) const;
+    wxRect GetComponentUpdateRect(const PlacedComponent& pc) const;
+    std::optional<PinReference> HitTestPin(const wxPoint& point) const;
+    wxPoint GetPinPosition(const PinReference& pin) const;
+    Wire::Path GetWirePath(const WireConnection& connection) const;
+    int HitTestWire(const wxPoint& point) const;
+    void HandleWireClick(const wxPoint& point);
+    void CancelPendingWire();
+    void DrawWires(wxDC& dc, const wxRect& updateRect);
+    void SelectWire(int index);
+    void DeleteWire(int index);
+    void RecomputeCircuit();
+    void ReportStatus(const wxString& message);
+    Circuit m_circuit;
+    std::optional<PinReference> m_pendingWire;
+    wxPoint m_wirePreview;
+    int m_selectedWireIndex = -1;
+    std::function<void(const wxString&)> m_statusCallback;
+    std::function<void(const WireConnection*)> m_wireSelectionCallback;
     std::vector<PlacedComponent> m_components;
     int m_selectedIndex = -1;
+    int m_defaultGateInputCount = 2;
     int m_pressedIndex = -1;
     bool m_dragging = false;
     bool m_togglePending = false;
@@ -142,7 +179,7 @@ private:
 
     // 网格
     int m_gridSize = 20;
-    wxColour m_gridColour = wxColour(220, 220, 220);
+    wxColour m_gridColour = wxColour(220, 228, 239);
     wxBitmap m_gridBitmap;
 
     wxDECLARE_EVENT_TABLE();

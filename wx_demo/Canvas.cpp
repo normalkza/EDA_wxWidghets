@@ -26,14 +26,18 @@
 
 namespace
 {
-    Component* CreateComponent(const wxString& type)
+    Component* CreateComponent(const wxString& type, int inputCount = 2)
     {
-        if (type == "AND") return new AndGate();
-        if (type == "OR") return new OrGate();
+        const bool variable = type == "AND" || type == "OR" || type == "NAND" ||
+            type == "NOR" || type == "XOR";
+        if (variable && (inputCount < MultiInputGate::MinInputCount ||
+            inputCount > MultiInputGate::MaxInputCount)) return nullptr;
+        if (type == "AND") return new AndGate(inputCount);
+        if (type == "OR") return new OrGate(inputCount);
         if (type == "NOT") return new NotGate();
-        if (type == "NAND") return new NandGate();
-        if (type == "NOR") return new NorGate();
-        if (type == "XOR") return new XorGate();
+        if (type == "NAND") return new NandGate(inputCount);
+        if (type == "NOR") return new NorGate(inputCount);
+        if (type == "XOR") return new XorGate(inputCount);
         if (type == "INPUT") return new InputComponent();
         if (type == "OUTPUT") return new OutputComponent();
         return nullptr;
@@ -54,7 +58,7 @@ Canvas::Canvas(wxWindow* parent, wxClipboard* clipboard)
         wxFULL_REPAINT_ON_RESIZE), m_dragTimer(this),
         m_clipboard(clipboard ? clipboard : wxTheClipboard), m_textTimer(this)
 {
-    SetBackgroundColour(*wxWHITE);
+    SetBackgroundColour(wxColour(251, 252, 254));
     SetBackgroundStyle(wxBG_STYLE_PAINT);
 
     Bind(wxEVT_LEFT_DOWN, &Canvas::OnLeftDown, this);
@@ -77,14 +81,22 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
 {
     CancelMouseInteraction();
     SetFocusIgnoringChildren();
-    // 连线模式预留给引脚操作，不触发切换或元件拖动。
-    if (g_selectedType == "WIRE") return;
-
     const wxPoint mouse = event.GetPosition();
+    if (g_selectedType == "WIRE")
+    {
+        HandleWireClick(mouse);
+        return;
+    }
+    m_selectedWireIndex = -1;
     if (g_selectedType == "DELETE")
     {
         DeleteAtPoint(mouse);
         return;
+    }
+    if (g_selectedType.IsEmpty() && HitTest(mouse.x, mouse.y) < 0)
+    {
+        const int wire = HitTestWire(mouse);
+        if (wire >= 0) { SelectWire(wire); return; }
     }
     if (g_selectedType != "DELETE")
     {
@@ -131,7 +143,7 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
         const auto& pc = m_components[hit];
         m_togglePending = pc.comp->name == "INPUT" &&
             g_selectedType != "DELETE" && g_selectedType != "TEXT" &&
-            wxRect(pc.x, pc.y, 40, 40).Contains(mouse);
+            wxRect(pc.x, pc.y, m_portSize, m_portSize).Contains(mouse);
         m_dragOffset = mouse - wxPoint(m_components[hit].x, m_components[hit].y);
         if (m_selectionCallback)
             m_selectionCallback(m_components[hit].comp, m_components[hit].x, m_components[hit].y);
@@ -148,12 +160,13 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
     int x = SnapToGrid(event.GetX());
     int y = SnapToGrid(event.GetY());
 
-    Component* comp = CreateComponent(type);
+    Component* comp = CreateComponent(type, m_defaultGateInputCount);
 
     if (comp)
     {
         m_components.push_back({ comp, x, y });
         m_selectedIndex = static_cast<int>(m_components.size()) - 1;
+        RecomputeCircuit();
         // 单次放置后恢复选择/拖动模式，同时保留新元件的选中状态。
         g_selectedType.Clear();
         SetCursor(wxCursor(wxCURSOR_ARROW));
@@ -168,6 +181,11 @@ void Canvas::DeleteAtPoint(const wxPoint& point)
     // 与普通选择保持一致：重叠时优先命中最上面的元件。
     const int componentIndex = HitTest(point.x, point.y);
     const int textIndex = componentIndex < 0 ? HitTestText(point, true) : -1;
+    if (componentIndex < 0 && textIndex < 0)
+    {
+        DeleteWire(HitTestWire(point));
+        return;
+    }
     DeleteItem(componentIndex, textIndex);
 }
 
@@ -175,8 +193,11 @@ void Canvas::DeleteItem(int componentIndex, int textIndex)
 {
     m_selectedIndex = -1;
     m_selectedTextIndex = -1;
+    m_selectedWireIndex = -1;
+    CancelPendingWire();
     if (componentIndex >= 0)
     {
+        m_circuit.RemoveComponent(m_components[componentIndex].comp);
         delete m_components[componentIndex].comp;
         m_components.erase(m_components.begin() + componentIndex);
     }
@@ -186,6 +207,7 @@ void Canvas::DeleteItem(int componentIndex, int textIndex)
         m_textBoxes.erase(m_textBoxes.begin() + textIndex);
         editor->Destroy();
     }
+    RecomputeCircuit();
     if (m_selectionCallback) m_selectionCallback(nullptr, 0, 0);
     Refresh(false);
 }
@@ -227,11 +249,11 @@ void Canvas::OnLeftUp(wxMouseEvent& event)
             g_selectedType != "WIRE" && g_selectedType != "DELETE" &&
             g_selectedType != "TEXT" &&
             HitTest(mouse.x, mouse.y) == m_pressedIndex &&
-            wxRect(pc.x, pc.y, 40, 40).Contains(mouse))
+            wxRect(pc.x, pc.y, m_portSize, m_portSize).Contains(mouse))
         {
             auto& value = pc.comp->outputs[0].value;
             value = value == LogicValue::Low ? LogicValue::High : LogicValue::Low;
-            if (m_selectionCallback) m_selectionCallback(pc.comp, pc.x, pc.y);
+            RecomputeCircuit();
         }
     }
     CancelMouseInteraction();
@@ -240,6 +262,17 @@ void Canvas::OnLeftUp(wxMouseEvent& event)
 
 void Canvas::OnMouseMove(wxMouseEvent& event)
 {
+    if (g_selectedType == "WIRE")
+    {
+        const auto pin = HitTestPin(event.GetPosition());
+        SetCursor(wxCursor(pin ? wxCURSOR_HAND : wxCURSOR_CROSS));
+        if (m_pendingWire)
+        {
+            m_wirePreview = pin ? GetPinPosition(*pin) : event.GetPosition();
+            Refresh(false);
+        }
+        return;
+    }
     if (m_textTransformIndex >= 0)
     {
         if (event.LeftIsDown()) UpdateTextTransform(event.GetPosition());
@@ -293,10 +326,10 @@ void Canvas::MoveDraggedComponent(const wxPoint& mouse, bool snap)
     const int x = snap ? SnapToGrid(mouse.x - m_dragOffset.x) : mouse.x - m_dragOffset.x;
     const int y = snap ? SnapToGrid(mouse.y - m_dragOffset.y) : mouse.y - m_dragOffset.y;
     if (pc.x == x && pc.y == y) return;
-    const wxRect oldRect = GetComponentRect(pc);
+    const wxRect oldRect = GetComponentUpdateRect(pc);
     pc.x = x;
     pc.y = y;
-    wxRect dirty = oldRect.Union(GetComponentRect(pc));
+    wxRect dirty = oldRect.Union(GetComponentUpdateRect(pc));
     dirty.Inflate(3); // 包含选中虚线和画笔边缘，清除旧位置的残影。
     RefreshRect(dirty, false);
 }
@@ -316,6 +349,7 @@ void Canvas::OnDragTimer(wxTimerEvent&)
 
 void Canvas::CancelMouseInteraction(bool restoreText)
 {
+    if (restoreText) CancelPendingWire();
     m_dragTimer.Stop();
     if (m_dragging && m_pressedIndex >= 0 &&
         m_pressedIndex < static_cast<int>(m_components.size()))
@@ -367,7 +401,7 @@ void Canvas::OnKeyDown(wxKeyEvent& event)
             (event.GetKeyCode() == 'V' ? wxID_PASTE : wxID_CUT);
         HandleEditCommand(command);
     }
-    else if (event.GetKeyCode() == WXK_BACK && !event.HasModifiers())
+    else if ((event.GetKeyCode() == WXK_BACK || event.GetKeyCode() == WXK_DELETE) && !event.HasModifiers())
         DeleteSelection();
     else
         event.Skip();
@@ -407,6 +441,12 @@ bool Canvas::HandleEditCommand(int command)
 
 bool Canvas::DeleteSelection()
 {
+    if (m_selectedWireIndex >= 0)
+    {
+        CancelMouseInteraction(true);
+        DeleteWire(m_selectedWireIndex);
+        return true;
+    }
     const int component = m_selectedIndex;
     const int text = m_selectedTextIndex;
     if (component < 0 && text < 0) return false;
@@ -493,7 +533,8 @@ bool Canvas::PasteSelection()
     {
         if (!(stream >> std::quoted(type) >> x >> y >> std::quoted(inputs) >> std::quoted(outputs)))
             return false;
-        component.reset(CreateComponent(wxString::FromUTF8(type)));
+        if (inputs.size() > MultiInputGate::MaxInputCount) return false;
+        component.reset(CreateComponent(wxString::FromUTF8(type), static_cast<int>(inputs.size())));
         if (!component || inputs.size() != component->inputs.size() ||
             outputs.size() != component->outputs.size() ||
             inputs.find_first_not_of("01") != std::string::npos ||
@@ -502,8 +543,9 @@ bool Canvas::PasteSelection()
             component->inputs[i].value = inputs[i] == '1' ? LogicValue::High : LogicValue::Low;
         for (std::size_t i = 0; i < outputs.size(); ++i)
             component->outputs[i].value = outputs[i] == '1' ? LogicValue::High : LogicValue::Low;
-        width = 95;
-        height = 70;
+        const wxRect bounds = GetComponentRect({ component.get(), 0, 0 });
+        width = bounds.GetRight() + 1;
+        height = bounds.GetBottom() + 1;
     }
     else if (kind == "TEXT")
     {
@@ -518,12 +560,13 @@ bool Canvas::PasteSelection()
     const int pasteCount = std::min(m_pasteCount + 1, 1000);
     const int offset = pasteCount * m_gridSize;
     const wxSize size = GetClientSize();
-    x = std::clamp(x + offset, 0, std::max(0, size.x - width));
+    const int minX = component ? -GetComponentRect({ component.get(), 0, 0 }).x : 0;
+    x = std::clamp(x + offset, minX, std::max(minX, size.x - width));
     y = std::clamp(y + offset, 0, std::max(0, size.y - height));
     CancelMouseInteraction(true);
     if (component)
     {
-        x = SnapToGrid(x);
+        x = std::max(SnapToGrid(x), ((minX + m_gridSize - 1) / m_gridSize) * m_gridSize);
         y = SnapToGrid(y);
         m_components.push_back({ component.get(), x, y });
         component.release();
@@ -539,6 +582,8 @@ bool Canvas::PasteSelection()
         box.editor->ChangeValue(wxString::FromUTF8(text));
         box.scrollY = scrollY;
     }
+    m_selectedWireIndex = -1;
+    RecomputeCircuit();
     m_lastPastePayload = payload;
     m_pasteCount = pasteCount;
     g_selectedType.Clear();
@@ -569,7 +614,6 @@ void Canvas::CreateTextBox(const wxRect& rect)
         wxPoint(-32760, -32760), rect.GetSize(),
         wxTE_MULTILINE | wxTE_DONTWRAP | wxTE_NO_VSCROLL | wxBORDER_NONE);
     editor->SetFont(wxFontInfo(m_defaultTextPointSize).Family(wxFONTFAMILY_SWISS));
-    editor->SetToolTip(wxT("在框内输入文字，Ctrl+Enter 完成编辑"));
     const int index = static_cast<int>(m_textBoxes.size());
     m_textBoxes.push_back({ editor, m_defaultTextPointSize, rect });
     editor->Bind(wxEVT_SET_FOCUS, [this, editor](wxFocusEvent& event) {
@@ -605,6 +649,7 @@ void Canvas::CreateTextBox(const wxRect& rect)
 
 void Canvas::NotifyTextSelection()
 {
+    if (m_selectedTextIndex >= 0) m_selectedWireIndex = -1;
     if (m_textSelectionCallback && m_selectedTextIndex >= 0 &&
         m_selectedTextIndex < static_cast<int>(m_textBoxes.size()))
     {
@@ -640,7 +685,9 @@ void Canvas::OnToolChanged()
     CancelMouseInteraction(true);
     m_selectedTextIndex = -1;
     m_selectedIndex = -1;
-    SetCursor(wxCursor(g_selectedType == "TEXT" ? wxCURSOR_CROSS : wxCURSOR_ARROW));
+    m_selectedWireIndex = -1;
+    SetCursor(wxCursor(g_selectedType == "TEXT" || g_selectedType == "WIRE" ? wxCURSOR_CROSS : wxCURSOR_ARROW));
+    ReportStatus(wxEmptyString);
     // 切换工具时结束框内编辑，但保留树状列表的键盘焦点。
     wxWindow* focus = wxWindow::FindFocus();
     if (focus && IsDescendant(focus)) SetFocusIgnoringChildren();
@@ -656,18 +703,61 @@ int Canvas::HitTest(int x, int y) const
     return -1;
 }
 
+Canvas::GateGeometry Canvas::GetGateGeometry(const Component& component) const
+{
+    const auto& type = component.name;
+    if (type == "NOT") return { 40, 40, 0, 60, { wxPoint(0, 20) } };
+    const bool andShape = type == "AND" || type == "NAND";
+    const bool inverted = type == "NAND" || type == "NOR";
+    const bool leftPins = type == "NOR" || type == "XOR";
+    const int count = static_cast<int>(component.inputs.size());
+    // 偶数输入在中线两侧对称排列；引脚和输出都落在网格点上。
+    const int height = std::max(andShape ? 80 : 120, (count / 2 + 1) * 2 * m_gridSize);
+    GateGeometry geometry{ 80, height, leftPins ? -20 : 0, inverted ? 100 : 80, {} };
+    for (int i = 0; i < count; ++i)
+    {
+        int row = i - count / 2;
+        if (count % 2 == 0 && i >= count / 2) ++row;
+        geometry.inputs.emplace_back(geometry.left, height / 2 + row * m_gridSize);
+    }
+    return geometry;
+}
+
 wxRect Canvas::GetComponentRect(const PlacedComponent& pc) const
 {
     if (!pc.comp) return wxRect();
-
-    // 输入/输出的本体及引线占 60 x 40，四周留出 5 像素命中余量。
     if (pc.comp->name == "INPUT" || pc.comp->name == "OUTPUT")
-        return wxRect(pc.x - 5, pc.y - 5, 70, 50);
+        return wxRect(pc.x - 5, pc.y - 5, m_portSize + 11, m_portSize + 11);
+    const auto geometry = GetGateGeometry(*pc.comp);
+    // 覆盖本体、全部引脚、反相圆圈及画笔边缘，不再使用旧的固定范围。
+    return wxRect(pc.x + geometry.left - 5, pc.y - 5,
+        geometry.outputX - geometry.left + 11, geometry.height + 11);
+}
 
-    // 包围盒覆盖当前已实现的六种门电路，并留出拖拽余量。
-    const int width = (pc.comp->name == "NOT") ? 50 :
-        ((pc.comp->name == "AND" || pc.comp->name == "NAND") ? 75 : 95);
-    return wxRect(pc.x - 5, pc.y - 5, width, 70);
+int Canvas::GetGateInputCount() const
+{
+    if (m_selectedIndex >= 0 && m_selectedIndex < static_cast<int>(m_components.size()) &&
+        m_components[m_selectedIndex].comp->SupportsVariableInputs())
+        return static_cast<int>(m_components[m_selectedIndex].comp->inputs.size());
+    return m_defaultGateInputCount;
+}
+
+void Canvas::SetGateInputCount(int count)
+{
+    if (count < MultiInputGate::MinInputCount || count > MultiInputGate::MaxInputCount) return;
+    m_defaultGateInputCount = count;
+    if (m_selectedIndex < 0 || m_selectedIndex >= static_cast<int>(m_components.size()))
+    {
+        if (m_selectionCallback) m_selectionCallback(nullptr, 0, 0);
+        return;
+    }
+    auto& pc = m_components[m_selectedIndex];
+    if (!pc.comp->SupportsVariableInputs() || static_cast<int>(pc.comp->inputs.size()) == count) return;
+    if (!pc.comp->SetInputCount(count)) return;
+    m_selectedWireIndex = -1;
+    CancelPendingWire();
+    m_circuit.PruneInvalidConnections();
+    RecomputeCircuit();
 }
 
 void Canvas::OnPaint(wxPaintEvent& event)
@@ -685,13 +775,19 @@ void Canvas::UpdateGridBitmap()
     if (m_gridBitmap.IsOk() && m_gridBitmap.GetSize() == size) return;
     m_gridBitmap = wxBitmap(size.x, size.y);
     wxMemoryDC gridDC(m_gridBitmap);
-    gridDC.SetBackground(*wxWHITE_BRUSH);
+    gridDC.SetBackground(wxBrush(GetBackgroundColour()));
     gridDC.Clear();
-    gridDC.SetPen(wxPen(wxColour(200, 200, 200), 1, wxPENSTYLE_SOLID));
-    gridDC.SetBrush(*wxWHITE_BRUSH);
-    for (int x = 0; x <= size.GetWidth(); x += m_gridSize)
-        for (int y = 0; y <= size.GetHeight(); y += m_gridSize)
-            gridDC.DrawCircle(x, y, 1);
+    // 保留网格缓存；用纵横线恢复方格绘图区。
+    for (int x = 0; x < size.GetWidth(); x += m_gridSize)
+    {
+        gridDC.SetPen(wxPen(x % (m_gridSize * 5) == 0 ? wxColour(198, 211, 228) : m_gridColour));
+        gridDC.DrawLine(x, 0, x, size.GetHeight());
+    }
+    for (int y = 0; y < size.GetHeight(); y += m_gridSize)
+    {
+        gridDC.SetPen(wxPen(y % (m_gridSize * 5) == 0 ? wxColour(198, 211, 228) : m_gridColour));
+        gridDC.DrawLine(0, y, size.GetWidth(), y);
+    }
 }
 
 void Canvas::DrawCanvas(wxDC& dc, const wxRect& updateRect)
@@ -699,34 +795,30 @@ void Canvas::DrawCanvas(wxDC& dc, const wxRect& updateRect)
     // 网格仅在画布尺寸改变时生成；拖动时直接复制缓存。
     UpdateGridBitmap();
     if (m_gridBitmap.IsOk()) dc.DrawBitmap(m_gridBitmap, 0, 0);
+    DrawWires(dc, updateRect);
 
     // 元件
     for (const auto& pc : m_components)
     {
         if (!pc.comp || !GetComponentRect(pc).Intersects(updateRect)) continue;
 
-        if (pc.comp->name == "AND")       DrawAndGate(dc, pc.x, pc.y);
-        else if (pc.comp->name == "OR")   DrawOrGate(dc, pc.x, pc.y);
-        else if (pc.comp->name == "NOT")  DrawNotGate(dc, pc.x, pc.y);
-        else if (pc.comp->name == "NAND") DrawNandGate(dc, pc.x, pc.y);
-        else if (pc.comp->name == "NOR")  DrawNorGate(dc, pc.x, pc.y);
-        else if (pc.comp->name == "XOR")  DrawXorGate(dc, pc.x, pc.y);
-        else if (pc.comp->name == "INPUT")
+        if (pc.comp->name == "INPUT")
             DrawInput(dc, pc.x, pc.y, pc.comp->outputs[0].value);
         else if (pc.comp->name == "OUTPUT")
             DrawOutput(dc, pc.x, pc.y, pc.comp->inputs[0].value);
+        else DrawGate(dc, pc);
 
     }
 
     if (m_selectedIndex >= 0 && m_selectedIndex < static_cast<int>(m_components.size()))
     {
-        dc.SetPen(wxPen(wxColour(30, 120, 220), 2, wxPENSTYLE_DOT));
+        dc.SetPen(wxPen(wxColour(53, 120, 229), 2, wxPENSTYLE_DOT));
         dc.SetBrush(*wxTRANSPARENT_BRUSH);
-        dc.DrawRectangle(GetComponentRect(m_components[m_selectedIndex]));
+        dc.DrawRoundedRectangle(GetComponentRect(m_components[m_selectedIndex]), 6);
     }
     if (m_creatingText)
     {
-        dc.SetPen(wxPen(wxColour(30, 120, 220), 1, wxPENSTYLE_DOT));
+        dc.SetPen(wxPen(wxColour(53, 120, 229), 1, wxPENSTYLE_DOT));
         dc.SetBrush(*wxTRANSPARENT_BRUSH);
         dc.DrawRectangle(GetPendingTextRect());
     }
@@ -845,7 +937,7 @@ void Canvas::DrawTextSelection(wxDC& dc)
 {
     if (m_selectedTextIndex < 0) return;
     const wxRect rect = m_textBoxes[m_selectedTextIndex].rect;
-    const wxColour colour(30, 120, 220);
+    const wxColour colour(53, 120, 229);
     dc.SetPen(wxPen(colour, 1, wxPENSTYLE_DOT));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
     dc.DrawRectangle(rect);
@@ -978,7 +1070,7 @@ void Canvas::UpdateTextInput()
 void Canvas::DrawTextBoxes(wxDC& dc, const wxRect& updateRect)
 {
     dc.SetBackgroundMode(wxTRANSPARENT);
-    dc.SetTextForeground(*wxBLACK);
+    dc.SetTextForeground(wxColour(36, 50, 71));
     for (const auto& box : m_textBoxes)
     {
         if (!box.rect.Intersects(updateRect)) continue;
@@ -997,7 +1089,7 @@ void Canvas::DrawTextBoxes(wxDC& dc, const wxRect& updateRect)
             {
                 const int left = dc.GetTextExtent(box.editor->GetRange(line.start, std::max(from, line.start))).x;
                 const int right = dc.GetTextExtent(box.editor->GetRange(line.start, std::min(to, end))).x;
-                dc.SetPen(wxPen(wxColour(30, 120, 220), 1));
+                dc.SetPen(wxPen(wxColour(53, 120, 229), 1));
                 dc.DrawLine(line.origin.x + left, line.origin.y + line.height - 1,
                     line.origin.x + right, line.origin.y + line.height - 1);
             }
@@ -1013,363 +1105,109 @@ void Canvas::DrawTextBoxes(wxDC& dc, const wxRect& updateRect)
 }
 
 
-// 输入：方框 + 右侧输出引线，连接端落在 (x + 60, y + 20)。
+// 输入、输出使用同样的方框；连接点贴在框边，不再伸出短导线。
+void Canvas::DrawPort(wxDC& dc, int x, int y, LogicValue value, PinType direction)
+{
+    const bool high = value == LogicValue::High;
+    const wxColour terminal = direction == PinType::Output ? wxColour(225, 92, 99) : wxColour(53, 120, 229);
+    const wxFont previousFont = dc.GetFont();
+    dc.SetPen(wxPen(terminal, 2));
+    dc.SetBrush(wxBrush(high ? wxColour(232, 247, 238) : wxColour(255, 255, 255)));
+    dc.DrawRoundedRectangle(x, y, m_portSize, m_portSize, 6);
+    dc.SetFont(wxFontInfo(14).FaceName("Microsoft YaHei UI").Bold());
+    dc.SetTextForeground(high ? wxColour(30, 143, 83) : wxColour(36, 50, 71));
+    dc.DrawLabel(high ? wxT("1") : wxT("0"), wxRect(x, y, m_portSize, m_portSize), wxALIGN_CENTER);
+    dc.SetFont(previousFont);
+    dc.SetPen(wxPen(terminal));
+    dc.SetBrush(wxBrush(terminal));
+    dc.DrawCircle(direction == PinType::Output ? x + m_portSize : x, y + m_portSize / 2, 3);
+}
+
 void Canvas::DrawInput(wxDC& dc, int x, int y, LogicValue value)
 {
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    dc.SetBrush(*wxWHITE_BRUSH);
-    dc.SetTextForeground(*wxBLACK);
-    dc.DrawRectangle(x, y, 40, 40);
-    dc.DrawLine(x + 40, y + 20, x + 60, y + 20);
-    dc.DrawLabel(value == LogicValue::High ? wxT("1") : wxT("0"),
-        wxRect(x, y, 40, 40), wxALIGN_CENTER);
+    DrawPort(dc, x, y, value, PinType::Output);
 }
 
-// 输出：圆框 + 左侧输入引线，连接端落在 (x, y + 20)。
 void Canvas::DrawOutput(wxDC& dc, int x, int y, LogicValue value)
 {
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    dc.SetBrush(*wxWHITE_BRUSH);
-    dc.SetTextForeground(*wxBLACK);
-    dc.DrawCircle(x + 40, y + 20, 20);
-    dc.DrawLine(x, y + 20, x + 20, y + 20);
-    dc.DrawLabel(value == LogicValue::High ? wxT("1") : wxT("0"),
-        wxRect(x + 20, y, 40, 40), wxALIGN_CENTER);
+    DrawPort(dc, x, y, value, PinType::Input);
 }
 
-// 非门 NOT
-// ============================================================
-void Canvas::DrawNotGate(wxDC& dc, int x, int y)
+// 门电路的轮廓和引脚使用与点击判定、拖动刷新相同的几何参数。
+void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
 {
-    dc.SetPen(wxPen(*wxBLACK, 2));
+    const auto geometry = GetGateGeometry(*pc.comp);
+    const auto& type = pc.comp->name;
+    const int x = pc.x, y = pc.y, w = geometry.width, h = geometry.height;
+    const int midY = y + h / 2;
+    const bool inverted = type == "NOT" || type == "NAND" || type == "NOR";
+    const bool andShape = type == "AND" || type == "NAND";
+    const int curveLeft = (type == "NOR" || type == "XOR") ? -10 : 0;
+    dc.SetPen(wxPen(wxColour(36, 50, 71), 2));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
-
-    int w = 40;
-    int h = 40;
-
-    dc.DrawLine(x, y, x, y + h);
-    dc.DrawLine(x, y, x + w, y + h / 2);
-    dc.DrawLine(x, y + h, x + w, y + h / 2);
-    dc.DrawCircle(x + w + 5, y + h / 2, 4);
-
-    dc.SetBrush(*wxBLUE_BRUSH);
-    dc.SetPen(wxPen(*wxBLUE, 1));
-    dc.DrawCircle(x, y + h / 2, 3);
-
-    dc.SetBrush(*wxRED_BRUSH);
-    dc.SetPen(wxPen(*wxRED, 1));
-    dc.DrawCircle(x + w + 10, y + h / 2, 3);
-}
-
-
-// ============================================================
-// 与门 AND
-// ============================================================
-void Canvas::DrawAndGate(wxDC& dc, int x, int y)
-{
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-
-    int h = 80;   // 4 格高
-    int r = h / 2;
-
-    dc.DrawLine(x, y, x, y + h);
-    dc.DrawLine(x, y, x + r, y);
-    dc.DrawLine(x, y + h, x + r, y + h);
-    dc.DrawEllipticArc(x, y, h, h, 270, 90);
-
-    dc.SetBrush(*wxBLUE_BRUSH);
-    dc.SetPen(wxPen(*wxBLUE, 1));
-    int ys[5] = { 0, 20, 40, 60, 80 };
-    for (int i = 0; i < 5; ++i)
-        dc.DrawCircle(x, y + ys[i], 3);
-
-    // 红点：右半圆最右端
-    dc.SetBrush(*wxRED_BRUSH);
-    dc.SetPen(wxPen(*wxRED, 1));
-    dc.DrawCircle(x + h, y + h / 2, 3);
-}
-
-// ============================================================
-// 或门 OR
-// ============================================================
-void Canvas::DrawOrGate(wxDC& dc, int x, int y)
-{
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-
-    int w = 80;
-    int h = 120;
-    int midY = y + h / 2;
-
-    const int N = 80;
-
-    wxPoint left[N + 1];
-    for (int i = 0; i <= N; ++i)
+    if (type == "NOT")
     {
-        double t = (double)i / N;
-        double py = y + t * h;
-        double bulge = 10.0 * std::sin(t * 3.1415926);
-        double px = x + bulge;
-        left[i] = wxPoint((int)px, (int)py);
+        dc.DrawLine(x, y, x, y + h);
+        dc.DrawLine(x, y, x + w, midY);
+        dc.DrawLine(x, y + h, x + w, midY);
     }
-    dc.DrawLines(N + 1, left);
-
-    wxPoint upper[N + 1];
-    double x0 = x, y0 = y;
-    double x1 = x + w * 0.65, y1 = y + 1;
-    double x2 = x + w, y2 = midY;
-    for (int i = 0; i <= N; ++i)
+    else if (andShape)
     {
-        double t = (double)i / N;
-        double mt = 1 - t;
-        double px = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2;
-        double py = mt * mt * y0 + 2 * mt * t * y1 + t * t * y2;
-        upper[i] = wxPoint((int)px, (int)py);
+        dc.DrawLine(x, y, x, y + h);
+        dc.DrawLine(x, y, x + w / 2, y);
+        dc.DrawLine(x, y + h, x + w / 2, y + h);
+        dc.DrawEllipticArc(x, y, w, h, 270, 90);
     }
-    dc.DrawLines(N + 1, upper);
-
-    wxPoint lower[N + 1];
-    double y3 = y + h;
-    double y4 = y + h - 1;
-    for (int i = 0; i <= N; ++i)
+    else
     {
-        double t = (double)i / N;
-        double mt = 1 - t;
-        double px = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2;
-        double py = mt * mt * y3 + 2 * mt * t * y4 + t * t * y2;
-        lower[i] = wxPoint((int)px, (int)py);
+        constexpr int segments = 80;
+        constexpr double pi = 3.141592653589793;
+        auto drawLeft = [&](int left) {
+            std::array<wxPoint, segments + 1> points;
+            for (int i = 0; i <= segments; ++i)
+            {
+                const double t = static_cast<double>(i) / segments;
+                points[i] = wxPoint(x + left + static_cast<int>(std::lround(10 * std::sin(t * pi))),
+                    y + static_cast<int>(std::lround(t * h)));
+            }
+            dc.DrawLines(static_cast<int>(points.size()), points.data());
+        };
+        drawLeft(curveLeft);
+        if (type == "XOR") drawLeft(curveLeft - 8);
+        for (const bool lower : { false, true })
+        {
+            std::array<wxPoint, segments + 1> points;
+            const double startY = lower ? y + h : y;
+            const double controlY = lower ? y + h - 1 : y + 1;
+            for (int i = 0; i <= segments; ++i)
+            {
+                const double t = static_cast<double>(i) / segments, mt = 1 - t;
+                points[i] = wxPoint(static_cast<int>(std::lround(mt * mt * (x + curveLeft) +
+                    2 * mt * t * (x + w * 0.65) + t * t * (x + w))),
+                    static_cast<int>(std::lround(mt * mt * startY +
+                    2 * mt * t * controlY + t * t * midY)));
+            }
+            dc.DrawLines(static_cast<int>(points.size()), points.data());
+        }
+        // 引线连接门本体的内弧，异或门仍保留左侧额外弧线。
+        for (const auto& pin : geometry.inputs)
+        {
+            const double t = static_cast<double>(pin.y) / h;
+            const int endX = x + curveLeft + static_cast<int>(std::lround(10 * std::sin(t * pi)));
+            dc.DrawLine(x + pin.x, y + pin.y, endX, y + pin.y);
+        }
     }
-    dc.DrawLines(N + 1, lower);
-
-    // 5 条短横线 + 5 个蓝点
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    int ys[5] = { 20, 40, 60, 80, 100 };
-    for (int i = 0; i < 5; ++i)
-        dc.DrawLine(x, y + ys[i], x + 8, y + ys[i]);
-
-    dc.SetBrush(*wxBLUE_BRUSH);
-    dc.SetPen(wxPen(*wxBLUE, 1));
-    for (int i = 0; i < 5; ++i)
-        dc.DrawCircle(x, y + ys[i], 3);
-
-    // 输出红点
-    dc.SetBrush(*wxRED_BRUSH);
-    dc.SetPen(wxPen(*wxRED, 1));
-    dc.DrawCircle(x + w, y + h / 2, 3);
-}
-
-// ============================================================
-// 与非门 NAND
-// ============================================================
-void Canvas::DrawNandGate(wxDC& dc, int x, int y)
-{
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-
-    int h = 80;   // 与 AND 保持一致
-    int r = h / 2;
-
-    // 与门本体
-    dc.DrawLine(x, y, x, y + h);
-    dc.DrawLine(x, y, x + r, y);
-    dc.DrawLine(x, y + h, x + r, y + h);
-    dc.DrawEllipticArc(x, y, h, h, 270, 90);
-
-    // 5 个蓝点：y+0/20/40/60/80，全部压在格点上
-    dc.SetBrush(*wxBLUE_BRUSH);
-    dc.SetPen(wxPen(*wxBLUE, 1));
-    int ys[5] = { 0, 20, 40, 60, 80 };
-    for (int i = 0; i < 5; ++i)
-        dc.DrawCircle(x, y + ys[i], 3);
-
-    // 黑小圆（贴在与门右端）
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    dc.DrawCircle(x + h + 5, y + h / 2, 6);
-
-    // 短横线：从黑小圆右缘画到红点位置
-    dc.DrawLine(x + h + 11, y + h / 2, x + h + 17, y + h / 2);
-
-    // 红点（位置保持不变）
-    dc.SetBrush(*wxRED_BRUSH);
-    dc.SetPen(wxPen(*wxRED, 1));
-    dc.DrawCircle(x + h + 17, y + h / 2, 3);
-}
-
-//或非门
-void Canvas::DrawNorGate(wxDC& dc, int x, int y)
-{
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-
-    int w = 80;
-    int h = 120;
-    int midY = y + h / 2;
-
-    const int N = 80;
-
-    // 左侧短弧
-    wxPoint left[N + 1];
-    for (int i = 0; i <= N; ++i)
+    if (inverted)
     {
-        double t = (double)i / N;
-        double py = y + t * h;
-        double bulge = 10.0 * std::sin(t * 3.1415926);
-        double px = (x - 10) + bulge;
-        left[i] = wxPoint((int)px, (int)py);
+        const int radius = type == "NOT" ? 4 : 6;
+        dc.DrawCircle(x + w + radius, midY, radius);
+        dc.DrawLine(x + w + 2 * radius, midY, x + geometry.outputX, midY);
     }
-    dc.DrawLines(N + 1, left);
-
-    // 上弧
-    wxPoint upper[N + 1];
-    double x0 = x - 10, y0 = y;
-    double x1 = x + w * 0.55, y1 = y + 1;
-    double x2 = x + w, y2 = midY;
-    for (int i = 0; i <= N; ++i)
-    {
-        double t = (double)i / N;
-        double mt = 1 - t;
-        double px = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2;
-        double py = mt * mt * y0 + 2 * mt * t * y1 + t * t * y2;
-        upper[i] = wxPoint((int)px, (int)py);
-    }
-    dc.DrawLines(N + 1, upper);
-
-    // 下弧
-    wxPoint lower[N + 1];
-    double y3 = y + h;
-    double y4 = y + h - 1;
-    for (int i = 0; i <= N; ++i)
-    {
-        double t = (double)i / N;
-        double mt = 1 - t;
-        double px = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2;
-        double py = mt * mt * y3 + 2 * mt * t * y4 + t * t * y2;
-        lower[i] = wxPoint((int)px, (int)py);
-    }
-    dc.DrawLines(N + 1, lower);
-
-    // 5 条短横线 + 5 个蓝点，终点动态计算弧线 x 坐标
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    int ys[5] = { 20, 40, 60, 80, 100 };
-    for (int i = 0; i < 5; ++i)
-    {
-        double t = (double)ys[i] / h;
-        double bulge = 10.0 * std::sin(t * 3.1415926);
-        double arcX = (x - 10) + bulge;   // 弧线在该 y 处的 x 坐标
-
-        // 从蓝点到弧线，画横线
-        dc.DrawLine(x - 20, y + ys[i], (int)arcX, y + ys[i]);
-
-        // 蓝点
-        dc.SetBrush(*wxBLUE_BRUSH);
-        dc.SetPen(wxPen(*wxBLUE, 1));
-        dc.DrawCircle(x - 20, y + ys[i], 3);
-
-        dc.SetPen(wxPen(*wxBLACK, 2));   // 恢复黑色画笔
-    }
-
-    // 输出：黑圆圈
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    dc.DrawCircle(x + w + 5, y + h / 2, 6);
-
-    // 短横线：从黑圈连到红点
-    dc.DrawLine(x + w + 11, y + h / 2, x + w + 17, y + h / 2);
-
-    // 红点
-    dc.SetBrush(*wxRED_BRUSH);
-    dc.SetPen(wxPen(*wxRED, 1));
-    dc.DrawCircle(x + w + 17, y + h / 2, 3);
-}
-// ============================================================
-// 异或门 XOR
-// ============================================================
-void Canvas::DrawXorGate(wxDC& dc, int x, int y)
-{
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-
-    int w = 80;
-    int h = 120;
-    int midY = y + h / 2;
-
-    const int N = 80;
-
-    // 左侧额外弧（异或门特征）：外凸最大处为 x - 18
-    wxPoint left[N + 1];
-    for (int i = 0; i <= N; ++i)
-    {
-        double t = (double)i / N;
-        double py = y + t * h;
-        double bulge = 10.0 * std::sin(t * 3.1415926);
-        double px = (x - 10 - 8) + bulge;   // 起点 x-18，最凸处 x-8
-        left[i] = wxPoint((int)px, (int)py);
-    }
-    dc.DrawLines(N + 1, left);
-
-    // 左侧内弧（或门左弧）：外凸最大处为 x
-    wxPoint left2[N + 1];
-    for (int i = 0; i <= N; ++i)
-    {
-        double t = (double)i / N;
-        double py = y + t * h;
-        double bulge = 10.0 * std::sin(t * 3.1415926);
-        double px = (x - 10) + bulge;
-        left2[i] = wxPoint((int)px, (int)py);
-    }
-    dc.DrawLines(N + 1, left2);
-
-    // 上弧
-    wxPoint upper[N + 1];
-    double x0 = x - 10, y0 = y;
-    double x1 = x + w * 0.55, y1 = y + 1;
-    double x2 = x + w, y2 = midY;
-    for (int i = 0; i <= N; ++i)
-    {
-        double t = (double)i / N;
-        double mt = 1 - t;
-        double px = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2;
-        double py = mt * mt * y0 + 2 * mt * t * y1 + t * t * y2;
-        upper[i] = wxPoint((int)px, (int)py);
-    }
-    dc.DrawLines(N + 1, upper);
-
-    // 下弧
-    wxPoint lower[N + 1];
-    double y3 = y + h;
-    double y4 = y + h - 1;
-    for (int i = 0; i <= N; ++i)
-    {
-        double t = (double)i / N;
-        double mt = 1 - t;
-        double px = mt * mt * x0 + 2 * mt * t * x1 + t * t * x2;
-        double py = mt * mt * y3 + 2 * mt * t * y4 + t * t * y2;
-        lower[i] = wxPoint((int)px, (int)py);
-    }
-    dc.DrawLines(N + 1, lower);
-
-    // 5 条短横线 + 5 个蓝点：连到额外左弧上
-    dc.SetPen(wxPen(*wxBLACK, 2));
-    int ys[5] = { 20, 40, 60, 80, 100 };
-    for (int i = 0; i < 5; ++i)
-    {
-        double t = (double)ys[i] / h;
-        double bulge = 10.0 * std::sin(t * 3.1415926);
-        double arcX = (x - 10 - 8) + bulge;   // 额外弧在该 y 处的 x
-
-        dc.DrawLine(x - 20, y + ys[i], (int)arcX, y + ys[i]);
-
-        dc.SetBrush(*wxBLUE_BRUSH);
-        dc.SetPen(wxPen(*wxBLUE, 1));
-        dc.DrawCircle(x - 20, y + ys[i], 3);
-
-        dc.SetPen(wxPen(*wxBLACK, 2));
-    }
-
-    // 输出红点
-    dc.SetBrush(*wxRED_BRUSH);
-    dc.SetPen(wxPen(*wxRED, 1));
-    dc.DrawCircle(x + w, y + h / 2, 3);
+    dc.SetBrush(wxBrush(wxColour(53, 120, 229)));
+    dc.SetPen(wxPen(wxColour(53, 120, 229), 1));
+    for (const auto& pin : geometry.inputs)
+        dc.DrawCircle(x + pin.x, y + pin.y, 3);
+    dc.SetBrush(wxBrush(wxColour(225, 92, 99)));
+    dc.SetPen(wxPen(wxColour(225, 92, 99), 1));
+    dc.DrawCircle(x + geometry.outputX, midY, 3);
 }

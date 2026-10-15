@@ -1,28 +1,16 @@
 #pragma once
 
 #include "Component.h"
+#include <algorithm>
 
-class NorGate : public Component
+class NorGate : public MultiInputGate
 {
 public:
-    NorGate()
-        : Component("NOR")
-    {
-        inputs.emplace_back("A", PinType::Input);
-        inputs.emplace_back("B", PinType::Input);
-        outputs.emplace_back("OUT", PinType::Output);
-    }
+    explicit NorGate(int inputCount = 2) : MultiInputGate("NOR", inputCount) {}
 
     void Evaluate() override
     {
-        if (inputs[0].value == LogicValue::Low &&
-            inputs[1].value == LogicValue::Low)
-        {
-            outputs[0].value = LogicValue::High;
-        }
-        else
-        {
-            outputs[0].value = LogicValue::Low;
-        }
+        const auto high = [](const Pin& pin) { return pin.value == LogicValue::High; };
+        outputs[0].value = (!std::any_of(inputs.begin(), inputs.end(), high)) ? LogicValue::High : LogicValue::Low;
     }
 };

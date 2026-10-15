@@ -11,12 +11,26 @@ MainFrame::MainFrame()
     : wxFrame(nullptr, wxID_ANY, wxT("数字电路编辑器"),
         wxDefaultPosition, wxSize(1200, 800))
 {
+    const wxColour background(243, 246, 251);
+    const wxColour text(36, 50, 71);
+    const wxColour secondary(100, 116, 139);
+    const wxColour divider(220, 228, 239);
+    const wxFont uiFont(wxFontInfo(9).FaceName(wxT("Microsoft YaHei UI")));
+    SetFont(uiFont);
+    SetBackgroundColour(background);
+    SetForegroundColour(text);
     SetMenuBar(CreateMainMenuBar());
+    auto* status = CreateStatusBar();
+    status->SetFont(uiFont);
+    status->SetBackgroundColour(*wxWHITE);
+    status->SetForegroundColour(secondary);
     SetMinSize(FromDIP(wxSize(800, 600)));
     auto* workspace = new wxSplitterWindow(this, wxID_ANY,
-        wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE | wxSP_3D);
+        wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
     auto* sidebar = new wxSplitterWindow(workspace, wxID_ANY,
-        wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE | wxSP_3D);
+        wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
+    workspace->SetBackgroundColour(divider);
+    sidebar->SetBackgroundColour(divider);
     auto* toolbox = new Toolbox(sidebar);
     auto* properties = new PropertyPanel(sidebar);
     auto* canvas = new Canvas(workspace);
@@ -41,7 +55,7 @@ MainFrame::MainFrame()
         toolbox->SelectTool(type);
         UpdateMainToolBarSelection(GetToolBar(), type);
         canvas->OnToolChanged();
-        properties->ShowTool(type, canvas->GetTextFontSize());
+        properties->ShowTool(type, canvas->GetTextFontSize(), canvas->GetGateInputCount());
     };
     if (auto* toolbar = CreateMainToolBar(this, showTool)) SetToolBar(toolbar);
     toolbox->SetSelectionCallback(showTool);
@@ -51,7 +65,7 @@ MainFrame::MainFrame()
     });
     canvas->SetSelectionCallback([properties, canvas](const Component* component, int x, int y) {
         if (component) properties->ShowComponent(component, x, y);
-        else properties->ShowTool(g_selectedType, canvas->GetTextFontSize());
+        else properties->ShowTool(g_selectedType, canvas->GetTextFontSize(), canvas->GetGateInputCount());
     });
     canvas->SetTextSelectionCallback([properties](const wxRect& rect, int pointSize) {
         properties->ShowTextBox(rect, pointSize);
@@ -59,8 +73,16 @@ MainFrame::MainFrame()
     properties->SetTextFontSizeCallback([canvas](int pointSize) {
         canvas->SetTextFontSize(pointSize);
     });
+    properties->SetGateInputCountCallback([canvas](int count) {
+        canvas->SetGateInputCount(count);
+    });
+    canvas->SetWireSelectionCallback([properties](const WireConnection* connection) {
+        properties->ShowConnection(connection);
+    });
+    canvas->SetStatusCallback([this](const wxString& message) { SetStatusText(message); });
+
     auto* root = new wxBoxSizer(wxVERTICAL);
-    root->Add(workspace, 1, wxEXPAND);
+    root->Add(workspace, 1, wxEXPAND | wxALL, FromDIP(12));
     SetSizer(root);
     Layout();
     // 按实际可用高度初始化，让状态区占左栏约 45%。

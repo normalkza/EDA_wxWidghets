@@ -19,3 +19,6 @@ Release/
 
 # 其他
 *.tmp
+
+# 回归测试编译产物
+/tests/build/

@@ -14,7 +14,14 @@ class ActiveToolTree : public wxTreeCtrl
 public:
     explicit ActiveToolTree(wxWindow* parent)
         : wxTreeCtrl(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-            wxTR_DEFAULT_STYLE | wxTR_HAS_BUTTONS) {}
+            wxTR_HAS_BUTTONS | wxTR_HIDE_ROOT | wxTR_NO_LINES | wxTR_LINES_AT_ROOT | wxTR_SINGLE | wxBORDER_NONE)
+    {
+        SetBackgroundColour(*wxWHITE);
+        SetForegroundColour(wxColour(36, 50, 71));
+        SetFont(wxFont(wxFontInfo(9).FaceName(wxT("Microsoft YaHei UI"))));
+        SetIndent(FromDIP(16));
+        SetSpacing(FromDIP(6));
+    }
 
     void SetActiveItem(const wxTreeItemId& item)
     {
@@ -23,12 +30,14 @@ public:
         {
             SetItemBold(m_activeItem, false);
             SetItemBackgroundColour(m_activeItem, GetBackgroundColour());
+            SetItemTextColour(m_activeItem, GetForegroundColour());
         }
         m_activeItem = item;
         if (item.IsOk())
         {
             SetItemBold(item, true);
-            SetItemBackgroundColour(item, wxColour(225, 239, 255));
+            SetItemBackgroundColour(item, wxColour(235, 243, 255));
+            SetItemTextColour(item, wxColour(53, 120, 229));
         }
         Refresh(false);
     }
@@ -53,7 +62,7 @@ public:
                 rect.Inflate(FromDIP(4), 0);
                 const HDC hdc = draw->nmcd.hdc;
                 const int saved = SaveDC(hdc);
-                const HPEN pen = CreatePen(PS_SOLID, FromDIP(3), RGB(30, 120, 220));
+                const HPEN pen = CreatePen(PS_SOLID, FromDIP(2), RGB(53, 120, 229));
                 SelectObject(hdc, pen);
                 SelectObject(hdc, GetStockObject(HOLLOW_BRUSH));
                 Rectangle(hdc, rect.x, rect.y + 1, rect.GetRight() + 1, rect.GetBottom());
@@ -85,7 +94,9 @@ namespace
 Toolbox::Toolbox(wxWindow* parent)
     : wxPanel(parent, wxID_ANY)
 {
-    this->SetBackgroundColour(wxColour(240, 240, 240));
+    SetBackgroundColour(*wxWHITE);
+    SetForegroundColour(wxColour(36, 50, 71));
+    SetFont(wxFont(wxFontInfo(9).FaceName(wxT("Microsoft YaHei UI"))));
 
     m_imageList = new wxImageList(16, 16, true);
     LoadIcons();
@@ -99,8 +110,16 @@ Toolbox::Toolbox(wxWindow* parent)
     m_treeCtrl->Bind(wxEVT_TREE_SEL_CHANGED, &Toolbox::OnTreeSelect, this);
     SelectTool(wxEmptyString);
 
+    auto* title = new wxStaticText(this, wxID_ANY, wxT("元件库"));
+    title->SetFont(wxFont(wxFontInfo(10).FaceName(wxT("Microsoft YaHei UI")).Bold()));
+    auto* divider = new wxPanel(this, wxID_ANY,
+        wxDefaultPosition, wxSize(-1, FromDIP(1)));
+    divider->SetBackgroundColour(wxColour(220, 228, 239));
+
     wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
-    sizer->Add(m_treeCtrl, 1, wxEXPAND | wxALL, 2);
+    sizer->Add(title, 0, wxALL, FromDIP(10));
+    sizer->Add(divider, 0, wxEXPAND);
+    sizer->Add(m_treeCtrl, 1, wxEXPAND | wxALL, FromDIP(8));
     this->SetSizer(sizer);
 }
 
@@ -191,9 +210,35 @@ void Toolbox::LoadIcons()
 void Toolbox::BuildTree()
 {
     wxTreeItemId rootId = m_treeCtrl->AddRoot(wxT("电路元件"));
+    auto appendCategory = [this, rootId](const wxString& label) {
+        const wxTreeItemId item = m_treeCtrl->AppendItem(rootId, label, m_imgFolder, m_imgFolder);
+        m_treeCtrl->SetItemBold(item, true);
+        m_treeCtrl->SetItemTextColour(item, wxColour(100, 116, 139));
+        return item;
+    };
+
+    // 常用工具优先展示；分类节点仍然只负责浏览，不改变当前绘图模式。
+    wxTreeItemId baseId = appendCategory(wxT("编辑工具"));
+    AppendTool(baseId, wxT("选择工具"), m_imgSelect, "");
+    AppendTool(baseId, wxT("文本工具"), m_imgText, "TEXT");
+    AppendTool(baseId, wxT("删除工具"), m_imgDelete, "DELETE");
+
+    wxTreeItemId ioId = appendCategory(wxT("输入 / 输出"));
+    AppendTool(ioId, wxT("输入引脚"), m_imgInput, "INPUT");
+    AppendTool(ioId, wxT("输出引脚"), m_imgOutput, "OUTPUT");
+    AppendTool(ioId, wxT("按钮"), m_imgButton, "BUTTON");
+    AppendTool(ioId, wxT("发光二极管"), m_imgLed, "LED");
+
+    wxTreeItemId gatesId = appendCategory(wxT("逻辑门"));
+    AppendTool(gatesId, wxT("与门"), m_imgAnd, "AND");
+    AppendTool(gatesId, wxT("或门"), m_imgOr, "OR");
+    AppendTool(gatesId, wxT("非门"), m_imgNot, "NOT");
+    AppendTool(gatesId, wxT("与非门"), m_imgNand, "NAND");
+    AppendTool(gatesId, wxT("或非门"), m_imgNor, "NOR");
+    AppendTool(gatesId, wxT("异或门"), m_imgXor, "XOR");
 
     // 线路
-    wxTreeItemId wiringId = m_treeCtrl->AppendItem(rootId, wxT("线路"), m_imgFolder, m_imgFolder);
+    wxTreeItemId wiringId = appendCategory(wxT("线路"));
     AppendTool(wiringId, wxT("引脚"), m_imgPin, "INPUT");
     AppendTool(wiringId, wxT("导线"), m_imgWire, "WIRE");
     AppendTool(wiringId, wxT("分线器"), m_imgSplitter, "SPLITTER");
@@ -201,42 +246,24 @@ void Toolbox::BuildTree()
     AppendTool(wiringId, wxT("时钟"), m_imgClock, "CLOCK");
     AppendTool(wiringId, wxT("常量"), m_imgConstant, "CONSTANT");
 
-    // 逻辑门
-    wxTreeItemId gatesId = m_treeCtrl->AppendItem(rootId, wxT("逻辑门"), m_imgFolder, m_imgFolder);
-    AppendTool(gatesId, wxT("非门"), m_imgNot, "NOT");
-    AppendTool(gatesId, wxT("与门"), m_imgAnd, "AND");
-    AppendTool(gatesId, wxT("或门"), m_imgOr, "OR");
-    AppendTool(gatesId, wxT("与非门"), m_imgNand, "NAND");
-    AppendTool(gatesId, wxT("或非门"), m_imgNor, "NOR");
-    AppendTool(gatesId, wxT("异或门"), m_imgXor, "XOR");
-
     // 复用器
-    wxTreeItemId plexersId = m_treeCtrl->AppendItem(rootId, wxT("复用器"), m_imgFolder, m_imgFolder);
+    wxTreeItemId plexersId = appendCategory(wxT("复用器"));
     AppendTool(plexersId, wxT("数据选择器"), m_imgMux, "MUX");
     AppendTool(plexersId, wxT("解复用器"), m_imgDemux, "DEMUX");
 
     // 运算器
-    wxTreeItemId arithmeticId = m_treeCtrl->AppendItem(rootId, wxT("运算器"), m_imgFolder, m_imgFolder);
+    wxTreeItemId arithmeticId = appendCategory(wxT("运算器"));
     AppendTool(arithmeticId, wxT("加法器"), m_imgAdder, "ADDER");
     AppendTool(arithmeticId, wxT("减法器"), m_imgSubtractor, "SUBTRACTOR");
     AppendTool(arithmeticId, wxT("比较器"), m_imgComparator, "COMPARATOR");
 
     // 存储
-    wxTreeItemId memoryId = m_treeCtrl->AppendItem(rootId, wxT("存储"), m_imgFolder, m_imgFolder);
+    wxTreeItemId memoryId = appendCategory(wxT("存储"));
     AppendTool(memoryId, wxT("D触发器"), m_imgDff, "DFF");
     AppendTool(memoryId, wxT("寄存器"), m_imgRegister, "REGISTER");
     AppendTool(memoryId, wxT("计数器"), m_imgCounter, "COUNTER");
 
-    // 输入/输出
-    wxTreeItemId ioId = m_treeCtrl->AppendItem(rootId, wxT("输入/输出"), m_imgFolder, m_imgFolder);
-    AppendTool(ioId, wxT("按钮"), m_imgButton, "BUTTON");
-    AppendTool(ioId, wxT("发光二极管"), m_imgLed, "LED");
-    AppendTool(ioId, wxT("输入引脚"), m_imgInput, "INPUT");
-    AppendTool(ioId, wxT("输出引脚"), m_imgOutput, "OUTPUT");
-
-    // 基本
-    wxTreeItemId baseId = m_treeCtrl->AppendItem(rootId, wxT("基本"), m_imgFolder, m_imgFolder);
-    AppendTool(baseId, wxT("选择工具"), m_imgSelect, "");
-    AppendTool(baseId, wxT("文本工具"), m_imgText, "TEXT");
-    AppendTool(baseId, wxT("删除工具"), m_imgDelete, "DELETE");
+    m_treeCtrl->Expand(baseId);
+    m_treeCtrl->Expand(ioId);
+    m_treeCtrl->Expand(gatesId);
 }

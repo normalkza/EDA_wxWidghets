@@ -1,28 +1,16 @@
 #pragma once
 
 #include "Component.h"
+#include <algorithm>
 
-class OrGate : public Component
+class OrGate : public MultiInputGate
 {
 public:
-    OrGate()
-        : Component("OR")
-    {
-        inputs.emplace_back("A", PinType::Input);
-        inputs.emplace_back("B", PinType::Input);
-        outputs.emplace_back("OUT", PinType::Output);
-    }
+    explicit OrGate(int inputCount = 2) : MultiInputGate("OR", inputCount) {}
 
     void Evaluate() override
     {
-        if (inputs[0].value == LogicValue::Low &&
-            inputs[1].value == LogicValue::Low)
-        {
-            outputs[0].value = LogicValue::Low;
-        }
-        else
-        {
-            outputs[0].value = LogicValue::High;
-        }
+        const auto high = [](const Pin& pin) { return pin.value == LogicValue::High; };
+        outputs[0].value = (std::any_of(inputs.begin(), inputs.end(), high)) ? LogicValue::High : LogicValue::Low;
     }
 };

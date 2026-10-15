@@ -1,27 +1,16 @@
 #pragma once
 
 #include "Component.h"
+#include <algorithm>
 
-class XorGate : public Component
+class XorGate : public MultiInputGate
 {
 public:
-    XorGate()
-        : Component("XOR")
-    {
-        inputs.emplace_back("A", PinType::Input);
-        inputs.emplace_back("B", PinType::Input);
-        outputs.emplace_back("OUT", PinType::Output);
-    }
+    explicit XorGate(int inputCount = 2) : MultiInputGate("XOR", inputCount) {}
 
     void Evaluate() override
     {
-        if (inputs[0].value != inputs[1].value)
-        {
-            outputs[0].value = LogicValue::High;
-        }
-        else
-        {
-            outputs[0].value = LogicValue::Low;
-        }
+        const auto high = [](const Pin& pin) { return pin.value == LogicValue::High; };
+        outputs[0].value = ((std::count_if(inputs.begin(), inputs.end(), high) % 2) != 0) ? LogicValue::High : LogicValue::Low;
     }
 };

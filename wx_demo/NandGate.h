@@ -1,28 +1,16 @@
 #pragma once
 
 #include "Component.h"
+#include <algorithm>
 
-class NandGate : public Component
+class NandGate : public MultiInputGate
 {
 public:
-    NandGate()
-        : Component("NAND")
-    {
-        inputs.emplace_back("A", PinType::Input);
-        inputs.emplace_back("B", PinType::Input);
-        outputs.emplace_back("OUT", PinType::Output);
-    }
+    explicit NandGate(int inputCount = 2) : MultiInputGate("NAND", inputCount) {}
 
     void Evaluate() override
     {
-        if (inputs[0].value == LogicValue::High &&
-            inputs[1].value == LogicValue::High)
-        {
-            outputs[0].value = LogicValue::Low;
-        }
-        else
-        {
-            outputs[0].value = LogicValue::High;
-        }
+        const auto high = [](const Pin& pin) { return pin.value == LogicValue::High; };
+        outputs[0].value = (!std::all_of(inputs.begin(), inputs.end(), high)) ? LogicValue::High : LogicValue::Low;
     }
 };
