@@ -103,11 +103,14 @@ void Canvas::HandleWireClick(const wxPoint& point)
         CancelPendingWire();
         return;
     }
+    auto before = ExportDocument();
     const auto result = m_circuit.Connect(*m_pendingWire, *pin);
     switch (result)
     {
     case ConnectionResult::Added:
+        RecordUndo(std::move(before));
         m_pendingWire.reset();
+        MarkModified();
         RecomputeCircuit();
         SelectWire(static_cast<int>(m_circuit.GetConnections().size()) - 1);
         ReportStatus(wxT("连线完成"));
@@ -153,7 +156,9 @@ void Canvas::SelectWire(int index)
 void Canvas::DeleteWire(int index)
 {
     if (index < 0 || index >= static_cast<int>(m_circuit.GetConnections().size())) return;
+    RecordUndo();
     m_circuit.RemoveConnection(index);
+    MarkModified();
     m_selectedWireIndex = -1;
     CancelPendingWire();
     RecomputeCircuit();

@@ -7,20 +7,21 @@ wxMenuBar* CreateMainMenuBar()
     wxMenuBar* menuBar = new wxMenuBar();
 
     wxMenu* fileMenu = new wxMenu();
-    fileMenu->Append(wxID_NEW, wxT("新建"));
-    fileMenu->Append(wxID_OPEN, wxT("打开"));
-    fileMenu->Append(wxID_SAVE, wxT("保存"));
+    fileMenu->Append(wxID_NEW, wxT("新建\tCtrl+N"));
+    fileMenu->Append(wxID_OPEN, wxT("打开...\tCtrl+O"));
+    fileMenu->Append(wxID_SAVE, wxT("保存\tCtrl+S"));
+    fileMenu->Append(wxID_SAVEAS, wxT("另存为...\tCtrl+Shift+S"));
     fileMenu->AppendSeparator();
     fileMenu->Append(wxID_EXIT, wxT("退出"));
     menuBar->Append(fileMenu, wxT("文件"));
 
     wxMenu* editMenu = new wxMenu();
-    editMenu->Append(wxID_UNDO, wxT("撤销"));
+    editMenu->Append(wxID_UNDO, wxT("撤销\tCtrl+Z"));
     editMenu->AppendSeparator();
     editMenu->Append(wxID_CUT, wxT("剪切\tCtrl+X"));
     editMenu->Append(wxID_COPY, wxT("复制\tCtrl+C"));
     editMenu->Append(wxID_PASTE, wxT("粘贴\tCtrl+V"));
-    editMenu->Append(wxID_DELETE, wxT("删除"));
+    editMenu->Append(wxID_DELETE, wxT("删除\tCtrl+D"));
     menuBar->Append(editMenu, wxT("编辑"));
 
     wxMenu* drawMenu = new wxMenu();

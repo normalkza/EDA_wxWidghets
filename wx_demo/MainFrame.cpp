@@ -5,7 +5,10 @@
 #include "Canvas.h"
 #include "PropertyPanel.h"
 #include "SelectionState.h"
+#include "CircuitFile.h"
 #include <wx/splitter.h>
+#include <wx/filedlg.h>
+#include <wx/filename.h>
 
 MainFrame::MainFrame()
     : wxFrame(nullptr, wxID_ANY, wxT("数字电路编辑器"),
@@ -34,12 +37,23 @@ MainFrame::MainFrame()
     auto* toolbox = new Toolbox(sidebar);
     auto* properties = new PropertyPanel(sidebar);
     auto* canvas = new Canvas(workspace);
-    for (const int command : {wxID_CUT, wxID_COPY, wxID_PASTE, wxID_DELETE})
+    m_canvas = canvas;
+    canvas->SetModifiedCallback([this] { UpdateDocumentTitle(); });
+    Bind(wxEVT_MENU, &MainFrame::OnNew, this, wxID_NEW);
+    Bind(wxEVT_MENU, &MainFrame::OnOpen, this, wxID_OPEN);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveDocument(); }, wxID_SAVE);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveDocument(true); }, wxID_SAVEAS);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) { Close(); }, wxID_EXIT);
+    Bind(wxEVT_CLOSE_WINDOW, &MainFrame::OnClose, this);
+    for (const int command : {wxID_UNDO, wxID_CUT, wxID_COPY, wxID_PASTE, wxID_DELETE})
     {
         Bind(wxEVT_MENU, [canvas](wxCommandEvent& event) {
             canvas->HandleEditCommand(event.GetId());
         }, command);
     }
+    Bind(wxEVT_UPDATE_UI, [canvas](wxUpdateUIEvent& event) {
+        event.Enable(canvas->CanUndo());
+    }, wxID_UNDO);
 
     // 左栏加宽，状态区不再按全部内容高度挤压树状列表。
     workspace->SetMinimumPaneSize(FromDIP(220));
@@ -87,4 +101,89 @@ MainFrame::MainFrame()
     Layout();
     // 按实际可用高度初始化，让状态区占左栏约 45%。
     sidebar->SetSashPosition(sidebar->GetClientSize().GetHeight() * 55 / 100);
+    UpdateDocumentTitle();
+}
+
+void MainFrame::UpdateDocumentTitle()
+{
+    const wxString name = m_filePath.IsEmpty() ? wxString(wxT("未命名.xml")) :
+        wxFileName(m_filePath).GetFullName();
+    SetTitle((m_canvas->IsModified() ? wxString("* ") : wxString()) + name +
+        wxT(" - 数字电路编辑器"));
+}
+
+bool MainFrame::SaveDocument(bool saveAs)
+{
+    wxString path = m_filePath;
+    if (saveAs || path.IsEmpty())
+    {
+        const wxFileName current(path);
+        wxFileDialog dialog(this, wxT("保存电路"), current.GetPath(),
+            path.IsEmpty() ? wxString(wxT("未命名.xml")) : current.GetFullName(),
+            wxT("电路 XML 文件 (*.xml)|*.xml"), wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+        if (dialog.ShowModal() != wxID_OK) return false;
+        path = dialog.GetPath();
+        if (!wxFileName(path).HasExt()) path += ".xml";
+    }
+
+    wxString error;
+    if (!CircuitFile::Save(path, m_canvas->ExportDocument(), error))
+    {
+        SetStatusText(wxT("保存失败：") + error);
+        wxMessageBox(error, wxT("无法保存电路"), wxOK | wxICON_ERROR, this);
+        return false;
+    }
+    m_filePath = path;
+    m_canvas->MarkSaved();
+    UpdateDocumentTitle();
+    SetStatusText(wxT("已保存：") + path);
+    return true;
+}
+
+bool MainFrame::ConfirmDiscardChanges()
+{
+    if (!m_canvas->IsModified()) return true;
+    const int answer = wxMessageBox(wxT("当前电路有未保存的修改，是否先保存？"),
+        wxT("保存修改"), wxYES_NO | wxCANCEL | wxICON_QUESTION, this);
+    if (answer == wxYES) return SaveDocument();
+    return answer == wxNO;
+}
+
+void MainFrame::OnNew(wxCommandEvent&)
+{
+    if (!ConfirmDiscardChanges()) return;
+    m_filePath.Clear();
+    m_canvas->ClearDocument();
+    UpdateDocumentTitle();
+    SetStatusText(wxT("已新建电路"));
+}
+
+void MainFrame::OnOpen(wxCommandEvent&)
+{
+    wxFileDialog dialog(this, wxT("打开电路"), wxFileName(m_filePath).GetPath(),
+        wxEmptyString, wxT("电路 XML 文件 (*.xml)|*.xml"), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    if (dialog.ShowModal() != wxID_OK || !ConfirmDiscardChanges()) return;
+
+    CircuitDocument document;
+    wxString error;
+    const wxString path = dialog.GetPath();
+    if (!CircuitFile::Load(path, document, error) || !m_canvas->ImportDocument(document, error))
+    {
+        SetStatusText(wxT("打开失败：") + error);
+        wxMessageBox(error, wxT("无法打开电路"), wxOK | wxICON_ERROR, this);
+        return;
+    }
+    m_filePath = path;
+    UpdateDocumentTitle();
+    SetStatusText(wxT("已打开：") + path);
+}
+
+void MainFrame::OnClose(wxCloseEvent& event)
+{
+    if (event.CanVeto() && !ConfirmDiscardChanges())
+    {
+        event.Veto();
+        return;
+    }
+    event.Skip();
 }

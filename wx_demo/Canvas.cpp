@@ -164,7 +164,9 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
 
     if (comp)
     {
-        m_components.push_back({ comp, x, y });
+        RecordUndo();
+        m_components.push_back({ comp, x, y, NextComponentId() });
+        MarkModified();
         m_selectedIndex = static_cast<int>(m_components.size()) - 1;
         RecomputeCircuit();
         // 单次放置后恢复选择/拖动模式，同时保留新元件的选中状态。
@@ -191,6 +193,8 @@ void Canvas::DeleteAtPoint(const wxPoint& point)
 
 void Canvas::DeleteItem(int componentIndex, int textIndex)
 {
+    if (componentIndex < 0 && textIndex < 0) return;
+    RecordUndo();
     m_selectedIndex = -1;
     m_selectedTextIndex = -1;
     m_selectedWireIndex = -1;
@@ -207,6 +211,7 @@ void Canvas::DeleteItem(int componentIndex, int textIndex)
         m_textBoxes.erase(m_textBoxes.begin() + textIndex);
         editor->Destroy();
     }
+    MarkModified();
     RecomputeCircuit();
     if (m_selectionCallback) m_selectionCallback(nullptr, 0, 0);
     Refresh(false);
@@ -251,8 +256,10 @@ void Canvas::OnLeftUp(wxMouseEvent& event)
             HitTest(mouse.x, mouse.y) == m_pressedIndex &&
             wxRect(pc.x, pc.y, m_portSize, m_portSize).Contains(mouse))
         {
+            RecordUndo();
             auto& value = pc.comp->outputs[0].value;
             value = value == LogicValue::Low ? LogicValue::High : LogicValue::Low;
+            MarkModified();
             RecomputeCircuit();
         }
     }
@@ -326,9 +333,11 @@ void Canvas::MoveDraggedComponent(const wxPoint& mouse, bool snap)
     const int x = snap ? SnapToGrid(mouse.x - m_dragOffset.x) : mouse.x - m_dragOffset.x;
     const int y = snap ? SnapToGrid(mouse.y - m_dragOffset.y) : mouse.y - m_dragOffset.y;
     if (pc.x == x && pc.y == y) return;
+    if (!m_dragUndoDocument) m_dragUndoDocument = ExportDocument();
     const wxRect oldRect = GetComponentUpdateRect(pc);
     pc.x = x;
     pc.y = y;
+    MarkModified();
     wxRect dirty = oldRect.Union(GetComponentUpdateRect(pc));
     dirty.Inflate(3); // 包含选中虚线和画笔边缘，清除旧位置的残影。
     RefreshRect(dirty, false);
@@ -365,6 +374,26 @@ void Canvas::CancelMouseInteraction(bool restoreText)
         box.scrollY = m_textTransformScrollY;
         box.editor->SetSize(box.rect.GetSize());
         NotifyTextSelection();
+        RefreshModifiedState();
+    }
+    if (m_dragUndoDocument)
+    {
+        const auto& before = *m_dragUndoDocument;
+        // 一次拖动只保存一个快照；拖回原位时不创建撤销操作。
+        if (m_pressedIndex >= 0 && m_pressedIndex < static_cast<int>(m_components.size()) &&
+            (before.components[m_pressedIndex].x != m_components[m_pressedIndex].x ||
+                before.components[m_pressedIndex].y != m_components[m_pressedIndex].y))
+            RecordUndo(std::move(*m_dragUndoDocument));
+        m_dragUndoDocument.reset();
+        RefreshModifiedState();
+    }
+    if (m_textTransformUndoDocument)
+    {
+        if (!restoreText && m_textTransformIndex >= 0 &&
+            m_textBoxes[m_textTransformIndex].rect != m_textTransformRect)
+            RecordUndo(std::move(*m_textTransformUndoDocument));
+        m_textTransformUndoDocument.reset();
+        RefreshModifiedState();
     }
     m_textTransformIndex = -1;
     m_textTransformHandle = -1;
@@ -392,6 +421,9 @@ void Canvas::OnKeyDown(wxKeyEvent& event)
     else if (event.GetKeyCode() == WXK_RETURN && event.ControlDown() &&
         m_selectedTextIndex >= 0)
         SetFocusIgnoringChildren();
+    else if (event.ControlDown() && !event.AltDown() && !event.ShiftDown() &&
+        (event.GetKeyCode() == 'Z' || event.GetKeyCode() == 'D'))
+        HandleEditCommand(event.GetKeyCode() == 'Z' ? wxID_UNDO : wxID_DELETE);
     else if (IsEditingText())
         event.Skip(); // 编辑文字时，交给原生控件处理剪贴板和退格。
     else if (event.ControlDown() && !event.AltDown() && !event.ShiftDown() &&
@@ -421,6 +453,7 @@ bool Canvas::HandleEditCommand(int command)
     {
         auto* editor = static_cast<wxTextCtrl*>(wxWindow::FindFocus());
         if (command == wxID_COPY) editor->Copy();
+        else if (command == wxID_UNDO) UndoText(*editor);
         else if (command == wxID_CUT) editor->Cut();
         else if (command == wxID_PASTE) editor->Paste();
         else if (command == wxID_DELETE)
@@ -436,6 +469,7 @@ bool Canvas::HandleEditCommand(int command)
     if (command == wxID_CUT) return CutSelection();
     if (command == wxID_PASTE) return PasteSelection();
     if (command == wxID_DELETE) return DeleteSelection();
+    if (command == wxID_UNDO) return Undo();
     return false;
 }
 
@@ -568,7 +602,8 @@ bool Canvas::PasteSelection()
     {
         x = std::max(SnapToGrid(x), ((minX + m_gridSize - 1) / m_gridSize) * m_gridSize);
         y = SnapToGrid(y);
-        m_components.push_back({ component.get(), x, y });
+        RecordUndo();
+        m_components.push_back({ component.get(), x, y, NextComponentId() });
         component.release();
         m_selectedIndex = static_cast<int>(m_components.size()) - 1;
         m_selectedTextIndex = -1;
@@ -580,9 +615,13 @@ bool Canvas::PasteSelection()
         box.pointSize = pointSize;
         box.editor->SetFont(wxFontInfo(pointSize).Family(wxFONTFAMILY_SWISS));
         box.editor->ChangeValue(wxString::FromUTF8(text));
+        box.lastValue = box.editor->GetValue();
+        // 粘贴的初始内容属于同一次对象粘贴，不另外生成一次空文本框的撤销。
+        m_textEditUndoDocument.reset();
         box.scrollY = scrollY;
     }
     m_selectedWireIndex = -1;
+    MarkModified();
     RecomputeCircuit();
     m_lastPastePayload = payload;
     m_pasteCount = pasteCount;
@@ -610,12 +649,15 @@ wxRect Canvas::GetPendingTextRect() const
 
 void Canvas::CreateTextBox(const wxRect& rect)
 {
-    auto* editor = new wxTextCtrl(this, wxID_ANY, wxEmptyString,
+    auto editorOwner = std::make_unique<wxTextCtrl>(this, wxID_ANY, wxEmptyString,
         wxPoint(-32760, -32760), rect.GetSize(),
         wxTE_MULTILINE | wxTE_DONTWRAP | wxTE_NO_VSCROLL | wxBORDER_NONE);
+    auto* editor = editorOwner.get();
     editor->SetFont(wxFontInfo(m_defaultTextPointSize).Family(wxFONTFAMILY_SWISS));
     const int index = static_cast<int>(m_textBoxes.size());
+    RecordUndo();
     m_textBoxes.push_back({ editor, m_defaultTextPointSize, rect });
+    editorOwner.release();
     editor->Bind(wxEVT_SET_FOCUS, [this, editor](wxFocusEvent& event) {
         // 删除文本框后索引会变化；按编辑控件查找当前索引。
         const auto box = std::find_if(m_textBoxes.begin(), m_textBoxes.end(),
@@ -627,19 +669,45 @@ void Canvas::CreateTextBox(const wxRect& rect)
         }
         m_selectedTextIndex = static_cast<int>(box - m_textBoxes.begin());
         m_selectedIndex = -1;
+        if (!m_loadingDocument)
+        {
+            // 离开编辑后，这段文字已经进入画布历史。新的编辑会话只撤销新输入，
+            // 避免原生控件跨越字号/对象操作撤销旧输入而使画布快照发生冲突。
+#ifdef __WXMSW__
+            ::SendMessage(static_cast<HWND>(editor->GetHandle()), EM_EMPTYUNDOBUFFER, 0, 0);
+#endif
+            m_textEditUndoDocument = ExportDocument();
+        }
         NotifyTextSelection();
         Refresh();
         event.Skip();
     });
-    editor->Bind(wxEVT_TEXT, [this](wxCommandEvent& event) {
+    editor->Bind(wxEVT_TEXT, [this, editor](wxCommandEvent& event) {
+        // 已移除的文本控件可能仍有排队中的事件，不能改变新文档状态。
+        const auto box = std::find_if(m_textBoxes.begin(), m_textBoxes.end(),
+            [editor](const TextBox& text) { return text.editor == editor; });
+        if (box != m_textBoxes.end() && box->lastValue != editor->GetValue())
+        {
+            if (!m_loadingDocument && !m_nativeTextUndo && !m_textEditUndoDocument)
+            {
+                auto before = ExportDocument();
+                before.texts[box - m_textBoxes.begin()].text = box->lastValue;
+                m_textEditUndoDocument = std::move(before);
+            }
+            box->lastValue = editor->GetValue();
+            MarkModified();
+        }
         UpdateTextInput();
         Refresh();
         event.Skip();
     });
     editor->Bind(wxEVT_KILL_FOCUS, [this](wxFocusEvent& event) {
+        FinishTextEditing();
         Refresh();
         event.Skip();
     });
+    MarkModified();
+    if (m_loadingDocument) return;
     m_selectedTextIndex = index;
     m_selectedIndex = -1;
     NotifyTextSelection();
@@ -649,6 +717,7 @@ void Canvas::CreateTextBox(const wxRect& rect)
 
 void Canvas::NotifyTextSelection()
 {
+    if (m_loadingDocument) return;
     if (m_selectedTextIndex >= 0) m_selectedWireIndex = -1;
     if (m_textSelectionCallback && m_selectedTextIndex >= 0 &&
         m_selectedTextIndex < static_cast<int>(m_textBoxes.size()))
@@ -671,7 +740,10 @@ void Canvas::SetTextFontSize(int pointSize)
     if (m_selectedTextIndex >= 0 && m_selectedTextIndex < static_cast<int>(m_textBoxes.size()))
     {
         auto& box = m_textBoxes[m_selectedTextIndex];
+        if (box.pointSize == m_defaultTextPointSize) return;
+        RecordUndo();
         box.pointSize = m_defaultTextPointSize;
+        MarkModified();
         box.editor->SetFont(wxFontInfo(box.pointSize).Family(wxFONTFAMILY_SWISS));
         box.scrollY = 0;
         UpdateTextInput();
@@ -753,7 +825,10 @@ void Canvas::SetGateInputCount(int count)
     }
     auto& pc = m_components[m_selectedIndex];
     if (!pc.comp->SupportsVariableInputs() || static_cast<int>(pc.comp->inputs.size()) == count) return;
+    auto before = ExportDocument();
     if (!pc.comp->SetInputCount(count)) return;
+    RecordUndo(std::move(before));
+    MarkModified();
     m_selectedWireIndex = -1;
     CancelPendingWire();
     m_circuit.PruneInvalidConnections();
@@ -865,6 +940,7 @@ void Canvas::BeginTextTransform(int index, int handle, const wxPoint& point)
     m_textTransformScrollY = m_textBoxes[index].scrollY;
     m_textTransformStart = point;
     m_textTransformMoved = false;
+    m_textTransformWasModified = m_modified;
     NotifyTextSelection();
     CaptureMouse();
     UpdateTextCursor(point);
@@ -893,7 +969,9 @@ void Canvas::UpdateTextTransform(const wxPoint& point)
     }
     auto& box = m_textBoxes[m_textTransformIndex];
     if (box.rect == rect) return;
+    if (!m_textTransformUndoDocument) m_textTransformUndoDocument = ExportDocument();
     box.rect = rect;
+    MarkModified(true);
     if (m_textTransformHandle != 8)
     {
         box.editor->SetSize(rect.GetSize());

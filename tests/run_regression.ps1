@@ -11,7 +11,7 @@ foreach ($item in @($project.SelectNodes('//m:ItemGroup/m:ClCompile | //m:ItemGr
     $item.ParentNode.RemoveChild($item) | Out-Null
 }
 $sources = $project.CreateElement('ItemGroup', $namespace)
-foreach ($sourcePath in @('wx_demo\Canvas.cpp', 'wx_demo\CanvasWiring.cpp', 'wx_demo\Circuit.cpp', 'wx_demo\Wire.cpp', 'wx_demo\PropertyPanel.cpp', 'wx_demo\SelectionState.cpp', 'tests\gate_regression.cpp')) {
+foreach ($sourcePath in @('wx_demo\Canvas.cpp', 'wx_demo\CanvasWiring.cpp', 'wx_demo\CanvasDocument.cpp', 'wx_demo\Circuit.cpp', 'wx_demo\CircuitFile.cpp', 'wx_demo\Wire.cpp', 'wx_demo\PropertyPanel.cpp', 'wx_demo\SelectionState.cpp', 'tests\gate_regression.cpp')) {
     $item = $project.CreateElement('ClCompile', $namespace)
     $item.SetAttribute('Include', (Join-Path $repoRoot $sourcePath))
     $sources.AppendChild($item) | Out-Null

@@ -8,6 +8,7 @@
 
 #include "Component.h"
 #include "Circuit.h"
+#include "CircuitFile.h"
 #include "Wire.h"
 #include <optional>
 #include <functional>
@@ -23,11 +24,22 @@ public:
     Canvas(wxWindow* parent, wxClipboard* clipboard = nullptr);
     ~Canvas() override;
     bool HandleEditCommand(int command);
+    bool Undo();
+    bool CanUndo() const;
     void OnToolChanged();
     void SetTextFontSize(int pointSize);
     int GetTextFontSize() const;
     void SetGateInputCount(int count);
     int GetGateInputCount() const;
+    CircuitDocument ExportDocument() const;
+    bool ImportDocument(const CircuitDocument& document, wxString& error);
+    void ClearDocument();
+    bool IsModified() const { return m_modified; }
+    void MarkSaved();
+    void SetModifiedCallback(std::function<void()> callback)
+    {
+        m_modifiedCallback = std::move(callback);
+    }
     void SetStatusCallback(std::function<void(const wxString&)> callback)
     {
         m_statusCallback = std::move(callback);
@@ -52,6 +64,15 @@ public:
 
 private:
     friend struct CanvasRegressionAccess;
+    void MarkModified(bool textTransform = false);
+    void RefreshModifiedState();
+    void UndoText(wxTextCtrl& editor);
+    void FinishTextEditing();
+    void RecordUndo();
+    void RecordUndo(CircuitDocument document);
+    bool ReplaceDocument(const CircuitDocument& document, wxString& error, bool resetHistory);
+    void ResetDocument();
+    int NextComponentId() const;
     void OnPaint(wxPaintEvent& event);
     void OnLeftDown(wxMouseEvent& event);
     void OnLeftUp(wxMouseEvent& event);
@@ -99,6 +120,7 @@ private:
     {
         Component* comp;
         int x, y;
+        int id = 0;
     };
     // 绘制、点击判定和局部刷新统一使用同一份几何信息。
     struct GateGeometry
@@ -142,6 +164,16 @@ private:
     int m_dragFrame = 0;
     std::function<void(const Component*, int, int)> m_selectionCallback;
     std::function<void()> m_componentPlacedCallback;
+    std::function<void()> m_modifiedCallback;
+    bool m_modified = false;
+    bool m_loadingDocument = false;
+    static constexpr std::size_t m_undoLimit = 50;
+    std::vector<CircuitDocument> m_undoHistory;
+    CircuitDocument m_savedDocument;
+    std::optional<CircuitDocument> m_dragUndoDocument;
+    std::optional<CircuitDocument> m_textTransformUndoDocument;
+    std::optional<CircuitDocument> m_textEditUndoDocument;
+    bool m_nativeTextUndo = false;
     wxClipboard* m_clipboard;
     std::string m_lastPastePayload;
     int m_pasteCount = 0;
@@ -152,6 +184,7 @@ private:
         int pointSize;
         wxRect rect;
         int scrollY = 0;
+        wxString lastValue;
     };
     struct TextLine
     {
@@ -174,6 +207,7 @@ private:
     wxRect m_textTransformRect;
     wxPoint m_textTransformStart;
     bool m_textTransformMoved = false;
+    bool m_textTransformWasModified = false;
     int m_textTransformScrollY = 0;
 
 

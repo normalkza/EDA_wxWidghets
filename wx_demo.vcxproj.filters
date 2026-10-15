@@ -37,6 +37,8 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="wx_demo\Circuit.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\CircuitFile.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\CanvasDocument.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="wx_demo\Wire.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="wx_demo\CanvasWiring.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="wx_demo\Canvas.cpp">
@@ -78,6 +80,7 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="wx_demo\Circuit.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\CircuitFile.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\Wire.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\Canvas.h">
       <Filter>头文件</Filter>
