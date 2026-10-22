@@ -64,6 +64,24 @@ void Circuit::RemoveConnection(std::size_t index)
     if (index < m_connections.size()) m_connections.erase(m_connections.begin() + index);
 }
 
+bool Circuit::SetConnectionRoute(std::size_t index, const std::vector<wxPoint>& route)
+{
+    if (index >= m_connections.size() || route.size() == 1 || route.size() > 256) return false;
+    std::size_t total = route.size();
+    for (std::size_t i = 0; i < m_connections.size(); ++i)
+        if (i != index) total += m_connections[i].route.size();
+    if (total > 4000) return false;
+    for (std::size_t i = 0; i < route.size(); ++i)
+    {
+        if (route[i].x < -1000000 || route[i].x > 1000000 ||
+            route[i].y < -1000000 || route[i].y > 1000000) return false;
+        if (i > 0 && (route[i] == route[i - 1] ||
+            (route[i].x != route[i - 1].x && route[i].y != route[i - 1].y))) return false;
+    }
+    m_connections[index].route = route;
+    return true;
+}
+
 void Circuit::RemoveComponent(const Component* component)
 {
     std::erase_if(m_connections, [component](const WireConnection& connection) {

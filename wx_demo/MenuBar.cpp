@@ -1,7 +1,5 @@
 #include "MenuBar.h"
 
-// 菜单栏
-// 菜单栏是一个三级结构,本身是一个wxMenuBar对象,它包含多个wxMenu对象,每个wxMenu对象包含多个wxMenuItem对象。
 wxMenuBar* CreateMainMenuBar()
 {
     wxMenuBar* menuBar = new wxMenuBar();
@@ -22,12 +20,54 @@ wxMenuBar* CreateMainMenuBar()
     editMenu->Append(wxID_COPY, wxT("复制\tCtrl+C"));
     editMenu->Append(wxID_PASTE, wxT("粘贴\tCtrl+V"));
     editMenu->Append(wxID_DELETE, wxT("删除\tCtrl+D"));
+    editMenu->AppendSeparator();
+    editMenu->AppendCheckItem(ID_TOOL_SELECT, wxT("选择工具"));
+    editMenu->AppendCheckItem(ID_TOOL_DELETE, wxT("删除工具"));
+    editMenu->Append(ID_EDIT_DESELECT, wxT("取消选择"));
     menuBar->Append(editMenu, wxT("编辑"));
 
-    wxMenu* drawMenu = new wxMenu();
-    drawMenu->Append(wxID_ANY, wxT("选择"));
-    drawMenu->Append(wxID_ANY, wxT("导线"));
-    menuBar->Append(drawMenu, wxT("绘图"));
+    auto* viewMenu = new wxMenu();
+    viewMenu->AppendCheckItem(ID_VIEW_GRID, wxT("网格"));
+    viewMenu->AppendCheckItem(ID_VIEW_SNAP, wxT("吸附到网格"));
+    viewMenu->AppendSeparator();
+    viewMenu->AppendCheckItem(ID_VIEW_TOOLBOX, wxT("元件库"));
+    viewMenu->AppendCheckItem(ID_VIEW_PROPERTIES, wxT("属性栏"));
+    menuBar->Append(viewMenu, wxT("视图"));
+
+    auto* componentMenu = new wxMenu();
+    componentMenu->AppendCheckItem(ID_TOOL_INPUT, wxT("输入引脚"));
+    componentMenu->AppendCheckItem(ID_TOOL_OUTPUT, wxT("输出引脚"));
+    componentMenu->AppendSeparator();
+    componentMenu->AppendCheckItem(ID_TOOL_AND, wxT("与门"));
+    componentMenu->AppendCheckItem(ID_TOOL_OR, wxT("或门"));
+    componentMenu->AppendCheckItem(ID_TOOL_NOT, wxT("非门"));
+    componentMenu->AppendCheckItem(ID_TOOL_NAND, wxT("与非门"));
+    componentMenu->AppendCheckItem(ID_TOOL_NOR, wxT("或非门"));
+    componentMenu->AppendCheckItem(ID_TOOL_XOR, wxT("异或门"));
+    componentMenu->AppendSeparator();
+    componentMenu->AppendCheckItem(ID_TOOL_TEXT, wxT("文本工具"));
+    componentMenu->AppendSeparator();
+    componentMenu->Append(ID_COMPONENT_ROTATE_CW, wxT("顺时针旋转 90°"));
+    componentMenu->Append(ID_COMPONENT_ROTATE_CCW, wxT("逆时针旋转 90°"));
+    menuBar->Append(componentMenu, wxT("元件"));
+
+    auto* wireMenu = new wxMenu();
+    wireMenu->AppendCheckItem(ID_TOOL_WIRE, wxT("连线工具"));
+    wireMenu->AppendSeparator();
+    wireMenu->Append(ID_WIRE_RESET_ROUTE, wxT("恢复自动走线"));
+    wireMenu->Append(ID_WIRE_DELETE, wxT("删除选中线路"));
+    menuBar->Append(wireMenu, wxT("连线"));
+
+    auto* simulationMenu = new wxMenu();
+    simulationMenu->Append(ID_SIMULATE_EVALUATE, wxT("重新计算\tF5"));
+    simulationMenu->Append(ID_SIMULATE_TOGGLE_INPUT, wxT("切换输入电平\tF6"));
+    menuBar->Append(simulationMenu, wxT("仿真"));
+
+    auto* helpMenu = new wxMenu();
+    helpMenu->Append(wxID_HELP, wxT("快捷键\tF1"));
+    helpMenu->AppendSeparator();
+    helpMenu->Append(wxID_ABOUT, wxT("关于"));
+    menuBar->Append(helpMenu, wxT("帮助"));
 
     return menuBar;
 }

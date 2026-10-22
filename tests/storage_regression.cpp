@@ -117,14 +117,16 @@ void SameDocument(const CircuitDocument& actual, const CircuitDocument& expected
         const auto& a = actual.components[i];
         const auto& e = expected.components[i];
         Check(a.id == e.id && a.type == e.type && a.x == e.x && a.y == e.y &&
-            a.inputCount == e.inputCount && a.high == e.high, context + ": component " + std::to_string(i));
+            a.inputCount == e.inputCount && a.high == e.high && a.rotation == e.rotation,
+            context + ": component " + std::to_string(i));
     }
     for (size_t i = 0; i < actual.wires.size(); ++i)
     {
         const auto& a = actual.wires[i];
         const auto& e = expected.wires[i];
         Check(a.sourceId == e.sourceId && a.sourcePin == e.sourcePin &&
-            a.targetId == e.targetId && a.targetPin == e.targetPin, context + ": wire " + std::to_string(i));
+            a.targetId == e.targetId && a.targetPin == e.targetPin && a.route == e.route,
+            context + ": wire " + std::to_string(i));
     }
     for (size_t i = 0; i < actual.texts.size(); ++i)
     {
@@ -145,7 +147,7 @@ CircuitDocument FullDocument()
     {
         for (const int count : { 2, 16 })
         {
-            document.components.push_back({ id, type, id * 100, id * 40, count, false });
+            document.components.push_back({ id, type, id * 100, id * 40, count, false, (id % 4) * 90 });
             document.wires.push_back({ 1, 0, id, 0 });
             document.wires.push_back({ 2, 0, id, count - 1 });
             ++id;
@@ -161,6 +163,39 @@ CircuitDocument FullDocument()
         wxString::FromUTF8("  中文注释：电路 <A & B> \"高电平\" '低电平'\n第二行\n\n尾行  ") });
     document.texts.push_back({ wxRect(20, 620, 240, 100), 14, "" });
     document.texts.push_back({ wxRect(280, 620, 220, 100), 6, " \t\n " });
+    return document;
+}
+
+CircuitDocument RoutedDocument()
+{
+    CircuitDocument document;
+    document.components = {{1, "INPUT", 80, 80, 0, true}, {2, "OUTPUT", 360, 200, 1, false}};
+    document.wires = {{1, 0, 2, 0,
+        {{120, 100}, {200, 100}, {200, 180}, {280, 180}, {280, 220}, {360, 220}}}};
+    return document;
+}
+
+CircuitDocument RouteBudgetDocument()
+{
+    CircuitDocument document;
+    document.components.push_back({1, "INPUT", 80, 80, 0, true});
+    // Sixteen orthogonal staircases use exactly the 4000-point budget. Every
+    // bend is necessary, and both endpoint directions already match the ports.
+    for (int wire = 0; wire < 16; ++wire)
+    {
+        std::vector<wxPoint> route{{120, 100}};
+        for (int segment = 0; segment < 249; ++segment)
+        {
+            wxPoint next = route.back();
+            if (segment % 2 == 0) next.x += 20;
+            else next.y += 20;
+            route.push_back(next);
+        }
+        route.back().x += wire * 20;
+        const wxPoint endpoint = route.back();
+        document.components.push_back({wire + 2, "OUTPUT", endpoint.x, endpoint.y - 20, 1, false});
+        document.wires.push_back({1, 0, wire + 2, 0, route});
+    }
     return document;
 }
 
@@ -180,6 +215,10 @@ void TestRoundTrips(const TemporaryDirectory& directory)
     CircuitDocument loaded;
     Check(CircuitFile::Load(path, loaded, error), "load saved document: " + Utf8(error));
     SameDocument(loaded, document, "full XML round trip");
+    Check(bytes.find("rotation=\"90\"") != std::string::npos &&
+        bytes.find("rotation=\"180\"") != std::string::npos &&
+        bytes.find("rotation=\"270\"") != std::string::npos,
+        "all nonzero right-angle rotations use optional XML attributes");
     for (const auto& data : loaded.components)
     {
         auto component = CircuitFile::CreateComponent(data);
@@ -189,6 +228,12 @@ void TestRoundTrips(const TemporaryDirectory& directory)
             Check((component->outputs[0].value == LogicValue::High) == data.high,
                 "component factory restores both input levels");
     }
+
+    const auto routed = RoutedDocument();
+    Check(CircuitFile::Save(path, routed, error) && CircuitFile::Load(path, loaded, error),
+        "save and load a manually routed wire: " + Utf8(error));
+    SameDocument(loaded, routed, "manual route points preserve their exact order and coordinates");
+    Check(ReadBytes(path).find("<point ") != std::string::npos, "manual routes serialize as wire point children");
 
     CircuitDocument empty;
     Check(CircuitFile::Save(path, empty, error), "overwrite with empty document: " + Utf8(error));
@@ -230,6 +275,21 @@ void TestValidation(const TemporaryDirectory& directory)
         { "duplicate wire", [](auto& d) { d.wires.push_back(d.wires[0]); } },
         { "multiple input drivers", [](auto& d) { d.wires.push_back({ 2, 0, 3, 0 }); } },
         { "coordinate limit", [](auto& d) { d.components[0].x = 1000001; } },
+        { "non-right-angle rotation", [](auto& d) { d.components[0].rotation = 45; } },
+        { "negative rotation", [](auto& d) { d.components[0].rotation = -90; } },
+        { "full-turn rotation", [](auto& d) { d.components[0].rotation = 360; } },
+        { "single route point", [](auto& d) { d.wires[0].route = {{0, 0}}; } },
+        { "diagonal route segment", [](auto& d) { d.wires[0].route = {{0, 0}, {20, 20}}; } },
+        { "duplicate adjacent route point", [](auto& d) { d.wires[0].route = {{0, 0}, {0, 0}}; } },
+        { "route coordinate limit", [](auto& d) { d.wires[0].route = {{0, 0}, {1000001, 0}}; } },
+        { "negative route coordinate limit", [](auto& d) { d.wires[0].route = {{0, 0}, {0, -1000001}}; } },
+        { "too many wire route points", [](auto& d) {
+            for (int point = 0; point <= 256; ++point) d.wires[0].route.emplace_back(point, 0);
+        } },
+        { "too many total route points", [](auto& d) {
+            for (auto& wire : d.wires)
+                for (int point = 0; point < 256; ++point) wire.route.emplace_back(point, 0);
+        } },
         { "empty text width", [](auto& d) { d.texts[0].rect.width = 0; } },
         { "font size limit", [](auto& d) { d.texts[0].pointSize = 97; } },
         { "XML control character", [](auto& d) { d.texts[0].text = wxString::FromUTF8("illegal\x01text"); } }
@@ -248,6 +308,32 @@ void TestValidation(const TemporaryDirectory& directory)
     Check(!CircuitFile::Validate(cycle, error) && !error.empty(), "feedback cycle rejected");
     cycle.wires = { { 1, 0, 1, 0 } };
     Check(!CircuitFile::Validate(cycle, error), "self loop rejected");
+
+    auto boundary = RoutedDocument();
+    boundary.wires[0].route = {{-1000000, -1000000}, {1000000, -1000000}, {1000000, 1000000}};
+    Check(CircuitFile::Validate(boundary, error), "route coordinates accept both inclusive boundaries");
+    boundary.wires[0].route.clear();
+    for (int point = 0; point < 256; ++point) boundary.wires[0].route.emplace_back(point, 0);
+    Check(CircuitFile::Validate(boundary, error), "maximum per-wire route size accepted");
+    CircuitDocument loaded;
+    Check(CircuitFile::Save(path, boundary, error) && CircuitFile::Load(path, loaded, error),
+        "maximum per-wire route can be saved and reopened");
+    SameDocument(loaded, boundary, "maximum route round trip");
+
+    auto totalBoundary = original;
+    for (std::size_t wire = 0; wire < 16; ++wire)
+        for (int point = 0; point < 250; ++point) totalBoundary.wires[wire].route.emplace_back(point, 0);
+    Check(CircuitFile::Save(path, totalBoundary, error) && CircuitFile::Load(path, loaded, error),
+        "the inclusive 4000-point total can be saved and reopened within XML limits");
+    SameDocument(loaded, totalBoundary, "maximum total route points round trip");
+    auto excessiveXml = ReadBytes(path);
+    const auto firstWireEnd = excessiveXml.find("</wire>");
+    Check(firstWireEnd != std::string::npos, "maximum route fixture contains a closed wire");
+    excessiveXml.insert(firstWireEnd, "<point x=\"250\" y=\"0\"/>");
+    WriteBytes(path, excessiveXml);
+    Check(!CircuitFile::Load(path, loaded, error) && error.Contains("4000"),
+        "XML loading enforces the total route limit even when every individual path is valid");
+    SameDocument(loaded, totalBoundary, "oversized route XML keeps the previous document intact");
 }
 
 void TestRejectedLoads(const TemporaryDirectory& directory)
@@ -258,6 +344,8 @@ void TestRejectedLoads(const TemporaryDirectory& directory)
         "<component id=\"3\" type=\"NOT\" x=\"100\" y=\"0\" inputCount=\"1\" high=\"0\"/>"
         "<component id=\"4\" type=\"OUTPUT\" x=\"200\" y=\"0\" inputCount=\"1\" high=\"0\"/>";
     const std::string wire = "<wire sourceId=\"1\" sourcePin=\"0\" targetId=\"3\" targetPin=\"0\"/>";
+    const std::string routedWireStart = "<wire sourceId=\"1\" sourcePin=\"0\" targetId=\"3\" targetPin=\"0\">";
+    const auto withRoute = [&](const std::string& points) { return routedWireStart + points + "</wire>"; };
     const std::string valid = "<circuit version=\"1\"><components>" + components +
         "</components><wires>" + wire + "</wires><texts/></circuit>";
     const auto replace = [&](const std::string& oldValue, const std::string& newValue) {
@@ -267,6 +355,9 @@ void TestRejectedLoads(const TemporaryDirectory& directory)
         result.replace(position, oldValue.size(), newValue);
         return result;
     };
+    std::string excessivePoints;
+    for (int point = 0; point <= 256; ++point)
+        excessivePoints += "<point x=\"" + std::to_string(point) + "\" y=\"0\"/>";
     const std::vector<std::pair<std::string, std::string>> rejected{
         { "truncated XML", valid.substr(0, valid.size() / 2) },
         { "unknown version", replace("version=\"1\"", "version=\"999\"") },
@@ -277,6 +368,23 @@ void TestRejectedLoads(const TemporaryDirectory& directory)
         { "invalid Boolean", replace("high=\"1\"", "high=\"yes\"") },
         { "invalid number", replace("x=\"0\"", "x=\"1x\"") },
         { "integer overflow", replace("x=\"0\"", "x=\"999999999999999999999999\"") },
+        { "invalid rotation", replace("type=\"INPUT\"", "type=\"INPUT\" rotation=\"45\"") },
+        { "negative rotation", replace("type=\"INPUT\"", "type=\"INPUT\" rotation=\"-90\"") },
+        { "full-turn rotation", replace("type=\"INPUT\"", "type=\"INPUT\" rotation=\"360\"") },
+        { "non-integer rotation", replace("type=\"INPUT\"", "type=\"INPUT\" rotation=\"90.0\"") },
+        { "empty rotation", replace("type=\"INPUT\"", "type=\"INPUT\" rotation=\"\"") },
+        { "route point without y", replace(wire, withRoute("<point x=\"40\"/><point x=\"100\" y=\"20\"/>")) },
+        { "unknown route point attribute", replace(wire, withRoute("<point x=\"40\" y=\"20\" z=\"0\"/><point x=\"100\" y=\"20\"/>")) },
+        { "single XML route point", replace(wire, withRoute("<point x=\"40\" y=\"20\"/>")) },
+        { "diagonal XML route", replace(wire, withRoute("<point x=\"40\" y=\"20\"/><point x=\"100\" y=\"40\"/>")) },
+        { "duplicate XML route point", replace(wire, withRoute("<point x=\"40\" y=\"20\"/><point x=\"40\" y=\"20\"/>")) },
+        { "XML route coordinate limit", replace(wire, withRoute("<point x=\"40\" y=\"20\"/><point x=\"1000001\" y=\"20\"/>")) },
+        { "XML route integer overflow", replace(wire, withRoute("<point x=\"40\" y=\"20\"/><point x=\"999999999999999999999999\" y=\"20\"/>")) },
+        { "XML route non-integer", replace(wire, withRoute("<point x=\"40\" y=\"20\"/><point x=\"1x\" y=\"20\"/>")) },
+        { "unknown wire child", replace(wire, withRoute("<bend x=\"40\" y=\"20\"/>")) },
+        { "nested route point", replace(wire, withRoute("<point x=\"40\" y=\"20\"><point x=\"100\" y=\"20\"/></point>")) },
+        { "wire text content", replace(wire, withRoute("unexpected text")) },
+        { "too many XML route points", replace(wire, withRoute(excessivePoints)) },
         { "dangling wire", replace("sourceId=\"1\"", "sourceId=\"99\"") },
         { "wire pin overflow", replace("targetPin=\"0\"", "targetPin=\"1\"") },
         { "duplicate wire", replace("</wires>", wire + "</wires>") },
@@ -298,6 +406,14 @@ void TestRejectedLoads(const TemporaryDirectory& directory)
     WriteBytes(path, valid);
     CircuitDocument parsed;
     Check(CircuitFile::Load(path, parsed, error), "independently authored XML fixture is valid: " + Utf8(error));
+    Check(std::all_of(parsed.components.begin(), parsed.components.end(), [](const auto& c) { return c.rotation == 0; }) &&
+        parsed.wires[0].route.empty(), "legacy version-1 XML defaults to unrotated components and automatic routing");
+    WriteBytes(path, replace(wire, withRoute("<!-- route -->\n<point x=\"40\" y=\"20\"/><point x=\"100\" y=\"20\"/>")));
+    Check(CircuitFile::Load(path, parsed, error) && parsed.wires[0].route == std::vector<wxPoint>{{40, 20}, {100, 20}},
+        "independently authored route XML accepts formatting and preserves ordered points");
+    WriteBytes(path, replace("type=\"INPUT\"", "type=\"INPUT\" rotation=\"270\""));
+    Check(CircuitFile::Load(path, parsed, error) && parsed.components[0].rotation == 270,
+        "optional rotation attribute is accepted in existing version-1 XML");
     for (const auto& fixture : rejected)
     {
         WriteBytes(path, fixture.second);
@@ -384,6 +500,119 @@ static void Key(Canvas& canvas, int code, bool control = false, bool shift = fal
     // Dispatch the bound event, including its real shortcut-routing path.
     event.SetEventObject(&canvas);
     canvas.GetEventHandler()->ProcessEvent(event);
+}
+
+static void TestRotationAndRouteHistory(Canvas& canvas, const TemporaryDirectory& directory)
+{
+    const auto original = RoutedDocument();
+    ImportUndoDocument(canvas, original);
+    SameDocument(canvas.ExportDocument(), original, "canvas preserves a complete manual route");
+    Check(canvas.m_components[1].comp->inputs[0].value == LogicValue::High,
+        "manual geometry does not change signal propagation");
+
+    // Exercise snapshot comparison independently of rotation command handling.
+    // Consecutive rotations must remain distinct undo entries.
+    canvas.RecordUndo();
+    canvas.m_components[0].rotation = 90;
+    canvas.RefreshModifiedState();
+    const auto firstRotation = canvas.ExportDocument();
+    Check(canvas.IsModified() && firstRotation.components[0].rotation == 90,
+        "rotation-only edits enter the snapshot and differ from the saved baseline");
+    canvas.RecordUndo();
+    canvas.m_components[0].rotation = 180;
+    canvas.RefreshModifiedState();
+    Check(canvas.Undo(), "undo the second rotation");
+    SameDocument(canvas.ExportDocument(), firstRotation, "rotation-only snapshots are not deduplicated");
+    Check(canvas.Undo() && !canvas.IsModified() && !canvas.CanUndo(), "undo rotations restores clean baseline");
+    SameDocument(canvas.ExportDocument(), original, "rotation undo restores original manual endpoints");
+
+    const std::vector<wxPoint> firstRoute{{120, 100}, {180, 100}, {180, 260}, {320, 260}, {320, 220}, {360, 220}};
+    const std::vector<wxPoint> secondRoute{{120, 100}, {160, 100}, {160, 280}, {340, 280}, {340, 220}, {360, 220}};
+    canvas.RecordUndo();
+    Check(canvas.m_circuit.SetConnectionRoute(0, firstRoute), "set the first manual route");
+    canvas.RefreshModifiedState();
+    const auto firstRouting = canvas.ExportDocument();
+    Check(canvas.IsModified() && firstRouting.wires[0].route == firstRoute,
+        "route-only edits differ from the saved baseline");
+    canvas.RecordUndo();
+    Check(canvas.m_circuit.SetConnectionRoute(0, secondRoute), "set the second manual route");
+    canvas.RefreshModifiedState();
+    Check(canvas.Undo(), "undo the second manual route");
+    SameDocument(canvas.ExportDocument(), firstRouting, "route-only snapshots are not deduplicated");
+    canvas.MarkSaved();
+    Check(!canvas.IsModified() && canvas.CanUndo(), "saving manual geometry preserves its history");
+    Check(canvas.Undo() && canvas.IsModified(), "undo route adjustment compares against the saved manual route");
+    SameDocument(canvas.ExportDocument(), original, "route undo preserves all ordered original bends");
+
+    // Saving after a move/rotation must use the current pin coordinates, even
+    // when Circuit still holds a manually routed path from before that edit.
+    ImportUndoDocument(canvas, original);
+    canvas.m_components[0].rotation = 270;
+    canvas.m_components[1].x += 40;
+    const auto moved = canvas.ExportDocument();
+    Check(moved.wires[0].route.front() == canvas.GetPinPosition({canvas.m_components[0].comp, PinType::Output, 0}) &&
+        moved.wires[0].route.back() == canvas.GetPinPosition({canvas.m_components[1].comp, PinType::Input, 0}),
+        "export reconnects manual route endpoints after rotation and movement");
+    const auto path = directory.File(wxString::FromUTF8("画布往返.xml"));
+    wxString error;
+    CircuitDocument reopened;
+    Check(CircuitFile::Save(path, moved, error) && CircuitFile::Load(path, reopened, error) &&
+        canvas.ImportDocument(reopened, error), "save and reopen rotated manual geometry: " + Utf8(error));
+    SameDocument(canvas.ExportDocument(), moved, "canvas/file round trip preserves rotated custom routes");
+
+    canvas.m_selectedIndex = 0;
+    canvas.DeleteSelection();
+    Check(canvas.Undo(), "undo deletion of a rotated, manually wired component");
+    SameDocument(canvas.ExportDocument(), moved, "deletion undo restores rotation and custom route");
+    Check(!canvas.IsModified(), "restoring the saved rotated route returns to clean state");
+    canvas.ClearDocument();
+}
+
+static void TestGeometryRouteBudget(Canvas& canvas, const TemporaryDirectory& directory)
+{
+    const auto document = RouteBudgetDocument();
+    ImportUndoDocument(canvas, document);
+    SameDocument(canvas.ExportDocument(), document, "full route budget imports without changing endpoint geometry");
+    canvas.m_selectedIndex = 0;
+    Check(!canvas.RotateSelection(90), "rotation cannot expand manual routes beyond the saved-file point budget");
+    SameDocument(canvas.ExportDocument(), document, "rejected rotation restores coordinates, angle and every bend");
+    Check(!canvas.IsModified() && !canvas.CanUndo(), "rejected rotation creates no dirty state or undo history");
+
+    canvas.m_pressedIndex = 0;
+    canvas.m_dragOffset = wxPoint();
+    canvas.MoveDraggedComponent(wxPoint(100, 100), false);
+    canvas.CancelMouseInteraction();
+    SameDocument(canvas.ExportDocument(), document, "rejected movement preserves the original manual route budget");
+    Check(!canvas.IsModified() && !canvas.CanUndo(), "rejected movement creates no dirty state or undo history");
+    const auto path = directory.File(wxString::FromUTF8("画布往返.xml"));
+    wxString error;
+    CircuitDocument reopened;
+    Check(CircuitFile::Save(path, canvas.ExportDocument(), error) && CircuitFile::Load(path, reopened, error),
+        "a rejected geometry edit leaves the full-budget circuit saveable: " + Utf8(error));
+    SameDocument(reopened, document, "full-budget circuit remains exactly reopenable after rejected edits");
+
+    auto staleEndpoints = document;
+    staleEndpoints.components[0].x += 20;
+    staleEndpoints.components[0].y += 20;
+    Check(CircuitFile::Validate(staleEndpoints, error), "stale endpoint fixture has a valid raw 4000-point route budget");
+    for (const bool saveBeforeImport : {false, true})
+    {
+        const auto previous = UndoDocument();
+        ImportUndoDocument(canvas, previous);
+        canvas.DeleteWire(0);
+        if (saveBeforeImport) canvas.MarkSaved();
+        const auto edited = canvas.ExportDocument();
+        Check(!canvas.ImportDocument(staleEndpoints, error) && error.Contains("4000"),
+            "import rejects a raw-valid circuit whose reconnected endpoints exceed the route budget");
+        SameDocument(canvas.ExportDocument(), edited, "failed geometry import restores the original active model");
+        Check(canvas.IsModified() != saveBeforeImport && canvas.CanUndo(),
+            "failed geometry import preserves dirty state and existing history");
+        Check(canvas.Undo(), "existing undo remains usable after rejected endpoint reconstruction");
+        SameDocument(canvas.ExportDocument(), previous, "undo after rejected geometry import restores the previous wire");
+        Check(canvas.IsModified() == saveBeforeImport,
+            "undo after rejected geometry import retains the original saved baseline");
+    }
+    canvas.ClearDocument();
 }
 
 static void TestUndoShortcuts(Canvas& canvas)
@@ -768,6 +997,8 @@ int main(int argc, char** argv)
         canvas->SetSize(1100, 800);
         frame->ShowWithoutActivating();
         CanvasRegressionAccess::TestPersistence(*canvas, directory);
+        CanvasRegressionAccess::TestRotationAndRouteHistory(*canvas, directory);
+        CanvasRegressionAccess::TestGeometryRouteBudget(*canvas, directory);
         CanvasRegressionAccess::TestUndoShortcuts(*canvas);
         CanvasRegressionAccess::TestUndoTransformsAndClipboard(*canvas);
         CanvasRegressionAccess::TestUndoPersistenceBoundaries(*canvas);
@@ -776,7 +1007,8 @@ int main(int argc, char** argv)
         CanvasRegressionAccess::TestNativeUndoSessionBoundary(*canvas);
         std::cout << "PASS: XML round trips (8 types, 2/16 inputs, levels, fanout, UTF-8, escaping, whitespace), "
             "invalid XML/network rejection, transactional loads, failed write preservation, canvas reopen, dirty tracking, "
-            "Ctrl+D/Ctrl+Z, canvas undo grouping, saved history, failed imports and native text undo\n";
+            "rotation/manual-route compatibility, geometry undo/dirty state, Ctrl+D/Ctrl+Z, canvas undo grouping, "
+            "saved history, failed imports and native text undo\n";
     }
     catch (const std::exception& error)
     {

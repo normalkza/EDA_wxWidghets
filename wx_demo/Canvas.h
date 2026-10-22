@@ -26,6 +26,20 @@ public:
     bool HandleEditCommand(int command);
     bool Undo();
     bool CanUndo() const;
+    bool RotateSelection(int degrees = 90);
+    bool HasSelectedComponent() const;
+    bool HasSelectedInput() const;
+    int GetSelectedRotation() const;
+    bool ToggleSelectedInput();
+    void EvaluateCircuit();
+    void DeselectAll();
+    void SetGridVisible(bool visible);
+    bool IsGridVisible() const { return m_gridVisible; }
+    void SetSnapEnabled(bool enabled);
+    bool IsSnapEnabled() const { return m_snapEnabled; }
+    bool ResetSelectedWireRoute();
+    bool HasSelectedWire() const;
+    bool CanResetWireRoute() const;
     void OnToolChanged();
     void SetTextFontSize(int pointSize);
     int GetTextFontSize() const;
@@ -108,10 +122,10 @@ private:
     void DrawTextSelection(wxDC& dc);
 
     // 把坐标对齐到网格点
-    int SnapToGrid(int value) const { return (value / m_gridSize) * m_gridSize; }
+    int SnapToGrid(int value) const { return m_snapEnabled ? (value / m_gridSize) * m_gridSize : value; }
 
     static constexpr int m_portSize = 40;
-    void DrawPort(wxDC& dc, int x, int y, LogicValue value, PinType direction);
+    void DrawPort(wxDC& dc, int x, int y, LogicValue value, PinType direction, int rotation = 0);
     void DrawInput(wxDC& dc, int x, int y, LogicValue value);
     void DrawOutput(wxDC& dc, int x, int y, LogicValue value);
 
@@ -121,6 +135,7 @@ private:
         Component* comp;
         int x, y;
         int id = 0;
+        int rotation = 0;
     };
     // 绘制、点击判定和局部刷新统一使用同一份几何信息。
     struct GateGeometry
@@ -129,12 +144,18 @@ private:
         std::vector<wxPoint> inputs;
     };
     GateGeometry GetGateGeometry(const Component& component) const;
+    wxPoint GetComponentCenter(const PlacedComponent& pc) const;
+    wxPoint ComponentToWorld(const PlacedComponent& pc, const wxPoint& point) const;
+    wxPoint WorldToComponent(const PlacedComponent& pc, const wxPoint& point) const;
+    void DrawPlacedComponent(wxDC& dc, const PlacedComponent& pc);
+    bool CanPersistWireGeometry() const;
     void DrawGate(wxDC& dc, const PlacedComponent& pc);
     int HitTest(int x, int y) const;
     wxRect GetComponentRect(const PlacedComponent& pc) const;
     wxRect GetComponentUpdateRect(const PlacedComponent& pc) const;
     std::optional<PinReference> HitTestPin(const wxPoint& point) const;
     wxPoint GetPinPosition(const PinReference& pin) const;
+    wxPoint GetPinDirection(const PinReference& pin) const;
     Wire::Path GetWirePath(const WireConnection& connection) const;
     int HitTestWire(const wxPoint& point) const;
     void HandleWireClick(const wxPoint& point);
@@ -144,6 +165,17 @@ private:
     void DeleteWire(int index);
     void RecomputeCircuit();
     void ReportStatus(const wxString& message);
+    bool BeginWireDrag(const wxPoint& point);
+    void UpdateWireDrag(const wxPoint& point);
+    void FinishWireDrag(bool cancel = false);
+    bool IsDraggingWire() const { return m_wireDragIndex >= 0; }
+    int m_wireDragIndex = -1;
+    int m_wireDragSegment = -1;
+    wxPoint m_wireDragStart;
+    Wire::Path m_wireDragPath;
+    Wire::Path m_wireDragOriginalRoute;
+    std::optional<CircuitDocument> m_wireDragUndoDocument;
+    bool m_wireDragMoved = false;
     Circuit m_circuit;
     std::optional<PinReference> m_pendingWire;
     wxPoint m_wirePreview;
@@ -213,6 +245,8 @@ private:
 
     // 网格
     int m_gridSize = 20;
+    bool m_gridVisible = true;
+    bool m_snapEnabled = true;
     wxColour m_gridColour = wxColour(220, 228, 239);
     wxBitmap m_gridBitmap;
 

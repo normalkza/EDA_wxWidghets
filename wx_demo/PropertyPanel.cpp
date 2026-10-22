@@ -322,7 +322,7 @@ void PropertyPanel::ShowTool(const wxString& type, int textPointSize, int gateIn
     SetRows(DisplayName(type), {{wxT("状态"), wxT("此元件尚不能放置")}});
 }
 
-void PropertyPanel::ShowComponent(const Component* component, int x, int y)
+void PropertyPanel::ShowComponent(const Component* component, int x, int y, int rotation)
 {
     m_textSettings->Hide();
     m_gateSettings->Hide();
@@ -337,6 +337,7 @@ void PropertyPanel::ShowComponent(const Component* component, int x, int y)
         {wxT("状态"), wxT("已选中")},
         {wxT("X 坐标"), wxString::Format("%d", x)},
         {wxT("Y 坐标"), wxString::Format("%d", y)},
+        {wxT("旋转角度"), wxString::Format(wxT("%d°"), rotation)},
         {wxT("输入引脚"), wxString::Format("%llu", static_cast<unsigned long long>(component->inputs.size()))},
         {wxT("输出引脚"), wxString::Format("%llu", static_cast<unsigned long long>(component->outputs.size()))}
     };

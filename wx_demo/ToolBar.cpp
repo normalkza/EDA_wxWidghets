@@ -3,6 +3,7 @@
 #include "ToolBar.h"
 #include <wx/stdpaths.h>
 #include <wx/filename.h>
+#include <algorithm>
 #include <vector>
 
 
@@ -34,6 +35,36 @@ namespace
     }
 }
 
+wxBitmap CreatePortToolBitmap(const wxSize& size, bool input)
+{
+    // 同一组几何比例同时用于工具栏和树状元件库，节点直接贴在方框边上。
+    constexpr int scale = 3;
+    const wxSize renderSize(std::max(1, size.x) * scale, std::max(1, size.y) * scale);
+    wxBitmap bitmap(renderSize);
+    {
+        wxMemoryDC dc(bitmap);
+        dc.SetBackground(*wxWHITE_BRUSH);
+        dc.Clear();
+        const int side = std::max(8, std::min(renderSize.x, renderSize.y) * 3 / 4);
+        const int left = (renderSize.x - side) / 2;
+        const int top = (renderSize.y - side) / 2;
+        const wxColour terminal = input ? wxColour(225, 92, 99) : wxColour(53, 120, 229);
+        dc.SetPen(wxPen(terminal, std::max(2, side / 20)));
+        dc.SetBrush(*wxWHITE_BRUSH);
+        dc.DrawRoundedRectangle(left, top, side, side, std::max(3, side * 6 / 40));
+        dc.SetTextForeground(wxColour(36, 50, 71));
+        dc.SetFont(wxFont(wxFontInfo(wxSize(0, side * 19 / 40))
+            .FaceName(wxT("Microsoft YaHei UI")).Bold()));
+        dc.DrawLabel(wxT("0"), wxRect(left, top, side, side), wxALIGN_CENTER);
+        dc.SetPen(wxPen(terminal, 1));
+        dc.SetBrush(wxBrush(terminal));
+        dc.DrawCircle(input ? left + side : left, top + side / 2, std::max(3, side * 3 / 40));
+    }
+    wxImage image = bitmap.ConvertToImage();
+    image.Rescale(std::max(1, size.x), std::max(1, size.y), wxIMAGE_QUALITY_HIGH);
+    return wxBitmap(image);
+}
+
 // 同时保留原生按下状态和显式的粗边框，失去焦点后仍能识别当前工具。
 class ActiveToolBar : public wxToolBar
 {
@@ -55,11 +86,13 @@ public:
         const wxString& type)
     {
         wxImage image;
-        const bool loaded = image.LoadFile(ResPath(file), wxBITMAP_TYPE_PNG);
         const wxSize bitmapSize = GetToolBitmapSize();
         const int iconSize = FromDIP(24);
         const int inset = (bitmapSize.x - iconSize) / 2;
-        if (loaded) image.Rescale(iconSize, iconSize, wxIMAGE_QUALITY_HIGH);
+        const bool port = type == "INPUT" || type == "OUTPUT";
+        const bool loaded = port || image.LoadFile(ResPath(file), wxBITMAP_TYPE_PNG);
+        if (port) image = CreatePortToolBitmap(wxSize(iconSize, iconSize), type == "INPUT").ConvertToImage();
+        else if (loaded) image.Rescale(iconSize, iconSize, wxIMAGE_QUALITY_HIGH);
         wxBitmap normal(bitmapSize);
         {
             wxMemoryDC dc(normal);

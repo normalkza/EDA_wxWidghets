@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 namespace
 {
@@ -17,14 +18,14 @@ namespace
             const auto& a = first.components[i];
             const auto& b = second.components[i];
             if (a.id != b.id || a.type != b.type || a.x != b.x || a.y != b.y ||
-                a.inputCount != b.inputCount || a.high != b.high) return false;
+                a.inputCount != b.inputCount || a.high != b.high || a.rotation != b.rotation) return false;
         }
         for (std::size_t i = 0; i < first.wires.size(); ++i)
         {
             const auto& a = first.wires[i];
             const auto& b = second.wires[i];
             if (a.sourceId != b.sourceId || a.sourcePin != b.sourcePin ||
-                a.targetId != b.targetId || a.targetPin != b.targetPin) return false;
+                a.targetId != b.targetId || a.targetPin != b.targetPin || a.route != b.route) return false;
         }
         for (std::size_t i = 0; i < first.texts.size(); ++i)
         {
@@ -56,10 +57,17 @@ void Canvas::RecordUndo(CircuitDocument document)
 
 bool Canvas::Undo()
 {
+    const bool cancelWireDrag = IsDraggingWire() && m_wireDragMoved;
     const bool cancelTextTransform = m_textTransformIndex >= 0 &&
         m_textTransformIndex < static_cast<int>(m_textBoxes.size()) &&
         m_textBoxes[m_textTransformIndex].rect != m_textTransformRect;
     CancelMouseInteraction(true);
+    if (cancelWireDrag)
+    {
+        ReportStatus(wxT("已撤销连线路径调整"));
+        SetFocusIgnoringChildren();
+        return true;
+    }
     if (cancelTextTransform)
     {
         ReportStatus(wxT("已撤销文本框移动或缩放"));
@@ -86,6 +94,7 @@ bool Canvas::CanUndo() const
 {
     if (IsEditingText())
         return static_cast<wxTextCtrl*>(wxWindow::FindFocus())->CanUndo();
+    if (IsDraggingWire() && m_wireDragMoved) return true;
     if (m_textTransformIndex >= 0 && m_textTransformIndex < static_cast<int>(m_textBoxes.size()) &&
         m_textBoxes[m_textTransformIndex].rect != m_textTransformRect) return true;
     if (m_dragUndoDocument && m_pressedIndex >= 0 &&
@@ -195,6 +204,7 @@ CircuitDocument Canvas::ExportDocument() const
         component.type = pc.comp->name;
         component.x = pc.x;
         component.y = pc.y;
+        component.rotation = pc.rotation;
         component.inputCount = static_cast<int>(pc.comp->inputs.size());
         component.high = pc.comp->name == "INPUT" && !pc.comp->outputs.empty() &&
             pc.comp->outputs[0].value == LogicValue::High;
@@ -204,7 +214,8 @@ CircuitDocument Canvas::ExportDocument() const
     {
         document.wires.push_back({ ids.at(connection.output.component),
             static_cast<int>(connection.output.index), ids.at(connection.input.component),
-            static_cast<int>(connection.input.index) });
+            static_cast<int>(connection.input.index),
+            connection.route.empty() ? std::vector<wxPoint>{} : GetWirePath(connection) });
     }
     for (const auto& box : m_textBoxes)
         document.texts.push_back({ box.rect, box.pointSize, box.editor->GetValue() });
@@ -218,6 +229,11 @@ void Canvas::ResetDocument()
     m_textTransformUndoDocument.reset();
     m_textEditUndoDocument.reset();
     m_pendingWire.reset();
+    m_wireDragIndex = m_wireDragSegment = -1;
+    m_wireDragPath.clear();
+    m_wireDragOriginalRoute.clear();
+    m_wireDragUndoDocument.reset();
+    m_wireDragMoved = false;
     m_selectedIndex = m_selectedTextIndex = m_selectedWireIndex = -1;
     m_pressedIndex = -1;
     m_dragging = m_togglePending = m_creatingText = false;
@@ -277,7 +293,7 @@ bool Canvas::ReplaceDocument(const CircuitDocument& document, wxString& error, b
             if (!component) throw std::runtime_error("Unsupported component");
             Component* pointer = component.get();
             ownedComponents.push_back(std::move(component));
-            components.push_back({ pointer, data.x, data.y, data.id });
+            components.push_back({ pointer, data.x, data.y, data.id, data.rotation });
             nodes.push_back(pointer);
             ids.emplace(data.id, pointer);
         }
@@ -288,8 +304,40 @@ bool Canvas::ReplaceDocument(const CircuitDocument& document, wxString& error, b
                 { ids.at(wire.targetId), PinType::Input,
                     static_cast<std::size_t>(wire.targetPin) }) != ConnectionResult::Added)
                 throw std::runtime_error("Invalid wire connection");
+            if (!circuit.SetConnectionRoute(circuit.GetConnections().size() - 1, wire.route))
+                throw std::runtime_error("Invalid wire route");
         }
         if (!circuit.Evaluate(nodes)) throw std::runtime_error("Invalid circuit");
+
+        // 只读几何预检使用已构建的新模型，期间不创建窗口、派发事件或通知属性面板。
+        // 旧模型在所有退出路径上恢复，过量的端点重接不会留下无法保存的新文档。
+        {
+            struct ScopedGeometryModel
+            {
+                std::vector<PlacedComponent>& activeComponents;
+                std::vector<PlacedComponent>& stagedComponents;
+                Circuit& activeCircuit;
+                Circuit& stagedCircuit;
+                ScopedGeometryModel(std::vector<PlacedComponent>& active,
+                    std::vector<PlacedComponent>& staged, Circuit& current, Circuit& replacement)
+                    : activeComponents(active), stagedComponents(staged),
+                      activeCircuit(current), stagedCircuit(replacement)
+                {
+                    activeComponents.swap(stagedComponents);
+                    std::swap(activeCircuit, stagedCircuit);
+                }
+                ~ScopedGeometryModel()
+                {
+                    std::swap(activeCircuit, stagedCircuit);
+                    activeComponents.swap(stagedComponents);
+                }
+            } geometryModel(m_components, components, m_circuit, circuit);
+            if (!CanPersistWireGeometry())
+            {
+                error = wxT("无法载入电路：按元件当前位置重接后，连线路径点总数超过 4000 个。");
+                return false;
+            }
+        }
 
         // 先创建所有离屏编辑器，任何构建错误均不替换原来的电路与文本。
         textBoxes.reserve(document.texts.size());

@@ -1,5 +1,6 @@
 #include "Toolbox.h"
 #include "SelectionState.h"
+#include "ToolBar.h"
 
 #include <wx/stdpaths.h>
 #include <wx/filename.h>
@@ -188,15 +189,15 @@ void Toolbox::LoadIcons()
     m_imgDelete = Load("delete");
     m_imgDemux = Load("demux");
     m_imgDff = Load("dff");
-    m_imgInput = Load("input");
+    m_imgInput = m_imageList->Add(CreatePortToolBitmap(wxSize(16, 16), true));
     m_imgLed = Load("led");
     m_imgMux = Load("mux");
     m_imgNand = Load("nand");
     m_imgNor = Load("nor");
     m_imgNot = Load("not");
     m_imgOr = Load("or");
-    m_imgOutput = Load("output");
-    m_imgPin = Load("pin");
+    m_imgOutput = m_imageList->Add(CreatePortToolBitmap(wxSize(16, 16), false));
+    m_imgPin = m_imgInput;
     m_imgProbe = Load("probe");
     m_imgRegister = Load("register");
     m_imgSelect = Load("select");

@@ -13,7 +13,7 @@ class PropertyPanel : public wxPanel
 {
 public:
     explicit PropertyPanel(wxWindow* parent);
-    void ShowComponent(const Component* component, int x, int y);
+    void ShowComponent(const Component* component, int x, int y, int rotation = 0);
     void ShowTool(const wxString& type, int textPointSize = 14, int gateInputCount = 2);
     void ShowTextBox(const wxRect& rect, int pointSize);
     void ShowConnection(const WireConnection* connection);

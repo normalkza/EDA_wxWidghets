@@ -31,6 +31,8 @@ namespace
 constexpr std::size_t MaxFileBytes = 8 * 1024 * 1024;
 constexpr std::size_t MaxComponents = 1000;
 constexpr std::size_t MaxWires = 4000;
+constexpr std::size_t MaxRoutePoints = 256;
+constexpr std::size_t MaxTotalRoutePoints = 4000;
 constexpr std::size_t MaxTexts = 1000;
 constexpr std::size_t MaxTextLength = 65536;
 constexpr std::size_t MaxTotalTextLength = 262144;
@@ -92,6 +94,29 @@ bool Fail(wxString& error, const wxString& message)
 bool IsCoordinate(int value)
 {
     return value >= -MaxCoordinate && value <= MaxCoordinate;
+}
+
+bool IsRotation(int value)
+{
+    return value == 0 || value == 90 || value == 180 || value == 270;
+}
+
+bool ValidateRoute(const std::vector<wxPoint>& route, wxString& error)
+{
+    if (route.empty()) return true;
+    if (route.size() < 2 || route.size() > MaxRoutePoints)
+        return Fail(error, wxS("手动连线路径必须包含 2 至 256 个点。"));
+    for (std::size_t index = 0; index < route.size(); ++index)
+    {
+        const auto& point = route[index];
+        if (!IsCoordinate(point.x) || !IsCoordinate(point.y))
+            return Fail(error, wxS("连线路径坐标必须在 -1000000 至 1000000 之间。"));
+        if (index == 0) continue;
+        const auto& previous = route[index - 1];
+        if (point == previous || (point.x != previous.x && point.y != previous.y))
+            return Fail(error, wxS("连线路径相邻点必须形成非零长度的水平或垂直线段。"));
+    }
+    return true;
 }
 
 bool IsValidXmlText(const wxString& text)
@@ -200,7 +225,8 @@ bool IsFormattingNode(const wxXmlNode& node)
 }
 
 bool CheckAttributes(const wxXmlNode& node,
-                     std::initializer_list<const char*> required, wxString& error)
+                     std::initializer_list<const char*> required, wxString& error,
+                     std::initializer_list<const char*> optional = {})
 {
     for (const auto* name : required)
         if (!node.HasAttribute(wxString::FromUTF8(name)))
@@ -210,6 +236,8 @@ bool CheckAttributes(const wxXmlNode& node,
     {
         bool known = false;
         for (const auto* name : required)
+            known = known || attribute->GetName() == wxString::FromUTF8(name);
+        for (const auto* name : optional)
             known = known || attribute->GetName() == wxString::FromUTF8(name);
         if (!known)
             return Fail(error, wxString::Format(wxS("元素 <%s> 包含未知属性 %s。"),
@@ -263,13 +291,15 @@ bool ParseComponents(const wxXmlNode& section, CircuitDocument& document, wxStri
             return Fail(error, wxS("components 中只能包含 component 元件。"));
         if (document.components.size() >= MaxComponents)
             return Fail(error, wxS("元件数量超过上限（1000）。"));
-        if (!CheckAttributes(*node, { "id", "type", "x", "y", "inputCount", "high" }, error) ||
+        if (!CheckAttributes(*node, { "id", "type", "x", "y", "inputCount", "high" }, error, { "rotation" }) ||
             !HasNoDataChildren(*node, error)) return false;
         CircuitComponentData data;
         data.type = node->GetAttribute(wxS("type")).ToStdString(wxConvUTF8);
         if (!ReadInt(*node, "id", data.id, error) || !ReadInt(*node, "x", data.x, error) ||
             !ReadInt(*node, "y", data.y, error) ||
             !ReadInt(*node, "inputCount", data.inputCount, error)) return false;
+        if (node->HasAttribute(wxS("rotation")) && !ReadInt(*node, "rotation", data.rotation, error))
+            return false;
         const wxString high = node->GetAttribute(wxS("high"));
         if (high != wxS("0") && high != wxS("1"))
             return Fail(error, wxS("元件的 high 属性只能是 0 或 1。"));
@@ -282,6 +312,7 @@ bool ParseComponents(const wxXmlNode& section, CircuitDocument& document, wxStri
 bool ParseWires(const wxXmlNode& section, CircuitDocument& document, wxString& error)
 {
     if (!CheckAttributes(section, {}, error)) return false;
+    std::size_t totalRoutePoints = 0;
     for (auto* node = section.GetChildren(); node; node = node->GetNext())
     {
         if (IsFormattingNode(*node)) continue;
@@ -289,14 +320,29 @@ bool ParseWires(const wxXmlNode& section, CircuitDocument& document, wxString& e
             return Fail(error, wxS("wires 中只能包含 wire 连线。"));
         if (document.wires.size() >= MaxWires)
             return Fail(error, wxS("连线数量超过上限（4000）。"));
-        if (!CheckAttributes(*node, { "sourceId", "sourcePin", "targetId", "targetPin" }, error) ||
-            !HasNoDataChildren(*node, error)) return false;
+        if (!CheckAttributes(*node, { "sourceId", "sourcePin", "targetId", "targetPin" }, error))
+            return false;
         CircuitWireData data;
         if (!ReadInt(*node, "sourceId", data.sourceId, error) ||
             !ReadInt(*node, "sourcePin", data.sourcePin, error) ||
             !ReadInt(*node, "targetId", data.targetId, error) ||
             !ReadInt(*node, "targetPin", data.targetPin, error)) return false;
-        document.wires.push_back(data);
+        for (auto* point = node->GetChildren(); point; point = point->GetNext())
+        {
+            if (IsFormattingNode(*point)) continue;
+            if (point->GetType() != wxXML_ELEMENT_NODE || point->GetName() != wxS("point"))
+                return Fail(error, wxS("wire 中只能包含 point 路径点。"));
+            if (data.route.size() >= MaxRoutePoints || totalRoutePoints >= MaxTotalRoutePoints)
+                return Fail(error, wxS("连线路径点过多：每条最多 256 个，全部连线最多 4000 个。"));
+            wxPoint position;
+            if (!CheckAttributes(*point, { "x", "y" }, error) || !HasNoDataChildren(*point, error) ||
+                !ReadInt(*point, "x", position.x, error) || !ReadInt(*point, "y", position.y, error))
+                return false;
+            data.route.push_back(position);
+            ++totalRoutePoints;
+        }
+        if (!ValidateRoute(data.route, error)) return false;
+        document.wires.push_back(std::move(data));
     }
     return true;
 }
@@ -376,6 +422,8 @@ bool CircuitFile::Validate(const CircuitDocument& document, wxString& error)
             return Fail(error, wxS("元件 id 必须为正整数且不能重复。"));
         if (!IsCoordinate(data.x) || !IsCoordinate(data.y))
             return Fail(error, wxS("元件坐标必须在 -1000000 至 1000000 之间。"));
+        if (!IsRotation(data.rotation))
+            return Fail(error, wxS("元件旋转角度只能是 0、90、180 或 270 度。"));
         auto component = CreateComponent(data);
         if (!component)
             return Fail(error, wxString::Format(wxS("元件 %d 的类型、输入数量或电平无效。"), data.id));
@@ -398,8 +446,13 @@ bool CircuitFile::Validate(const CircuitDocument& document, wxString& error)
     }
     std::vector<std::vector<std::size_t>> outgoing(components.size());
     std::vector<std::size_t> indegree(components.size(), 0);
+    std::size_t totalRoutePoints = 0;
     for (const auto& wire : document.wires)
     {
+        if (!ValidateRoute(wire.route, error)) return false;
+        totalRoutePoints += wire.route.size();
+        if (totalRoutePoints > MaxTotalRoutePoints)
+            return Fail(error, wxS("全部连线的路径点总数不能超过 4000 个。"));
         const auto source = indices.find(wire.sourceId), target = indices.find(wire.targetId);
         if (source == indices.end() || target == indices.end())
             return Fail(error, wxS("连线引用了不存在的元件。"));
@@ -470,6 +523,7 @@ bool CircuitFile::Save(const wxString& path, const CircuitDocument& document, wx
         AddInt(*node, "y", data.y);
         AddInt(*node, "inputCount", data.inputCount);
         AddInt(*node, "high", data.high ? 1 : 0);
+        if (data.rotation != 0) AddInt(*node, "rotation", data.rotation);
     }
     auto* wires = AddElement(*root, wxS("wires"));
     for (const auto& data : document.wires)
@@ -479,6 +533,12 @@ bool CircuitFile::Save(const wxString& path, const CircuitDocument& document, wx
         AddInt(*node, "sourcePin", data.sourcePin);
         AddInt(*node, "targetId", data.targetId);
         AddInt(*node, "targetPin", data.targetPin);
+        for (const auto& position : data.route)
+        {
+            auto* point = AddElement(*node, wxS("point"));
+            AddInt(*point, "x", position.x);
+            AddInt(*point, "y", position.y);
+        }
     }
     auto* texts = AddElement(*root, wxS("texts"));
     for (const auto& data : document.texts)

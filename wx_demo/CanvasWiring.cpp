@@ -18,14 +18,23 @@ wxPoint Canvas::GetPinPosition(const PinReference& pin) const
     for (const auto& pc : m_components)
     {
         if (pc.comp != pin.component || !pin.IsValid()) continue;
-        if (pc.comp->name == "INPUT") return wxPoint(pc.x + m_portSize, pc.y + m_portSize / 2);
-        if (pc.comp->name == "OUTPUT") return wxPoint(pc.x, pc.y + m_portSize / 2);
+        if (pc.comp->name == "INPUT") return ComponentToWorld(pc, wxPoint(m_portSize, m_portSize / 2));
+        if (pc.comp->name == "OUTPUT") return ComponentToWorld(pc, wxPoint(0, m_portSize / 2));
         const auto geometry = GetGateGeometry(*pc.comp);
         const wxPoint offset = pin.type == PinType::Input ? geometry.inputs.at(pin.index) :
             wxPoint(geometry.outputX, geometry.height / 2);
-        return wxPoint(pc.x, pc.y) + offset;
+        return ComponentToWorld(pc, offset);
     }
     return wxPoint();
+}
+
+wxPoint Canvas::GetPinDirection(const PinReference& pin) const
+{
+    const wxPoint direction = pin.type == PinType::Output ? wxPoint(1, 0) : wxPoint(-1, 0);
+    for (const auto& pc : m_components)
+        if (pc.comp == pin.component && pin.IsValid())
+            return ComponentToWorld(pc, direction) - ComponentToWorld(pc, wxPoint());
+    return direction;
 }
 
 std::optional<PinReference> Canvas::HitTestPin(const wxPoint& point) const
@@ -36,7 +45,7 @@ std::optional<PinReference> Canvas::HitTestPin(const wxPoint& point) const
         // 端口只有一个连接点，连线工具可点击整个方框；门电路仍逐引脚判定。
         if (pc->comp->name == "INPUT" || pc->comp->name == "OUTPUT")
         {
-            if (wxRect(pc->x, pc->y, m_portSize + 1, m_portSize + 1).Contains(point))
+            if (wxRect(0, 0, m_portSize + 1, m_portSize + 1).Contains(WorldToComponent(*pc, point)))
                 return PinReference{ pc->comp, pc->comp->name == "INPUT" ? PinType::Output : PinType::Input, 0 };
         }
         for (const auto type : { PinType::Input, PinType::Output })
@@ -55,7 +64,10 @@ std::optional<PinReference> Canvas::HitTestPin(const wxPoint& point) const
 
 Wire::Path Canvas::GetWirePath(const WireConnection& connection) const
 {
-    return Wire::Route(GetPinPosition(connection.output), GetPinPosition(connection.input), m_gridSize);
+    const wxPoint output = GetPinPosition(connection.output), input = GetPinPosition(connection.input);
+    const wxPoint outDirection = GetPinDirection(connection.output), inDirection = GetPinDirection(connection.input);
+    return connection.route.empty() ? Wire::Route(output, input, m_gridSize, outDirection, inDirection) :
+        Wire::Reanchor(connection.route, output, input, m_gridSize, outDirection, inDirection);
 }
 
 wxRect Canvas::GetComponentUpdateRect(const PlacedComponent& pc) const
@@ -73,6 +85,105 @@ int Canvas::HitTestWire(const wxPoint& point) const
     for (int i = static_cast<int>(connections.size()) - 1; i >= 0; --i)
         if (Wire::HitTest(GetWirePath(connections[i]), point, FromDIP(6))) return i;
     return -1;
+}
+
+bool Canvas::HasSelectedWire() const
+{
+    return m_selectedWireIndex >= 0 &&
+        m_selectedWireIndex < static_cast<int>(m_circuit.GetConnections().size());
+}
+
+bool Canvas::CanResetWireRoute() const
+{
+    return HasSelectedWire() && !m_circuit.GetConnections()[m_selectedWireIndex].route.empty();
+}
+
+bool Canvas::ResetSelectedWireRoute()
+{
+    if (IsDraggingWire()) FinishWireDrag(true);
+    if (!CanResetWireRoute()) return false;
+    auto before = ExportDocument();
+    if (!m_circuit.SetConnectionRoute(static_cast<std::size_t>(m_selectedWireIndex), {})) return false;
+    RecordUndo(std::move(before));
+    MarkModified();
+    if (m_wireSelectionCallback)
+        m_wireSelectionCallback(&m_circuit.GetConnections()[m_selectedWireIndex]);
+    ReportStatus(wxT("已恢复自动走线"));
+    Refresh(false);
+    return true;
+}
+
+bool Canvas::BeginWireDrag(const wxPoint& point)
+{
+    if (IsDraggingWire() || m_pendingWire) return false;
+    const int index = HitTestWire(point);
+    if (index < 0) return false;
+    const auto& connection = m_circuit.GetConnections()[index];
+    const auto path = GetWirePath(connection);
+    const int segment = Wire::HitTestSegment(path, point, FromDIP(6));
+    if (segment < 0) return false;
+    FinishTextEditing();
+    m_wireDragUndoDocument = ExportDocument();
+    m_wireDragIndex = index;
+    m_wireDragSegment = segment;
+    m_wireDragStart = point;
+    m_wireDragPath = path;
+    m_wireDragOriginalRoute = connection.route;
+    m_wireDragMoved = false;
+    SelectWire(index);
+    const bool horizontal = path[segment].y == path[segment + 1].y;
+    SetCursor(wxCursor(horizontal ? wxCURSOR_SIZENS : wxCURSOR_SIZEWE));
+    if (!HasCapture()) CaptureMouse();
+    return true;
+}
+
+void Canvas::UpdateWireDrag(const wxPoint& point)
+{
+    if (!IsDraggingWire() || m_wireDragIndex >= static_cast<int>(m_circuit.GetConnections().size())) return;
+    auto path = Wire::MoveSegment(m_wireDragPath, static_cast<std::size_t>(m_wireDragSegment),
+        point - m_wireDragStart, m_snapEnabled ? m_gridSize : 1);
+    const auto& connection = m_circuit.GetConnections()[m_wireDragIndex];
+    path = Wire::Reanchor(path, GetPinPosition(connection.output), GetPinPosition(connection.input),
+        m_gridSize, GetPinDirection(connection.output), GetPinDirection(connection.input));
+    const auto& route = path == m_wireDragPath ? m_wireDragOriginalRoute : path;
+    if (route == connection.route) return;
+    const auto previousRoute = connection.route;
+    if (!m_circuit.SetConnectionRoute(static_cast<std::size_t>(m_wireDragIndex), route)) return;
+    if (!CanPersistWireGeometry())
+    {
+        m_circuit.SetConnectionRoute(static_cast<std::size_t>(m_wireDragIndex), previousRoute);
+        ReportStatus(wxT("连线路径点已达到上限，无法调整导线"));
+        return;
+    }
+    m_wireDragMoved = route != m_wireDragOriginalRoute;
+    Refresh(false);
+}
+
+void Canvas::FinishWireDrag(bool cancel)
+{
+    if (!IsDraggingWire()) return;
+    const int index = m_wireDragIndex;
+    const bool valid = index < static_cast<int>(m_circuit.GetConnections().size());
+    const bool moved = m_wireDragMoved;
+    m_wireDragIndex = m_wireDragSegment = -1;
+    if (cancel && valid)
+        m_circuit.SetConnectionRoute(static_cast<std::size_t>(index), m_wireDragOriginalRoute);
+    if (!cancel && valid && moved && m_wireDragUndoDocument)
+    {
+        RecordUndo(std::move(*m_wireDragUndoDocument));
+        MarkModified();
+        ReportStatus(wxT("导线布局已更新"));
+    }
+    else if (cancel && moved) ReportStatus(wxT("已取消导线调整"));
+    m_wireDragUndoDocument.reset();
+    m_wireDragPath.clear();
+    m_wireDragOriginalRoute.clear();
+    m_wireDragMoved = false;
+    if (HasCapture()) ReleaseMouse();
+    SetCursor(wxCursor(wxCURSOR_ARROW));
+    if (HasSelectedWire() && m_wireSelectionCallback)
+        m_wireSelectionCallback(&m_circuit.GetConnections()[m_selectedWireIndex]);
+    Refresh(false);
 }
 
 void Canvas::HandleWireClick(const wxPoint& point)
@@ -155,6 +266,7 @@ void Canvas::SelectWire(int index)
 
 void Canvas::DeleteWire(int index)
 {
+    if (IsDraggingWire()) FinishWireDrag(true);
     if (index < 0 || index >= static_cast<int>(m_circuit.GetConnections().size())) return;
     RecordUndo();
     m_circuit.RemoveConnection(index);
@@ -194,8 +306,14 @@ void Canvas::DrawWires(wxDC& dc, const wxRect& updateRect)
     if (m_pendingWire && m_pendingWire->IsValid())
     {
         const wxPoint start = GetPinPosition(*m_pendingWire);
+        const auto target = HitTestPin(m_wirePreview);
+        const wxPoint outputDirection = m_pendingWire->type == PinType::Output ? GetPinDirection(*m_pendingWire) :
+            (target && target->type == PinType::Output ? GetPinDirection(*target) : wxPoint(1, 0));
+        const wxPoint inputDirection = m_pendingWire->type == PinType::Input ? GetPinDirection(*m_pendingWire) :
+            (target && target->type == PinType::Input ? GetPinDirection(*target) : wxPoint(-1, 0));
         const auto path = m_pendingWire->type == PinType::Output ?
-            Wire::Route(start, m_wirePreview, m_gridSize) : Wire::Route(m_wirePreview, start, m_gridSize);
+            Wire::Route(start, m_wirePreview, m_gridSize, outputDirection, inputDirection) :
+            Wire::Route(m_wirePreview, start, m_gridSize, outputDirection, inputDirection);
         Wire::Draw(dc, path, LogicValue::Low, false, true);
     }
 }

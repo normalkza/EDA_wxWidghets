@@ -2,6 +2,8 @@
 #include "SelectionState.h"
 
 #include <wx/dcbuffer.h>
+#include <wx/dcgraph.h>
+#include <wx/graphics.h>
 #include <cmath>
 #include <algorithm>
 #include <wx/clipbrd.h>
@@ -95,8 +97,7 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
     }
     if (g_selectedType.IsEmpty() && HitTest(mouse.x, mouse.y) < 0)
     {
-        const int wire = HitTestWire(mouse);
-        if (wire >= 0) { SelectWire(wire); return; }
+        if (BeginWireDrag(mouse)) return;
     }
     if (g_selectedType != "DELETE")
     {
@@ -143,7 +144,7 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
         const auto& pc = m_components[hit];
         m_togglePending = pc.comp->name == "INPUT" &&
             g_selectedType != "DELETE" && g_selectedType != "TEXT" &&
-            wxRect(pc.x, pc.y, m_portSize, m_portSize).Contains(mouse);
+            wxRect(0, 0, m_portSize + 1, m_portSize + 1).Contains(WorldToComponent(pc, mouse));
         m_dragOffset = mouse - wxPoint(m_components[hit].x, m_components[hit].y);
         if (m_selectionCallback)
             m_selectionCallback(m_components[hit].comp, m_components[hit].x, m_components[hit].y);
@@ -219,6 +220,12 @@ void Canvas::DeleteItem(int componentIndex, int textIndex)
 
 void Canvas::OnLeftUp(wxMouseEvent& event)
 {
+    if (IsDraggingWire())
+    {
+        UpdateWireDrag(event.GetPosition());
+        FinishWireDrag(false);
+        return;
+    }
     if (m_textTransformIndex >= 0)
     {
         UpdateTextTransform(event.GetPosition());
@@ -254,7 +261,7 @@ void Canvas::OnLeftUp(wxMouseEvent& event)
             g_selectedType != "WIRE" && g_selectedType != "DELETE" &&
             g_selectedType != "TEXT" &&
             HitTest(mouse.x, mouse.y) == m_pressedIndex &&
-            wxRect(pc.x, pc.y, m_portSize, m_portSize).Contains(mouse))
+            wxRect(0, 0, m_portSize + 1, m_portSize + 1).Contains(WorldToComponent(pc, mouse)))
         {
             RecordUndo();
             auto& value = pc.comp->outputs[0].value;
@@ -269,6 +276,12 @@ void Canvas::OnLeftUp(wxMouseEvent& event)
 
 void Canvas::OnMouseMove(wxMouseEvent& event)
 {
+    if (IsDraggingWire())
+    {
+        if (event.LeftIsDown()) UpdateWireDrag(event.GetPosition());
+        else FinishWireDrag(false);
+        return;
+    }
     if (g_selectedType == "WIRE")
     {
         const auto pin = HitTestPin(event.GetPosition());
@@ -335,8 +348,16 @@ void Canvas::MoveDraggedComponent(const wxPoint& mouse, bool snap)
     if (pc.x == x && pc.y == y) return;
     if (!m_dragUndoDocument) m_dragUndoDocument = ExportDocument();
     const wxRect oldRect = GetComponentUpdateRect(pc);
+    const int previousX = pc.x, previousY = pc.y;
     pc.x = x;
     pc.y = y;
+    if (!CanPersistWireGeometry())
+    {
+        pc.x = previousX;
+        pc.y = previousY;
+        ReportStatus(wxT("连线路径点已达到上限，无法移动元件"));
+        return;
+    }
     MarkModified();
     wxRect dirty = oldRect.Union(GetComponentUpdateRect(pc));
     dirty.Inflate(3); // 包含选中虚线和画笔边缘，清除旧位置的残影。
@@ -358,6 +379,7 @@ void Canvas::OnDragTimer(wxTimerEvent&)
 
 void Canvas::CancelMouseInteraction(bool restoreText)
 {
+    if (IsDraggingWire()) FinishWireDrag(restoreText);
     if (restoreText) CancelPendingWire();
     m_dragTimer.Stop();
     if (m_dragging && m_pressedIndex >= 0 &&
@@ -426,6 +448,8 @@ void Canvas::OnKeyDown(wxKeyEvent& event)
         HandleEditCommand(event.GetKeyCode() == 'Z' ? wxID_UNDO : wxID_DELETE);
     else if (IsEditingText())
         event.Skip(); // 编辑文字时，交给原生控件处理剪贴板和退格。
+    else if (event.GetKeyCode() == 'R' && !event.ControlDown() && !event.AltDown())
+        RotateSelection(event.ShiftDown() ? -90 : 90);
     else if (event.ControlDown() && !event.AltDown() && !event.ShiftDown() &&
         (event.GetKeyCode() == 'C' || event.GetKeyCode() == 'V' || event.GetKeyCode() == 'X'))
     {
@@ -503,7 +527,7 @@ bool Canvas::CopySelection()
         for (const auto& pin : pc.comp->inputs) inputs += pin.value == LogicValue::High ? '1' : '0';
         for (const auto& pin : pc.comp->outputs) outputs += pin.value == LogicValue::High ? '1' : '0';
         stream << "COMPONENT " << std::quoted(pc.comp->name) << ' ' << pc.x << ' ' << pc.y
-            << ' ' << std::quoted(inputs) << ' ' << std::quoted(outputs);
+            << ' ' << std::quoted(inputs) << ' ' << std::quoted(outputs) << ' ' << pc.rotation;
     }
     else if (m_selectedTextIndex >= 0 && m_selectedTextIndex < static_cast<int>(m_textBoxes.size()))
     {
@@ -560,12 +584,16 @@ bool Canvas::PasteSelection()
     }
     std::istringstream stream(payload);
     std::string magic, kind, type, inputs, outputs, text;
-    int x = 0, y = 0, width = 0, height = 0, pointSize = 14, scrollY = 0;
+    int x = 0, y = 0, width = 0, height = 0, pointSize = 14, scrollY = 0, rotation = 0;
     if (!(stream >> magic >> kind) || magic != "WX_DEMO_1") return false;
     std::unique_ptr<Component> component;
     if (kind == "COMPONENT")
     {
         if (!(stream >> std::quoted(type) >> x >> y >> std::quoted(inputs) >> std::quoted(outputs)))
+            return false;
+        stream >> std::ws;
+        // 旧剪贴板未写入角度，仍按 0 度粘贴。
+        if (!stream.eof() && (!(stream >> rotation) || rotation < 0 || rotation >= 360 || rotation % 90 != 0))
             return false;
         if (inputs.size() > MultiInputGate::MaxInputCount) return false;
         component.reset(CreateComponent(wxString::FromUTF8(type), static_cast<int>(inputs.size())));
@@ -577,7 +605,7 @@ bool Canvas::PasteSelection()
             component->inputs[i].value = inputs[i] == '1' ? LogicValue::High : LogicValue::Low;
         for (std::size_t i = 0; i < outputs.size(); ++i)
             component->outputs[i].value = outputs[i] == '1' ? LogicValue::High : LogicValue::Low;
-        const wxRect bounds = GetComponentRect({ component.get(), 0, 0 });
+        const wxRect bounds = GetComponentRect({ component.get(), 0, 0, 0, rotation });
         width = bounds.GetRight() + 1;
         height = bounds.GetBottom() + 1;
     }
@@ -594,16 +622,17 @@ bool Canvas::PasteSelection()
     const int pasteCount = std::min(m_pasteCount + 1, 1000);
     const int offset = pasteCount * m_gridSize;
     const wxSize size = GetClientSize();
-    const int minX = component ? -GetComponentRect({ component.get(), 0, 0 }).x : 0;
+    const int minX = component ? -GetComponentRect({ component.get(), 0, 0, 0, rotation }).x : 0;
+    const int minY = component ? -GetComponentRect({ component.get(), 0, 0, 0, rotation }).y : 0;
     x = std::clamp(x + offset, minX, std::max(minX, size.x - width));
-    y = std::clamp(y + offset, 0, std::max(0, size.y - height));
+    y = std::clamp(y + offset, minY, std::max(minY, size.y - height));
     CancelMouseInteraction(true);
     if (component)
     {
-        x = std::max(SnapToGrid(x), ((minX + m_gridSize - 1) / m_gridSize) * m_gridSize);
-        y = SnapToGrid(y);
+        x = std::max(SnapToGrid(x), m_snapEnabled ? ((minX + m_gridSize - 1) / m_gridSize) * m_gridSize : minX);
+        y = std::max(SnapToGrid(y), m_snapEnabled ? ((minY + m_gridSize - 1) / m_gridSize) * m_gridSize : minY);
         RecordUndo();
-        m_components.push_back({ component.get(), x, y, NextComponentId() });
+        m_components.push_back({ component.get(), x, y, NextComponentId(), rotation });
         component.release();
         m_selectedIndex = static_cast<int>(m_components.size()) - 1;
         m_selectedTextIndex = -1;
@@ -798,12 +827,181 @@ Canvas::GateGeometry Canvas::GetGateGeometry(const Component& component) const
 wxRect Canvas::GetComponentRect(const PlacedComponent& pc) const
 {
     if (!pc.comp) return wxRect();
+    wxRect local;
     if (pc.comp->name == "INPUT" || pc.comp->name == "OUTPUT")
-        return wxRect(pc.x - 5, pc.y - 5, m_portSize + 11, m_portSize + 11);
+        local = wxRect(-5, -5, m_portSize + 11, m_portSize + 11);
+    else
+    {
+        const auto geometry = GetGateGeometry(*pc.comp);
+        local = wxRect(geometry.left - 5, -5,
+            geometry.outputX - geometry.left + 11, geometry.height + 11);
+    }
+    int left = 10000000, right = -10000000, top = 10000000, bottom = -10000000;
+    for (const auto corner : { local.GetTopLeft(), local.GetTopRight(), local.GetBottomLeft(), local.GetBottomRight() })
+    {
+        const auto point = ComponentToWorld(pc, corner);
+        left = std::min(left, point.x); right = std::max(right, point.x);
+        top = std::min(top, point.y); bottom = std::max(bottom, point.y);
+    }
+    return wxRect(wxPoint(left, top), wxPoint(right, bottom));
+}
+
+wxPoint Canvas::GetComponentCenter(const PlacedComponent& pc) const
+{
+    if (pc.comp->name == "INPUT" || pc.comp->name == "OUTPUT") return wxPoint(m_portSize / 2, m_portSize / 2);
     const auto geometry = GetGateGeometry(*pc.comp);
-    // 覆盖本体、全部引脚、反相圆圈及画笔边缘，不再使用旧的固定范围。
-    return wxRect(pc.x + geometry.left - 5, pc.y - 5,
-        geometry.outputX - geometry.left + 11, geometry.height + 11);
+    return wxPoint(geometry.width / 2, geometry.height / 2);
+}
+
+wxPoint Canvas::ComponentToWorld(const PlacedComponent& pc, const wxPoint& point) const
+{
+    const wxPoint center = GetComponentCenter(pc);
+    const wxPoint delta = point - center;
+    wxPoint rotated = delta;
+    if (pc.rotation == 90) rotated = wxPoint(-delta.y, delta.x);
+    else if (pc.rotation == 180) rotated = wxPoint(-delta.x, -delta.y);
+    else if (pc.rotation == 270) rotated = wxPoint(delta.y, -delta.x);
+    return wxPoint(pc.x, pc.y) + center + rotated;
+}
+
+wxPoint Canvas::WorldToComponent(const PlacedComponent& pc, const wxPoint& point) const
+{
+    const wxPoint center = GetComponentCenter(pc);
+    const wxPoint delta = point - wxPoint(pc.x, pc.y) - center;
+    wxPoint rotated = delta;
+    if (pc.rotation == 90) rotated = wxPoint(delta.y, -delta.x);
+    else if (pc.rotation == 180) rotated = wxPoint(-delta.x, -delta.y);
+    else if (pc.rotation == 270) rotated = wxPoint(-delta.y, delta.x);
+    return center + rotated;
+}
+
+void Canvas::DrawPlacedComponent(wxDC& dc, const PlacedComponent& pc)
+{
+    if (pc.comp->name == "INPUT" || pc.comp->name == "OUTPUT")
+    {
+        const bool input = pc.comp->name == "INPUT";
+        DrawPort(dc, pc.x, pc.y, input ? pc.comp->outputs[0].value : pc.comp->inputs[0].value,
+            input ? PinType::Output : PinType::Input, pc.rotation);
+        return;
+    }
+    if (pc.rotation == 0) { DrawGate(dc, pc); return; }
+    // 只旋转元件图形；画布网格、文本标注和线路使用各自的世界坐标。
+    if (auto* graphics = wxGraphicsContext::CreateFromUnknownDC(dc))
+    {
+        const auto center = wxPoint(pc.x, pc.y) + GetComponentCenter(pc);
+        graphics->Translate(center.x, center.y);
+        graphics->Rotate(pc.rotation * 3.141592653589793 / 180.0);
+        graphics->Translate(-center.x, -center.y);
+        wxGCDC rotated(graphics);
+        DrawGate(rotated, pc);
+    }
+}
+
+bool Canvas::HasSelectedComponent() const
+{
+    return m_selectedIndex >= 0 && m_selectedIndex < static_cast<int>(m_components.size());
+}
+
+bool Canvas::HasSelectedInput() const
+{
+    return HasSelectedComponent() && m_components[m_selectedIndex].comp->name == "INPUT";
+}
+
+int Canvas::GetSelectedRotation() const
+{
+    return HasSelectedComponent() ? m_components[m_selectedIndex].rotation : 0;
+}
+
+bool Canvas::CanPersistWireGeometry() const
+{
+    std::size_t rawPoints = 0, manualWires = 0;
+    for (const auto& connection : m_circuit.GetConnections())
+    {
+        if (connection.route.empty() || !connection.output.IsValid() || !connection.input.IsValid()) continue;
+        rawPoints += connection.route.size();
+        ++manualWires;
+    }
+    // 重接两端最多增加十个点；普通规模的电路无需额外生成全部路径。
+    if (rawPoints + manualWires * 16 <= 4000) return true;
+    std::size_t points = 0;
+    for (const auto& connection : m_circuit.GetConnections())
+    {
+        if (connection.route.empty() || !connection.output.IsValid() || !connection.input.IsValid()) continue;
+        points += GetWirePath(connection).size();
+        if (points > 4000) return false;
+    }
+    return true;
+}
+
+bool Canvas::RotateSelection(int degrees)
+{
+    if (IsEditingText() || !HasSelectedComponent() || degrees % 90 != 0 || degrees % 360 == 0) return false;
+    CancelMouseInteraction(true);
+    auto before = ExportDocument();
+    auto& pc = m_components[m_selectedIndex];
+    const auto previous = pc;
+    pc.rotation = ((pc.rotation + degrees % 360) % 360 + 360) % 360;
+    const auto bounds = GetComponentRect(pc);
+    // 靠近画布边缘旋转时，将整个元件移回可见区域。
+    if (bounds.x < 0) pc.x += m_snapEnabled ? ((-bounds.x + m_gridSize - 1) / m_gridSize) * m_gridSize : -bounds.x;
+    if (bounds.y < 0) pc.y += m_snapEnabled ? ((-bounds.y + m_gridSize - 1) / m_gridSize) * m_gridSize : -bounds.y;
+    if (!CanPersistWireGeometry())
+    {
+        pc = previous;
+        ReportStatus(wxT("连线路径点已达到上限，无法旋转元件"));
+        return false;
+    }
+    RecordUndo(std::move(before));
+    MarkModified();
+    if (m_selectionCallback) m_selectionCallback(pc.comp, pc.x, pc.y);
+    ReportStatus(wxString::Format(wxT("旋转：%d°"), pc.rotation));
+    Refresh(false);
+    return true;
+}
+
+bool Canvas::ToggleSelectedInput()
+{
+    if (IsEditingText() || !HasSelectedInput()) return false;
+    CancelMouseInteraction(true);
+    RecordUndo();
+    auto& value = m_components[m_selectedIndex].comp->outputs[0].value;
+    value = value == LogicValue::Low ? LogicValue::High : LogicValue::Low;
+    MarkModified();
+    RecomputeCircuit();
+    return true;
+}
+
+void Canvas::EvaluateCircuit()
+{
+    CancelMouseInteraction(true);
+    RecomputeCircuit();
+    ReportStatus(wxT("逻辑已重新计算"));
+}
+
+void Canvas::DeselectAll()
+{
+    CancelMouseInteraction(true);
+    SetFocusIgnoringChildren();
+    m_selectedIndex = m_selectedTextIndex = m_selectedWireIndex = -1;
+    g_selectedType.Clear();
+    if (m_componentPlacedCallback) m_componentPlacedCallback();
+    if (m_selectionCallback) m_selectionCallback(nullptr, 0, 0);
+    Refresh(false);
+}
+
+void Canvas::SetGridVisible(bool visible)
+{
+    if (m_gridVisible == visible) return;
+    m_gridVisible = visible;
+    m_gridBitmap = wxNullBitmap;
+    Refresh(false);
+}
+
+void Canvas::SetSnapEnabled(bool enabled)
+{
+    if (m_snapEnabled == enabled) return;
+    CancelMouseInteraction(true);
+    m_snapEnabled = enabled;
 }
 
 int Canvas::GetGateInputCount() const
@@ -826,7 +1024,17 @@ void Canvas::SetGateInputCount(int count)
     auto& pc = m_components[m_selectedIndex];
     if (!pc.comp->SupportsVariableInputs() || static_cast<int>(pc.comp->inputs.size()) == count) return;
     auto before = ExportDocument();
+    const auto previousInputs = pc.comp->inputs;
     if (!pc.comp->SetInputCount(count)) return;
+    if (!CanPersistWireGeometry())
+    {
+        pc.comp->SetInputCount(static_cast<int>(previousInputs.size()));
+        pc.comp->inputs = previousInputs;
+        pc.comp->Evaluate();
+        if (m_selectionCallback) m_selectionCallback(pc.comp, pc.x, pc.y);
+        ReportStatus(wxT("连线路径点已达到上限，无法调整引脚数量"));
+        return;
+    }
     RecordUndo(std::move(before));
     MarkModified();
     m_selectedWireIndex = -1;
@@ -852,6 +1060,7 @@ void Canvas::UpdateGridBitmap()
     wxMemoryDC gridDC(m_gridBitmap);
     gridDC.SetBackground(wxBrush(GetBackgroundColour()));
     gridDC.Clear();
+    if (!m_gridVisible) return;
     // 保留网格缓存；用纵横线恢复方格绘图区。
     for (int x = 0; x < size.GetWidth(); x += m_gridSize)
     {
@@ -877,11 +1086,7 @@ void Canvas::DrawCanvas(wxDC& dc, const wxRect& updateRect)
     {
         if (!pc.comp || !GetComponentRect(pc).Intersects(updateRect)) continue;
 
-        if (pc.comp->name == "INPUT")
-            DrawInput(dc, pc.x, pc.y, pc.comp->outputs[0].value);
-        else if (pc.comp->name == "OUTPUT")
-            DrawOutput(dc, pc.x, pc.y, pc.comp->inputs[0].value);
-        else DrawGate(dc, pc);
+        DrawPlacedComponent(dc, pc);
 
     }
 
@@ -1184,7 +1389,7 @@ void Canvas::DrawTextBoxes(wxDC& dc, const wxRect& updateRect)
 
 
 // 输入、输出使用同样的方框；连接点贴在框边，不再伸出短导线。
-void Canvas::DrawPort(wxDC& dc, int x, int y, LogicValue value, PinType direction)
+void Canvas::DrawPort(wxDC& dc, int x, int y, LogicValue value, PinType direction, int rotation)
 {
     const bool high = value == LogicValue::High;
     const wxColour terminal = direction == PinType::Output ? wxColour(225, 92, 99) : wxColour(53, 120, 229);
@@ -1198,7 +1403,11 @@ void Canvas::DrawPort(wxDC& dc, int x, int y, LogicValue value, PinType directio
     dc.SetFont(previousFont);
     dc.SetPen(wxPen(terminal));
     dc.SetBrush(wxBrush(terminal));
-    dc.DrawCircle(direction == PinType::Output ? x + m_portSize : x, y + m_portSize / 2, 3);
+    wxPoint offset(direction == PinType::Output ? m_portSize / 2 : -m_portSize / 2, 0);
+    if (rotation == 90) offset = wxPoint(0, offset.x);
+    else if (rotation == 180) offset.x = -offset.x;
+    else if (rotation == 270) offset = wxPoint(0, -offset.x);
+    dc.DrawCircle(wxPoint(x + m_portSize / 2, y + m_portSize / 2) + offset, 3);
 }
 
 void Canvas::DrawInput(wxDC& dc, int x, int y, LogicValue value)

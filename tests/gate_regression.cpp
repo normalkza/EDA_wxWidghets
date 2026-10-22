@@ -449,6 +449,194 @@ static void TestWiring(Canvas& canvas)
     Check(!canvas.m_pendingWire, "Esc cancels unfinished wire");
 }
 
+static void TestRotations(Canvas& canvas)
+{
+    for (const auto& type : { "AND", "OR", "NOT", "NAND", "NOR", "XOR", "INPUT", "OUTPUT" })
+    {
+        canvas.ClearDocument();
+        Component* component = std::string(type) == "INPUT" ? static_cast<Component*>(new InputComponent()) :
+            std::string(type) == "OUTPUT" ? static_cast<Component*>(new OutputComponent()) : Gate(type, 5).release();
+        canvas.m_components.push_back({ component, 300, 140, 1 });
+        canvas.m_selectedIndex = 0;
+        const auto initial = Render(canvas);
+        const wxPoint center = wxPoint(300, 140) + canvas.GetComponentCenter(canvas.m_components[0]);
+        const auto checkPins = [&](const wxImage& image, PinType direction) {
+            const auto& pins = direction == PinType::Input ? component->inputs : component->outputs;
+            for (size_t i = 0; i < pins.size(); ++i)
+            {
+                const PinReference pin{ component, direction, i };
+                const wxPoint point = canvas.GetPinPosition(pin);
+                Check(canvas.HitTestPin(point) == pin, "rotated pin is connectable");
+                Check(canvas.GetComponentRect(canvas.m_components[0]).Contains(point), "rotated pin within component bounds");
+                const int r = image.GetRed(point.x, point.y), g = image.GetGreen(point.x, point.y), b = image.GetBlue(point.x, point.y);
+                Check(direction == PinType::Input ? (b > 150 && b > r + 60 && b > g + 40) :
+                    (r > 160 && r > g + 60 && r > b + 60), "drawn terminal agrees with rotated hit position");
+            }
+        };
+        for (const int angle : { 90, 180, 270, 0 })
+        {
+            Check(canvas.RotateSelection(90) && canvas.GetSelectedRotation() == angle, "all components rotate through four directions");
+            const auto& pc = canvas.m_components[0];
+            Check(wxPoint(pc.x, pc.y) + canvas.GetComponentCenter(pc) == center, "rotation keeps component center");
+            wxBitmap isolated(800, 700);
+            {
+                wxMemoryDC dc(isolated);
+                dc.SetBackground(*wxWHITE_BRUSH);
+                dc.Clear();
+                canvas.DrawPlacedComponent(dc, pc);
+            }
+            const auto image = isolated.ConvertToImage();
+            checkPins(image, PinType::Input);
+            checkPins(image, PinType::Output);
+            const auto bounds = canvas.GetComponentRect(pc);
+            for (int y = 0; y < image.GetHeight(); ++y)
+                for (int x = 0; x < image.GetWidth(); ++x)
+                {
+                    const bool ink = image.GetRed(x, y) != 255 || image.GetGreen(x, y) != 255 || image.GetBlue(x, y) != 255;
+                    Check(!ink || bounds.Contains(x, y), "rotated ink stays in hit and refresh bounds");
+                }
+        }
+        Compare(Render(canvas), initial, "four rotations return exact component pixels");
+        Check(canvas.RotateSelection(-90) && canvas.GetSelectedRotation() == 270, "counterclockwise rotation");
+        canvas.m_pressedIndex = 0;
+        canvas.m_dragOffset = wxPoint();
+        const auto before = canvas.GetComponentUpdateRect(canvas.m_components[0]);
+        auto partial = Render(canvas);
+        canvas.MoveDraggedComponent(wxPoint(320, 160), false);
+        RepaintRegion(canvas, partial, before.Union(canvas.GetComponentUpdateRect(canvas.m_components[0])));
+        Compare(partial, Render(canvas), "rotated component drag leaves no stale pixels");
+        canvas.CancelMouseInteraction();
+        Check(canvas.CopySelection() && canvas.PasteSelection(), "rotated component copy paste");
+        Check(canvas.m_components.back().rotation == 270 && canvas.m_components.back().comp->name == type,
+            "clipboard preserves angle and component type");
+        Check(canvas.Undo() && canvas.m_components.size() == 1 && canvas.m_components[0].rotation == 270,
+            "undo paste preserves original rotation");
+        canvas.m_selectedIndex = 0;
+        Check(canvas.RotateSelection(90) && canvas.Undo() && canvas.m_components[0].rotation == 270,
+            "undo rotation restores angle");
+    }
+    canvas.ClearDocument();
+    auto* tall = new NorGate(16);
+    canvas.m_components.push_back({ tall, 300, 140, 1, 90 });
+    canvas.m_selectedIndex = 0;
+    const auto geometry = canvas.GetGateGeometry(*tall);
+    const auto bounds = canvas.GetComponentRect(canvas.m_components[0]);
+    Check(bounds.width == geometry.height + 11 && bounds.height == geometry.outputX - geometry.left + 11,
+        "tall rotated gate swaps selection dimensions");
+    Check(!canvas.RotateSelection(45), "only quarter turn rotation accepted");
+    canvas.ClearDocument();
+}
+
+static void TestWireGeometry()
+{
+    const std::array<wxPoint, 4> directions = { wxPoint(1, 0), wxPoint(0, 1), wxPoint(-1, 0), wxPoint(0, -1) };
+    const auto checkPath = [](const Wire::Path& path, wxPoint source, wxPoint target, wxPoint out, wxPoint in) {
+        Check(path.size() >= 2 && path.front() == source && path.back() == target, "routed endpoints exist for every orientation");
+        for (size_t i = 1; i < path.size(); ++i)
+            Check(path[i] != path[i-1] && (path[i].x == path[i-1].x || path[i].y == path[i-1].y),
+                "routing orientation matrix stays orthogonal");
+        const wxPoint first = path[1] - path.front(), last = path[path.size()-2] - path.back();
+        Check(first.x * out.y == first.y * out.x && first.x * out.x + first.y * out.y > 0,
+            "route leaves output in rotated pin direction");
+        Check(last.x * in.y == last.y * in.x && last.x * in.x + last.y * in.y > 0,
+            "route enters input in rotated pin direction");
+    };
+    for (const auto out : directions)
+        for (const auto in : directions)
+            for (const auto target : { wxPoint(500, 360), wxPoint(100, 80), wxPoint(200, 200), wxPoint(200, 400), wxPoint(400, 200) })
+            {
+                const auto path = Wire::Route(wxPoint(200, 200), target, 20, out, in);
+                checkPath(path, wxPoint(200, 200), target, out, in);
+                const auto moved = Wire::Reanchor(path, wxPoint(220, 240), target + wxPoint(20, 40), 20, out, in);
+                checkPath(moved, wxPoint(220, 240), target + wxPoint(20, 40), out, in);
+            }
+    const Wire::Path manual = { {100, 100}, {120, 100}, {120, 200}, {480, 200}, {480, 100}, {500, 100} };
+    for (size_t segment : { size_t(0), size_t(2), manual.size() - 2 })
+    {
+        const auto shifted = Wire::MoveSegment(manual, segment, wxPoint(0, 60));
+        checkPath(shifted, manual.front(), manual.back(), wxPoint(1, 0), wxPoint(-1, 0));
+        Check(shifted != manual, "first, middle and last wire segments can all be moved");
+    }
+    const auto moved = Wire::Reanchor(manual, wxPoint(100, 140), wxPoint(500, 160));
+    checkPath(moved, wxPoint(100, 140), wxPoint(500, 160), wxPoint(1, 0), wxPoint(-1, 0));
+    Check(Wire::HitTest(moved, wxPoint(300, 200), 0), "moving endpoints preserves manual middle line position");
+}
+
+static void TestWireEditing(Canvas& canvas)
+{
+    canvas.ClearDocument();
+    g_selectedType.Clear();
+    CircuitDocument document;
+    document.components = { {1, "INPUT", 100, 100, 0, true}, {2, "OUTPUT", 500, 100, 1, false} };
+    document.wires = { {1, 0, 2, 0} };
+    wxString error;
+    Check(canvas.ImportDocument(document, error), "wire edit fixture imports");
+    const auto begin = [&](wxPoint point) {
+        wxMouseEvent down(wxEVT_LEFT_DOWN);
+        down.SetPosition(point);
+        canvas.OnLeftDown(down);
+        Check(canvas.IsDraggingWire(), "selection click starts editable line segment");
+    };
+    const auto finish = [&](wxPoint point) {
+        wxMouseEvent up(wxEVT_LEFT_UP);
+        up.SetPosition(point);
+        canvas.OnLeftUp(up);
+        Check(!canvas.IsDraggingWire(), "mouse release finishes wire drag");
+    };
+    begin(wxPoint(300, 120));
+    canvas.UpdateWireDrag(wxPoint(300, 200));
+    finish(wxPoint(300, 200));
+    Check(canvas.IsModified() && canvas.CanResetWireRoute(), "line drag is persistent and resettable");
+    auto path = canvas.GetWirePath(canvas.m_circuit.GetConnections()[0]);
+    Check(path.front() == wxPoint(140, 120) && path.back() == wxPoint(500, 120), "drag retains both terminal nodes");
+    Check(Wire::HitTest(path, wxPoint(300, 200), 0), "straight connection can move to another row");
+    const auto edited = canvas.ExportDocument();
+    Check(!edited.wires[0].route.empty(), "custom routing exported");
+    Check(canvas.Undo() && !canvas.IsModified() && canvas.ExportDocument().wires[0].route.empty(),
+        "one undo restores automatic route and saved state");
+    Check(!canvas.CanUndo(), "wire drag produces exactly one undo entry");
+    Check(canvas.ImportDocument(edited, error), "manual route roundtrip");
+    canvas.SelectWire(0);
+    begin(wxPoint(300, 200));
+    canvas.UpdateWireDrag(wxPoint(300, 280));
+    wxKeyEvent escape(wxEVT_CHAR_HOOK);
+    escape.m_keyCode = WXK_ESCAPE;
+    canvas.OnKeyDown(escape);
+    Check(!canvas.IsDraggingWire() && !canvas.IsModified() && canvas.ExportDocument().wires[0].route == edited.wires[0].route,
+        "Esc cancels line drag without changing saved route");
+    canvas.m_selectedIndex = 0;
+    canvas.m_selectedWireIndex = -1;
+    Check(canvas.RotateSelection(90), "wired source rotation");
+    path = canvas.GetWirePath(canvas.m_circuit.GetConnections()[0]);
+    Check(path.front() == wxPoint(120, 140) && path.back() == wxPoint(500, 120), "wire follows rotated terminal");
+    for (size_t i = 1; i < path.size(); ++i)
+        Check(path[i].x == path[i-1].x || path[i].y == path[i-1].y, "rotated manual route remains orthogonal");
+    Check(canvas.m_components[1].comp->inputs[0].value == LogicValue::High, "rotating routed source retains logic signal");
+    canvas.SelectWire(0);
+    Check(canvas.ResetSelectedWireRoute() && canvas.m_circuit.GetConnections()[0].route.empty(), "reset returns automatic routing");
+    Check(canvas.Undo() && !canvas.m_circuit.GetConnections()[0].route.empty(), "reset custom route can be undone");
+    Check(canvas.ImportDocument(document, error), "free wire placement fixture");
+    canvas.SetSnapEnabled(false);
+    begin(wxPoint(300, 120));
+    canvas.UpdateWireDrag(wxPoint(300, 157));
+    finish(wxPoint(300, 157));
+    Check(Wire::HitTest(canvas.GetWirePath(canvas.m_circuit.GetConnections()[0]), wxPoint(300, 157), 0),
+        "disabling snapping allows pixel-level wire placement");
+    canvas.SetSnapEnabled(true);
+    canvas.ClearDocument();
+    canvas.SetGridVisible(false);
+    auto plain = Render(canvas).ConvertToImage();
+    Check(plain.GetRed(20, 30) == plain.GetRed(21, 30) && plain.GetBlue(20, 30) == plain.GetBlue(21, 30),
+        "hidden grid removes line pixels");
+    canvas.SetGridVisible(true);
+    auto grid = Render(canvas).ConvertToImage();
+    Check(grid.GetRed(20, 30) != grid.GetRed(21, 30), "grid toggle regenerates cached lines");
+    canvas.SetSnapEnabled(false);
+    Check(canvas.SnapToGrid(37) == 37, "free placement disables snapping");
+    canvas.SetSnapEnabled(true);
+    Check(canvas.SnapToGrid(37) == 20, "grid snapping can be restored");
+}
+
 static void TestProperties(Canvas& canvas, PropertyPanel& properties)
 {
     canvas.SetSelectionCallback([&](const Component* component, int x, int y) {
@@ -501,8 +689,11 @@ int main(int argc, char** argv)
         CanvasRegressionAccess::TestCanvas(*canvas);
         CanvasRegressionAccess::TestPorts(*canvas);
         CanvasRegressionAccess::TestWiring(*canvas);
+        CanvasRegressionAccess::TestRotations(*canvas);
+        CanvasRegressionAccess::TestWireGeometry();
+        CanvasRegressionAccess::TestWireEditing(*canvas);
         CanvasRegressionAccess::TestProperties(*canvas, *properties);
-        std::cout << "PASS: truth tables, pin resizing, hit bounds, drag/resize pixels, copy/paste, properties, port box endpoints and drag pixels, all pin wiring, fanout, propagation, disconnection and cycle rejection\n";
+        std::cout << "PASS: truth tables, pin resizing, hit bounds, drag/resize pixels, rotated pins and pixels, rotation clipboard/undo, editable wire segments and undo, view options, properties, fanout, propagation, disconnection and cycle rejection\n";
     }
     catch (const std::exception& error)
     {

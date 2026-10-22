@@ -16,6 +16,7 @@ struct CircuitComponentData
     int y = 0;
     int inputCount = 0;
     bool high = false;
+    int rotation = 0;
 };
 
 struct CircuitWireData
@@ -24,6 +25,8 @@ struct CircuitWireData
     int sourcePin = 0;
     int targetId = 0;
     int targetPin = 0;
+    // 空路径使用自动布线；非空路径包含源端、拐点及目标端。
+    std::vector<wxPoint> route;
 };
 
 struct CircuitTextData

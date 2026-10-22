@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Component.h"
+#include <wx/gdicmn.h>
 #include <cstddef>
 #include <vector>
 
@@ -19,6 +20,7 @@ struct WireConnection
     PinReference output;
     PinReference input;
     LogicValue GetValue() const;
+    std::vector<wxPoint> route;
 };
 
 enum class ConnectionResult
@@ -32,6 +34,7 @@ class Circuit
 public:
     ConnectionResult Connect(PinReference first, PinReference second);
     void RemoveConnection(std::size_t index);
+    bool SetConnectionRoute(std::size_t index, const std::vector<wxPoint>& route);
     void RemoveComponent(const Component* component);
     void PruneInvalidConnections();
     bool Evaluate(const std::vector<Component*>& components);
