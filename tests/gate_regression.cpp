@@ -23,6 +23,17 @@
 #include "XorGate.h"
 #include "SelectionState.h"
 #include "IOComponent.h"
+#include "registry_regression.h"
+#include "toolbox_regression.h"
+#include "topology_regression.h"
+#include "snapshot_regression.h"
+#include "canvas_structure_regression.h"
+#include "timing_regression.h"
+#include "canvas_timing_regression.h"
+#include "simulation_ui_regression.h"
+#include "pcb_import_regression.h"
+#include "pcb_workspace_regression.h"
+#include "pcb_view_regression.h"
 
 class TestApp : public wxApp
 {
@@ -345,8 +356,8 @@ static void TestPorts(Canvas& canvas)
     canvas.HandleWireClick(wxPoint(420, 200));
     Check(!canvas.m_pendingWire && canvas.m_circuit.GetConnections().size() == 1,
         "output box center completes connection");
-    input->outputs[0].value = LogicValue::High;
-    canvas.RecomputeCircuit();
+    canvas.m_selectedIndex = 0;
+    Check(canvas.ToggleSelectedInput(), "edit the input design stimulus");
     Check(output->inputs[0].value == LogicValue::High, "box connection propagates signal");
     g_selectedType.Clear();
     canvas.m_selectedWireIndex = -1;
@@ -400,8 +411,10 @@ static void TestWiring(Canvas& canvas)
     for (size_t i : { 1u, 2u, 3u }) connect({ gate, PinType::Input, i }, { a, PinType::Output, 0 });
     connect({ gate, PinType::Output, 0 }, { output, PinType::Input, 0 });
     Check(canvas.m_circuit.GetConnections().size() == 6, "all configurable input pins connect");
-    a->outputs[0].value = b->outputs[0].value = LogicValue::High;
-    canvas.RecomputeCircuit();
+    canvas.m_selectedIndex = 0;
+    Check(canvas.ToggleSelectedInput(), "edit source A design stimulus");
+    canvas.m_selectedIndex = 1;
+    Check(canvas.ToggleSelectedInput(), "edit source B design stimulus");
     Check(output->inputs[0].value == LogicValue::High, "canvas receives propagated result");
     g_selectedType.Clear();
     // 走实际鼠标释放处理，验证点击输入端口触发重算而非只更新其标签。
@@ -679,12 +692,23 @@ int main(int argc, char** argv)
     int result = 0;
     try
     {
+        TestComponentRegistry();
+        TestRegistryToolbox();
+        RunTopologyRegression();
+        SnapshotRegression::Run();
+        TimingRegression::Run();
         TestLogic();
         TestCircuit();
+        SimulationUiRegressionAccess::Run();
+        PcbImportRegression::Run();
+        PcbWorkspaceRegressionAccess::Run();
+        PcbViewRegressionAccess::Run();
         auto frame = std::make_unique<wxFrame>(nullptr, wxID_ANY, "Regression", wxDefaultPosition, wxSize(1200, 800));
         MemoryClipboard clipboard;
         auto* canvas = new Canvas(frame.get(), &clipboard);
         canvas->SetSize(800, 700);
+        CanvasStructureRegressionAccess::Run(*canvas);
+        CanvasTimingRegressionAccess::Run(*canvas);
         auto* properties = new PropertyPanel(frame.get());
         CanvasRegressionAccess::TestCanvas(*canvas);
         CanvasRegressionAccess::TestPorts(*canvas);
@@ -693,7 +717,12 @@ int main(int argc, char** argv)
         CanvasRegressionAccess::TestWireGeometry();
         CanvasRegressionAccess::TestWireEditing(*canvas);
         CanvasRegressionAccess::TestProperties(*canvas, *properties);
-        std::cout << "PASS: truth tables, pin resizing, hit bounds, drag/resize pixels, rotated pins and pixels, rotation clipboard/undo, editable wire segments and undo, view options, properties, fanout, propagation, disconnection and cycle rejection\n";
+        std::cout << "PASS: native KiCad PCB parsing/view/workspace, async import, saved-file refresh, exact snapshot copy; "
+            "digital timing engine, DFF chains/divider/reset, simultaneous sampling, resource rollback, CSV/VCD; "
+            "timing canvas/controller integration and shipped examples; registry, disabled toolbox placeholders, undirected nets, shared topology and atomic bulk import, "
+            "independent snapshots, runtime/design separation and revision rejection; "
+            "truth tables, pin resizing, hit bounds, drag/resize pixels, rotated pins and pixels, rotation clipboard/undo, "
+            "editable wire segments and undo, view options, properties, fanout, propagation, disconnection and cycle rejection\n";
     }
     catch (const std::exception& error)
     {

@@ -6,6 +6,7 @@ class Canvas;
 class Toolbox;
 class PropertyPanel;
 class wxSplitterWindow;
+class SimulationPanel;
 
 class MainFrame : public wxFrame
 {
@@ -13,17 +14,22 @@ public:
     MainFrame();
 
 private:
+    friend struct SimulationUiRegressionAccess;
     bool SaveDocument(bool saveAs = false);
     bool ConfirmDiscardChanges();
     void UpdateDocumentTitle();
     void UpdateSidebarVisibility();
     void OnNew(wxCommandEvent& event);
     void OnOpen(wxCommandEvent& event);
+    void OnImportKiCadPcb(wxCommandEvent& event);
     void OnClose(wxCloseEvent& event);
+    void LoadTimingExample();
 
     Canvas* m_canvas = nullptr;
     wxSplitterWindow* m_workspace = nullptr;
     wxSplitterWindow* m_sidebar = nullptr;
+    wxSplitterWindow* m_editor = nullptr;
+    SimulationPanel* m_simulation = nullptr;
     Toolbox* m_toolbox = nullptr;
     PropertyPanel* m_properties = nullptr;
     bool m_showToolbox = true;

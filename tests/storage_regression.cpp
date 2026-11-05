@@ -17,6 +17,7 @@
 #include "CircuitFile.h"
 #include "Canvas.h"
 #include "SelectionState.h"
+#include "format_regression.h"
 
 class StorageTestApp : public wxApp
 {
@@ -109,6 +110,7 @@ void WriteBytes(const wxString& path, const std::string& bytes)
 
 void SameDocument(const CircuitDocument& actual, const CircuitDocument& expected, const std::string& context)
 {
+    Check(actual.formatVersion == expected.formatVersion, context + ": format version");
     Check(actual.components.size() == expected.components.size(), context + ": component count");
     Check(actual.wires.size() == expected.wires.size(), context + ": wire count");
     Check(actual.texts.size() == expected.texts.size(), context + ": text count");
@@ -989,6 +991,7 @@ int main(int argc, char** argv)
         TestValidation(directory);
         TestRejectedLoads(directory);
         TestFailedWrites(directory);
+        FormatRegression::Run();
         // A real, offscreen parent permits native focus/undo and mouse-capture
         // checks without showing a test window over the user's application.
         auto frame = std::make_unique<wxFrame>(nullptr, wxID_ANY, "Storage regression", wxPoint(-32000, -32000), wxSize(1200, 900));
@@ -1005,7 +1008,8 @@ int main(int argc, char** argv)
         CanvasRegressionAccess::TestNativeTextUndo(*canvas);
         CanvasRegressionAccess::TestUndoTextSessionsAndSaveDuringTransform(*canvas);
         CanvasRegressionAccess::TestNativeUndoSessionBoundary(*canvas);
-        std::cout << "PASS: XML round trips (8 types, 2/16 inputs, levels, fanout, UTF-8, escaping, whitespace), "
+        std::cout << "PASS: v1/v2 version preservation and named-pin schema validation; "
+            "XML round trips (8 types, 2/16 inputs, levels, fanout, UTF-8, escaping, whitespace), "
             "invalid XML/network rejection, transactional loads, failed write preservation, canvas reopen, dirty tracking, "
             "rotation/manual-route compatibility, geometry undo/dirty state, Ctrl+D/Ctrl+Z, canvas undo grouping, "
             "saved history, failed imports and native text undo\n";

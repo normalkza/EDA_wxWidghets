@@ -1,6 +1,7 @@
 #include "Toolbox.h"
 #include "SelectionState.h"
 #include "ToolBar.h"
+#include "ComponentRegistry.h"
 
 #include <wx/stdpaths.h>
 #include <wx/filename.h>
@@ -108,6 +109,14 @@ Toolbox::Toolbox(wxWindow* parent)
     BuildTree();
 
     // 绑定树节点选中事件
+    m_treeCtrl->Bind(wxEVT_TREE_SEL_CHANGING, [this](wxTreeEvent& event) {
+        for (const auto& tool : m_tools)
+            if (tool.second == event.GetItem() && !IsToolAvailable(tool.first))
+            {
+                event.Veto();
+                return;
+            }
+    });
     m_treeCtrl->Bind(wxEVT_TREE_SEL_CHANGED, &Toolbox::OnTreeSelect, this);
     SelectTool(wxEmptyString);
 
@@ -126,6 +135,7 @@ Toolbox::Toolbox(wxWindow* parent)
 
 void Toolbox::SelectTool(const wxString& type)
 {
+    if (!IsToolAvailable(type)) return;
     m_selectedType = type;
     wxTreeItemId item;
     for (const auto& tool : m_tools)
@@ -146,6 +156,13 @@ void Toolbox::SelectTool(const wxString& type)
     m_syncingSelection = false;
 }
 
+bool Toolbox::IsToolAvailable(const wxString& type) const
+{
+    if (type.IsEmpty() || type == "TEXT" || type == "DELETE" || type == "WIRE") return true;
+    const auto* definition = ComponentRegistry::Find(type.ToStdString(wxConvUTF8));
+    return definition && definition->IsAvailable();
+}
+
 void Toolbox::OnTreeSelect(wxTreeEvent& event)
 {
     if (m_syncingSelection) return;
@@ -153,6 +170,7 @@ void Toolbox::OnTreeSelect(wxTreeEvent& event)
     for (const auto& tool : m_tools)
     {
         if (tool.second != item) continue;
+        if (!IsToolAvailable(tool.first)) return;
         g_selectedType = tool.first;
         SelectTool(g_selectedType);
         if (m_selectionCallback) m_selectionCallback(g_selectedType);
@@ -162,9 +180,12 @@ void Toolbox::OnTreeSelect(wxTreeEvent& event)
 }
 
 void Toolbox::AppendTool(const wxTreeItemId& parent, const wxString& label,
-    int image, const wxString& type)
+    int image, const wxString& type, bool available)
 {
-    m_tools.emplace_back(type, m_treeCtrl->AppendItem(parent, label, image, image));
+    const auto item = m_treeCtrl->AppendItem(parent,
+        available ? label : label + wxT("（待实现）"), image, image);
+    if (!available) m_treeCtrl->SetItemTextColour(item, wxColour(148, 156, 169));
+    m_tools.emplace_back(type, item);
 }
 void Toolbox::LoadIcons()
 {
@@ -179,33 +200,17 @@ void Toolbox::LoadIcons()
         };
 
     m_imgFolder = Load("folder");
-    m_imgAdder = Load("adder");
-    m_imgAnd = Load("and");
-    m_imgButton = Load("button");
-    m_imgClock = Load("clock");
-    m_imgComparator = Load("comparator");
-    m_imgConstant = Load("constant");
-    m_imgCounter = Load("counter");
     m_imgDelete = Load("delete");
-    m_imgDemux = Load("demux");
-    m_imgDff = Load("dff");
-    m_imgInput = m_imageList->Add(CreatePortToolBitmap(wxSize(16, 16), true));
-    m_imgLed = Load("led");
-    m_imgMux = Load("mux");
-    m_imgNand = Load("nand");
-    m_imgNor = Load("nor");
-    m_imgNot = Load("not");
-    m_imgOr = Load("or");
-    m_imgOutput = m_imageList->Add(CreatePortToolBitmap(wxSize(16, 16), false));
-    m_imgPin = m_imgInput;
-    m_imgProbe = Load("probe");
-    m_imgRegister = Load("register");
     m_imgSelect = Load("select");
-    m_imgSplitter = Load("splitter");
-    m_imgSubtractor = Load("subtractor");
     m_imgText = Load("text");
     m_imgWire = Load("wire");
-    m_imgXor = Load("xor");
+    for (const auto& definition : ComponentRegistry::All())
+    {
+        const int image = definition.type == "INPUT" || definition.type == "OUTPUT" ?
+            m_imageList->Add(CreatePortToolBitmap(wxSize(16, 16), definition.type == "INPUT")) :
+            Load(wxString::FromUTF8(definition.icon.data(), definition.icon.size()));
+        m_componentIcons.emplace(std::string(definition.type), image);
+    }
 }
 
 void Toolbox::BuildTree()
@@ -224,47 +229,22 @@ void Toolbox::BuildTree()
     AppendTool(baseId, wxT("文本工具"), m_imgText, "TEXT");
     AppendTool(baseId, wxT("删除工具"), m_imgDelete, "DELETE");
 
-    wxTreeItemId ioId = appendCategory(wxT("输入 / 输出"));
-    AppendTool(ioId, wxT("输入引脚"), m_imgInput, "INPUT");
-    AppendTool(ioId, wxT("输出引脚"), m_imgOutput, "OUTPUT");
-    AppendTool(ioId, wxT("按钮"), m_imgButton, "BUTTON");
-    AppendTool(ioId, wxT("发光二极管"), m_imgLed, "LED");
-
-    wxTreeItemId gatesId = appendCategory(wxT("逻辑门"));
-    AppendTool(gatesId, wxT("与门"), m_imgAnd, "AND");
-    AppendTool(gatesId, wxT("或门"), m_imgOr, "OR");
-    AppendTool(gatesId, wxT("非门"), m_imgNot, "NOT");
-    AppendTool(gatesId, wxT("与非门"), m_imgNand, "NAND");
-    AppendTool(gatesId, wxT("或非门"), m_imgNor, "NOR");
-    AppendTool(gatesId, wxT("异或门"), m_imgXor, "XOR");
-
-    // 线路
-    wxTreeItemId wiringId = appendCategory(wxT("线路"));
-    AppendTool(wiringId, wxT("引脚"), m_imgPin, "INPUT");
-    AppendTool(wiringId, wxT("导线"), m_imgWire, "WIRE");
-    AppendTool(wiringId, wxT("分线器"), m_imgSplitter, "SPLITTER");
-    AppendTool(wiringId, wxT("探针"), m_imgProbe, "PROBE");
-    AppendTool(wiringId, wxT("时钟"), m_imgClock, "CLOCK");
-    AppendTool(wiringId, wxT("常量"), m_imgConstant, "CONSTANT");
-
-    // 复用器
-    wxTreeItemId plexersId = appendCategory(wxT("复用器"));
-    AppendTool(plexersId, wxT("数据选择器"), m_imgMux, "MUX");
-    AppendTool(plexersId, wxT("解复用器"), m_imgDemux, "DEMUX");
-
-    // 运算器
-    wxTreeItemId arithmeticId = appendCategory(wxT("运算器"));
-    AppendTool(arithmeticId, wxT("加法器"), m_imgAdder, "ADDER");
-    AppendTool(arithmeticId, wxT("减法器"), m_imgSubtractor, "SUBTRACTOR");
-    AppendTool(arithmeticId, wxT("比较器"), m_imgComparator, "COMPARATOR");
-
-    // 存储
-    wxTreeItemId memoryId = appendCategory(wxT("存储"));
-    AppendTool(memoryId, wxT("D触发器"), m_imgDff, "DFF");
-    AppendTool(memoryId, wxT("寄存器"), m_imgRegister, "REGISTER");
-    AppendTool(memoryId, wxT("计数器"), m_imgCounter, "COUNTER");
-
+    std::unordered_map<std::string, wxTreeItemId> categories;
+    for (const auto& definition : ComponentRegistry::All())
+    {
+        const std::string category(definition.category);
+        auto [position, inserted] = categories.try_emplace(category);
+        if (inserted)
+        {
+            position->second = appendCategory(wxString::FromUTF8(category));
+            if (category == "线路") AppendTool(position->second, wxT("导线"), m_imgWire, "WIRE");
+        }
+        AppendTool(position->second,
+            wxString::FromUTF8(definition.displayName.data(), definition.displayName.size()),
+            m_componentIcons.at(std::string(definition.type)),
+            wxString::FromUTF8(definition.type.data(), definition.type.size()), definition.IsAvailable());
+    }
     m_treeCtrl->Expand(baseId);
-    m_treeCtrl->Expand(ioId);
-    m_treeCtrl->Expand(gatesId);
+    m_treeCtrl->Expand(categories.at("输入 / 输出"));
+    m_treeCtrl->Expand(categories.at("逻辑门"));
 }

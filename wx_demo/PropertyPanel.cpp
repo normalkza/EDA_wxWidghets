@@ -1,4 +1,5 @@
 #include "PropertyPanel.h"
+#include "ComponentRegistry.h"
 
 namespace
 {
@@ -66,29 +67,9 @@ namespace
 
     wxString DisplayName(const wxString& type)
     {
-        if (type == "INPUT") return wxT("输入 (INPUT)");
-        if (type == "OUTPUT") return wxT("输出 (OUTPUT)");
-        if (type == "AND") return wxT("与门 (AND)");
-        if (type == "OR") return wxT("或门 (OR)");
-        if (type == "NOT") return wxT("非门 (NOT)");
-        if (type == "NAND") return wxT("与非门 (NAND)");
-        if (type == "NOR") return wxT("或非门 (NOR)");
-        if (type == "XOR") return wxT("异或门 (XOR)");
-        if (type == "BUTTON") return wxT("按钮 (BUTTON)");
-        if (type == "LED") return wxT("发光二极管 (LED)");
-        if (type == "DFF") return wxT("D 触发器 (DFF)");
-        if (type == "REGISTER") return wxT("寄存器 (REGISTER)");
-        if (type == "COUNTER") return wxT("计数器 (COUNTER)");
-        if (type == "ADDER") return wxT("加法器 (ADDER)");
-        if (type == "SUBTRACTOR") return wxT("减法器 (SUBTRACTOR)");
-        if (type == "COMPARATOR") return wxT("比较器 (COMPARATOR)");
-        if (type == "MUX") return wxT("数据选择器 (MUX)");
-        if (type == "DEMUX") return wxT("解复用器 (DEMUX)");
-        if (type == "SPLITTER") return wxT("分线器 (SPLITTER)");
-        if (type == "PROBE") return wxT("探针 (PROBE)");
-        if (type == "CLOCK") return wxT("时钟 (CLOCK)");
-        if (type == "CONSTANT") return wxT("常量 (CONSTANT)");
-        return type;
+        const auto* definition = ComponentRegistry::Find(type.ToStdString(wxConvUTF8));
+        return definition ? wxString::FromUTF8(definition->displayName.data(), definition->displayName.size()) +
+            wxT(" (") + type + wxT(")") : type;
     }
 }
 
@@ -189,6 +170,19 @@ PropertyPanel::PropertyPanel(wxWindow* parent)
             m_gateInputCountCallback)
             m_gateInputCountCallback(static_cast<int>(count));
     });
+    m_timingSettings = new wxPanel(m_viewport);
+    m_timingSettings->SetBackgroundColour(CardBackground);
+    auto* timingSizer = new wxBoxSizer(wxVERTICAL);
+    timingSizer->Add(Caption(m_timingSettings, wxT("时序与激励"), true),
+        0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(12));
+    auto* editTiming = new wxButton(m_timingSettings, wxID_ANY, wxT("编辑时序参数…"));
+    editTiming->SetToolTip(wxT("编辑保存到文档的初始电平、时钟参数或探针名称。"));
+    editTiming->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        if (m_editTimingCallback) m_editTimingCallback();
+    });
+    timingSizer->Add(editTiming, 0, wxEXPAND | wxALL, FromDIP(12));
+    m_timingSettings->SetSizer(timingSizer);
+    root->Add(m_timingSettings, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(10));
     m_viewport->SetSizer(root);
     auto* outerSizer = new wxBoxSizer(wxVERTICAL);
     outerSizer->Add(m_viewport, 1, wxEXPAND);
@@ -274,6 +268,7 @@ void PropertyPanel::ShowTool(const wxString& type, int textPointSize, int gateIn
 {
     m_textSettings->Hide();
     m_gateSettings->Hide();
+    m_timingSettings->Hide();
     if (type == "TEXT")
     {
         ShowTextSettings(textPointSize);
@@ -303,18 +298,15 @@ void PropertyPanel::ShowTool(const wxString& type, int textPointSize, int gateIn
         });
         return;
     }
-    const bool gate = type == "AND" || type == "OR" || type == "NOT" ||
-        type == "NAND" || type == "NOR" || type == "XOR";
-    if (gate || type == "INPUT" || type == "OUTPUT")
+    const auto* definition = ComponentRegistry::Find(type.ToStdString(wxConvUTF8));
+    if (definition && definition->IsAvailable())
     {
-        const int inputs = type == "INPUT" ? 0 :
-            ((type == "OUTPUT" || type == "NOT") ? 1 : gateInputCount);
-        const int outputs = type == "OUTPUT" ? 0 : 1;
-        if (gate && type != "NOT") ShowGateSettings(inputs);
+        const int inputs = definition->SupportsVariableInputs() ? gateInputCount : definition->defaultInputCount;
+        if (definition->SupportsVariableInputs()) ShowGateSettings(inputs);
         SetRows(DisplayName(type), {
             {wxT("状态"), wxT("待放置")},
             {wxT("输入引脚"), wxString::Format("%d", inputs)},
-            {wxT("输出引脚"), wxString::Format("%d", outputs)},
+            {wxT("输出引脚"), wxString::Format("%d", definition->outputCount)},
             {wxT("数据位宽"), wxT("1")}
         });
         return;
@@ -326,6 +318,7 @@ void PropertyPanel::ShowComponent(const Component* component, int x, int y, int 
 {
     m_textSettings->Hide();
     m_gateSettings->Hide();
+    m_timingSettings->Hide();
     if (!component)
     {
         Clear();
@@ -342,6 +335,9 @@ void PropertyPanel::ShowComponent(const Component* component, int x, int y, int 
         {wxT("输出引脚"), wxString::Format("%llu", static_cast<unsigned long long>(component->outputs.size()))}
     };
     const wxString type = wxString::FromUTF8(component->name.c_str());
+    if (type == "INPUT" || type == "BUTTON" || type == "CONSTANT" ||
+        type == "CLOCK" || type == "DFF" || type == "PROBE")
+        m_timingSettings->Show();
     if (type == "INPUT" && !component->outputs.empty())
         rows.push_back({wxT("当前值"), component->outputs[0].value == LogicValue::High ? wxT("1") : wxT("0")});
     if (type == "OUTPUT" && !component->inputs.empty())
@@ -359,6 +355,7 @@ void PropertyPanel::Clear()
 {
     m_textSettings->Hide();
     m_gateSettings->Hide();
+    m_timingSettings->Hide();
     SetRows(wxT("未选中元件"), {
         {wxT("状态"), wxT("等待选择")}
     });
@@ -373,6 +370,7 @@ void PropertyPanel::ShowTextSettings(int pointSize)
 void PropertyPanel::ShowTextBox(const wxRect& rect, int pointSize)
 {
     m_gateSettings->Hide();
+    m_timingSettings->Hide();
     ShowTextSettings(pointSize);
     SetRows(wxT("文本框"), {
         {wxT("状态"), wxT("已选中")},
@@ -395,6 +393,7 @@ void PropertyPanel::ShowConnection(const WireConnection* connection)
 {
     m_textSettings->Hide();
     m_gateSettings->Hide();
+    m_timingSettings->Hide();
     if (!connection || !connection->output.IsValid() || !connection->input.IsValid())
     {
         Clear();

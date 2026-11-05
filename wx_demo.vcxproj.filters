@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="源文件">
@@ -36,7 +36,12 @@
     <ClCompile Include="wx_demo\Toolbox.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="wx_demo\ComponentRegistry.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\TopologyRules.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\Connectivity.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\SimulationSnapshot.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="wx_demo\Circuit.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\CircuitValidation.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="wx_demo\CircuitFile.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="wx_demo\CanvasDocument.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="wx_demo\Wire.cpp"><Filter>源文件</Filter></ClCompile>
@@ -79,7 +84,14 @@
     <ClInclude Include="wx_demo\Toolbox.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="wx_demo\ComponentRegistry.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\TopologyRules.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\Connectivity.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\SimulationSnapshot.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\CircuitDocument.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\Circuit.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\CircuitValidation.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\CircuitLimits.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\CircuitFile.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\Wire.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\Canvas.h">
@@ -94,10 +106,10 @@
     <ClInclude Include="wx_demo\AndGate.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="NandGate.h">
+    <ClInclude Include="wx_demo\NandGate.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="XorGate.h">
+    <ClInclude Include="wx_demo\XorGate.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="wx_demo\NorGate.h">
@@ -111,44 +123,68 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="x64\Debug\res\and.png">
+    <Image Include="wx_demo\res\and.png">
       <Filter>资源文件</Filter>
     </Image>
-    <Image Include="x64\Debug\res\delete.png">
+    <Image Include="wx_demo\res\delete.png">
       <Filter>资源文件</Filter>
     </Image>
-    <Image Include="x64\Debug\res\input.png">
+    <Image Include="wx_demo\res\input.png">
       <Filter>资源文件</Filter>
     </Image>
-    <Image Include="x64\Debug\res\nand.png">
+    <Image Include="wx_demo\res\nand.png">
       <Filter>资源文件</Filter>
     </Image>
-    <Image Include="x64\Debug\res\nor.png">
+    <Image Include="wx_demo\res\nor.png">
       <Filter>资源文件</Filter>
     </Image>
-    <Image Include="x64\Debug\res\not.png">
+    <Image Include="wx_demo\res\not.png">
       <Filter>资源文件</Filter>
     </Image>
-    <Image Include="x64\Debug\res\or.png">
+    <Image Include="wx_demo\res\or.png">
       <Filter>资源文件</Filter>
     </Image>
-    <Image Include="x64\Debug\res\output.png">
+    <Image Include="wx_demo\res\output.png">
       <Filter>资源文件</Filter>
     </Image>
-    <Image Include="x64\Debug\res\probe.png">
+    <Image Include="wx_demo\res\probe.png">
       <Filter>资源文件</Filter>
     </Image>
-    <Image Include="x64\Debug\res\select.png">
+    <Image Include="wx_demo\res\select.png">
       <Filter>资源文件</Filter>
     </Image>
-    <Image Include="x64\Debug\res\text.png">
+    <Image Include="wx_demo\res\text.png">
       <Filter>资源文件</Filter>
     </Image>
-    <Image Include="x64\Debug\res\wire.png">
+    <Image Include="wx_demo\res\wire.png">
       <Filter>资源文件</Filter>
     </Image>
-    <Image Include="x64\Debug\res\xor.png">
+    <Image Include="wx_demo\res\xor.png">
       <Filter>资源文件</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="wx_demo\DigitalSimulator.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\TraceRecorder.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\WaveformPanel.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\SimulationPanel.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\CanvasTiming.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClInclude Include="wx_demo\DigitalSimulator.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\TraceRecorder.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\WaveformPanel.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\SimulationPanel.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\SimulationConfig.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\TimingComponents.h"><Filter>头文件</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="wx_demo\KiCadSExpr.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\KiCadPcbImporter.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\PcbCanvas.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\PcbFrame.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClInclude Include="wx_demo\KiCadSExpr.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\KiCadPcbImporter.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\PcbDocument.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\PcbCanvas.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\PcbFrame.h"><Filter>头文件</Filter></ClInclude>
   </ItemGroup>
 </Project>

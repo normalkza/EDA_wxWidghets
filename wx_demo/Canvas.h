@@ -10,6 +10,7 @@
 #include "Circuit.h"
 #include "CircuitFile.h"
 #include "Wire.h"
+#include "SimulationSnapshot.h"
 #include <optional>
 #include <functional>
 #include <utility>
@@ -31,7 +32,18 @@ public:
     bool HasSelectedInput() const;
     int GetSelectedRotation() const;
     bool ToggleSelectedInput();
+    bool EditSelectedTimingParameters();
+    bool CanEditTimingParameters() const;
+    std::optional<CircuitComponentData> GetSelectedComponentData() const;
+    bool SetSimulationConfig(const SimulationConfig& config, wxString& error);
+    void SetDocumentChangedCallback(std::function<void()> callback) { m_documentChangedCallback = std::move(callback); }
+    void SetRuntimeInputCallback(std::function<bool(int)> callback) { m_runtimeInputCallback = std::move(callback); }
     void EvaluateCircuit();
+    // Call on the UI thread. Worker code owns the returned independent snapshot
+    // and sends back values, never pointers into this canvas.
+    std::unique_ptr<SimulationSnapshot> CreateSimulationSnapshot(wxString& error) const;
+    bool ApplySimulationResult(const SimulationResult& result);
+    std::uint64_t GetDocumentRevision() const { return m_documentRevision; }
     void DeselectAll();
     void SetGridVisible(bool visible);
     bool IsGridVisible() const { return m_gridVisible; }
@@ -78,6 +90,8 @@ public:
 
 private:
     friend struct CanvasRegressionAccess;
+    friend struct CanvasStructureRegressionAccess;
+    friend struct CanvasTimingRegressionAccess;
     void MarkModified(bool textTransform = false);
     void RefreshModifiedState();
     void UndoText(wxTextCtrl& editor);
@@ -136,6 +150,10 @@ private:
         int x, y;
         int id = 0;
         int rotation = 0;
+        // A missing value supports legacy/test view objects. Real editor
+        // objects always retain their design stimulus separately from results.
+        std::optional<bool> initialHigh;
+        CircuitComponentData parameters;
     };
     // 绘制、点击判定和局部刷新统一使用同一份几何信息。
     struct GateGeometry
@@ -163,7 +181,7 @@ private:
     void DrawWires(wxDC& dc, const wxRect& updateRect);
     void SelectWire(int index);
     void DeleteWire(int index);
-    void RecomputeCircuit();
+    bool RecomputeCircuit();
     void ReportStatus(const wxString& message);
     bool BeginWireDrag(const wxPoint& point);
     void UpdateWireDrag(const wxPoint& point);
@@ -177,6 +195,11 @@ private:
     std::optional<CircuitDocument> m_wireDragUndoDocument;
     bool m_wireDragMoved = false;
     Circuit m_circuit;
+    std::uint64_t m_documentRevision = 1;
+    int m_formatVersion = CircuitFile::CurrentVersion;
+    SimulationConfig m_simulationConfig;
+    std::function<void()> m_documentChangedCallback;
+    std::function<bool(int)> m_runtimeInputCallback;
     std::optional<PinReference> m_pendingWire;
     wxPoint m_wirePreview;
     int m_selectedWireIndex = -1;

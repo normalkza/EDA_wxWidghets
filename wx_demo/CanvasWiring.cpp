@@ -1,5 +1,8 @@
 #include "Canvas.h"
+#include "DigitalSimulator.h"
 #include <algorithm>
+#include <unordered_map>
+#include <unordered_set>
 
 Canvas::~Canvas()
 {
@@ -278,11 +281,46 @@ void Canvas::DeleteWire(int index)
     ReportStatus(wxT("已删除导线并更新电路"));
 }
 
-void Canvas::RecomputeCircuit()
+std::unique_ptr<SimulationSnapshot> Canvas::CreateSimulationSnapshot(wxString& error) const
 {
-    std::vector<Component*> components;
-    for (const auto& pc : m_components) components.push_back(pc.comp);
-    m_circuit.Evaluate(components);
+    auto snapshot = std::make_unique<SimulationSnapshot>();
+    if (!snapshot->Compile(ExportDocument(), m_documentRevision, error)) return nullptr;
+    return snapshot;
+}
+
+bool Canvas::ApplySimulationResult(const SimulationResult& result)
+{
+    if (result.revision != m_documentRevision) return false;
+    const auto document = ExportDocument();
+    std::unordered_map<int, Component*> byId;
+    std::size_t pinCount = 0;
+    for (std::size_t index = 0; index < m_components.size(); ++index)
+    {
+        auto* component = m_components[index].comp;
+        byId.emplace(document.components[index].id, component);
+        pinCount += component->inputs.size() + component->outputs.size();
+    }
+    if (result.values.size() != pinCount) return false;
+    std::unordered_set<Pin*> seen;
+    std::vector<std::pair<Pin*, LogicValue>> updates;
+    updates.reserve(pinCount);
+    // Validate the entire packet first. A missing/duplicate/unknown pin cannot
+    // leave the view showing half of a result from an invalid worker message.
+    for (const auto& value : result.values)
+    {
+        const auto component = byId.find(value.componentId);
+        if (component == byId.end() ||
+            (value.type != PinType::Input && value.type != PinType::Output) ||
+            (value.value != LogicValue::Low && value.value != LogicValue::High)) return false;
+        auto& pins = value.type == PinType::Input ? component->second->inputs : component->second->outputs;
+        if (value.index >= pins.size() || !seen.insert(&pins[value.index]).second) return false;
+        updates.emplace_back(&pins[value.index], value.value);
+    }
+    // Freeze any legacy initial value before applying runtime display values.
+    for (std::size_t index = 0; index < m_components.size(); ++index)
+        if (m_components[index].comp->name == "INPUT")
+            m_components[index].initialHigh = document.components[index].high;
+    for (const auto& [pin, value] : updates) pin->value = value;
     if (m_selectedIndex >= 0 && m_selectedIndex < static_cast<int>(m_components.size()) && m_selectionCallback)
     {
         const auto& pc = m_components[m_selectedIndex];
@@ -292,6 +330,32 @@ void Canvas::RecomputeCircuit()
         m_wireSelectionCallback)
         m_wireSelectionCallback(&m_circuit.GetConnections()[m_selectedWireIndex]);
     Refresh(false);
+    return true;
+}
+
+bool Canvas::RecomputeCircuit()
+{
+    m_circuit.PruneInvalidConnections();
+    wxString error;
+    const auto document = ExportDocument();
+    if (std::any_of(document.components.begin(), document.components.end(),
+        [](const auto& data) { return data.type == "DFF"; }))
+    {
+        DigitalSimulator simulator;
+        if (!simulator.Compile(document, m_documentRevision, error))
+        {
+            ReportStatus(error);
+            return false;
+        }
+        return ApplySimulationResult(simulator.GetResult());
+    }
+    auto snapshot = CreateSimulationSnapshot(error);
+    if (!snapshot)
+    {
+        ReportStatus(error);
+        return false;
+    }
+    return ApplySimulationResult(snapshot->GetResult());
 }
 
 void Canvas::DrawWires(wxDC& dc, const wxRect& updateRect)

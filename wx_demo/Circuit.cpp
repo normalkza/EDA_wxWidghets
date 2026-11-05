@@ -1,13 +1,15 @@
 #include "Circuit.h"
+#include "TopologyRules.h"
+#include "CircuitLimits.h"
+#include "CircuitValidation.h"
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
-#include <queue>
 #include <stdexcept>
 
 bool PinReference::IsValid() const
 {
-    if (!component) return false;
+    if (!component || (type != PinType::Input && type != PinType::Output)) return false;
     return index < (type == PinType::Input ? component->inputs : component->outputs).size();
 }
 
@@ -30,33 +32,33 @@ LogicValue WireConnection::GetValue() const
 ConnectionResult Circuit::Connect(PinReference first, PinReference second)
 {
     PruneInvalidConnections();
-    if (!first.IsValid() || !second.IsValid()) return ConnectionResult::InvalidPin;
-    if (first.type == second.type) return ConnectionResult::SameDirection;
+    const auto result = ValidateConnection(first, second);
+    if (result != ConnectionResult::Added) return result;
     if (first.type == PinType::Input) std::swap(first, second);
-    for (const auto& connection : m_connections)
-    {
-        if (connection.output == first && connection.input == second) return ConnectionResult::Duplicate;
-        if (connection.input == second) return ConnectionResult::InputOccupied;
-    }
-    if (WouldCreateCycle(first.component, second.component)) return ConnectionResult::Cycle;
     m_connections.push_back({ first, second });
     return ConnectionResult::Added;
 }
 
-bool Circuit::WouldCreateCycle(Component* output, Component* input) const
+ConnectionResult Circuit::ValidateConnection(PinReference first, PinReference second) const
 {
-    std::vector<Component*> pending{ input };
-    std::unordered_set<Component*> visited;
-    while (!pending.empty())
-    {
-        Component* current = pending.back();
-        pending.pop_back();
-        if (current == output) return true;
-        if (!visited.insert(current).second) continue;
-        for (const auto& connection : m_connections)
-            if (connection.output.component == current) pending.push_back(connection.input.component);
-    }
-    return false;
+    return TopologyRules::CheckConnection(m_connections, first, second);
+}
+
+ConnectionResult Circuit::ReplaceConnections(const std::vector<Component*>& components,
+    const std::vector<WireConnection>& connections)
+{
+    const auto result = TopologyRules::Validate(components, connections);
+    if (result != ConnectionResult::Added) return result;
+    // Stage the copy too, so an allocation failure cannot partially replace the
+    // old wires. Geometry validation belongs to the document/import boundary.
+    auto replacement = connections;
+    m_connections.swap(replacement);
+    return ConnectionResult::Added;
+}
+
+ConnectionResult Circuit::ValidateTopology(const std::vector<Component*>& components) const
+{
+    return TopologyRules::Validate(components, m_connections);
 }
 
 void Circuit::RemoveConnection(std::size_t index)
@@ -66,18 +68,12 @@ void Circuit::RemoveConnection(std::size_t index)
 
 bool Circuit::SetConnectionRoute(std::size_t index, const std::vector<wxPoint>& route)
 {
-    if (index >= m_connections.size() || route.size() == 1 || route.size() > 256) return false;
+    wxString error;
+    if (index >= m_connections.size() || !CircuitValidation::ValidateRoute(route, error)) return false;
     std::size_t total = route.size();
     for (std::size_t i = 0; i < m_connections.size(); ++i)
         if (i != index) total += m_connections[i].route.size();
-    if (total > 4000) return false;
-    for (std::size_t i = 0; i < route.size(); ++i)
-    {
-        if (route[i].x < -1000000 || route[i].x > 1000000 ||
-            route[i].y < -1000000 || route[i].y > 1000000) return false;
-        if (i > 0 && (route[i] == route[i - 1] ||
-            (route[i].x != route[i - 1].x && route[i].y != route[i - 1].y))) return false;
-    }
+    if (total > CircuitLimits::MaxTotalRoutePoints) return false;
     m_connections[index].route = route;
     return true;
 }
@@ -98,42 +94,31 @@ void Circuit::PruneInvalidConnections()
 
 bool Circuit::Evaluate(const std::vector<Component*>& components)
 {
-    std::unordered_map<Component*, std::size_t> nodes;
+    std::unordered_set<Component*> nodes;
     for (auto* component : components)
-        if (component) nodes.emplace(component, nodes.size());
+        if (component) nodes.insert(component);
     // 先核对节点归属，避免访问已不在画布中的元件。
     std::erase_if(m_connections, [&nodes](const WireConnection& connection) {
         return !nodes.contains(connection.output.component) || !nodes.contains(connection.input.component) ||
             !connection.output.IsValid() || !connection.input.IsValid();
     });
-    std::vector<int> indegree(nodes.size(), 0);
-    std::vector<std::vector<std::size_t>> outgoing(nodes.size());
+    std::vector<Component*> order;
+    if (!TopologyRules::EvaluationOrder(components, m_connections, order)) return false;
+    std::unordered_map<Component*, std::vector<std::size_t>> outgoing;
     for (std::size_t i = 0; i < m_connections.size(); ++i)
-    {
-        const auto& connection = m_connections[i];
-        ++indegree[nodes.at(connection.input.component)];
-        outgoing[nodes.at(connection.output.component)].push_back(i);
-    }
-    std::queue<Component*> ready;
-    for (const auto& [component, index] : nodes)
-    {
+        outgoing[m_connections[i].output.component].push_back(i);
+    for (auto* component : order)
         for (auto& pin : component->inputs) pin.value = LogicValue::Low;
-        if (indegree[index] == 0) ready.push(component);
-    }
-    std::size_t evaluated = 0;
-    while (!ready.empty())
+    for (auto* component : order)
     {
-        Component* component = ready.front();
-        ready.pop();
         component->Evaluate();
-        ++evaluated;
-        for (const auto wireIndex : outgoing[nodes.at(component)])
+        const auto wires = outgoing.find(component);
+        if (wires == outgoing.end()) continue;
+        for (const auto wireIndex : wires->second)
         {
             const auto& connection = m_connections[wireIndex];
             connection.input.Get().value = connection.output.Get().value;
-            if (--indegree[nodes.at(connection.input.component)] == 0)
-                ready.push(connection.input.component);
         }
     }
-    return evaluated == nodes.size();
+    return true;
 }

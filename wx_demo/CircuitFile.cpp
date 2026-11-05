@@ -1,13 +1,8 @@
 #include <wx/wx.h>
 #include "CircuitFile.h"
-#include "AndGate.h"
-#include "Circuit.h"
-#include "IOComponent.h"
-#include "NandGate.h"
-#include "NorGate.h"
-#include "NotGate.h"
-#include "OrGate.h"
-#include "XorGate.h"
+#include "CircuitLimits.h"
+#include "ComponentRegistry.h"
+#include "CircuitValidation.h"
 
 #include <wx/file.h>
 #include <wx/filename.h>
@@ -19,27 +14,15 @@
 #else
 #include <cstdio>
 #endif
-#include <algorithm>
 #include <initializer_list>
-#include <queue>
 #include <unordered_map>
 #include <utility>
+#include <cstdint>
+#include <limits>
 
 namespace
 {
-// 限制原始文件和解析后的对象，避免损坏文件制造大量窗口或超大坐标。
-constexpr std::size_t MaxFileBytes = 8 * 1024 * 1024;
-constexpr std::size_t MaxComponents = 1000;
-constexpr std::size_t MaxWires = 4000;
-constexpr std::size_t MaxRoutePoints = 256;
-constexpr std::size_t MaxTotalRoutePoints = 4000;
-constexpr std::size_t MaxTexts = 1000;
-constexpr std::size_t MaxTextLength = 65536;
-constexpr std::size_t MaxTotalTextLength = 262144;
-constexpr int MaxCoordinate = 1000000;
-constexpr int MaxDimension = 1000000;
-constexpr int MaxXmlDepth = 8;
-constexpr std::size_t MaxXmlNodes = 16000;
+using namespace CircuitLimits;
 
 class PendingCircuitFile
 {
@@ -89,48 +72,6 @@ bool Fail(wxString& error, const wxString& message)
 {
     error = message;
     return false;
-}
-
-bool IsCoordinate(int value)
-{
-    return value >= -MaxCoordinate && value <= MaxCoordinate;
-}
-
-bool IsRotation(int value)
-{
-    return value == 0 || value == 90 || value == 180 || value == 270;
-}
-
-bool ValidateRoute(const std::vector<wxPoint>& route, wxString& error)
-{
-    if (route.empty()) return true;
-    if (route.size() < 2 || route.size() > MaxRoutePoints)
-        return Fail(error, wxS("手动连线路径必须包含 2 至 256 个点。"));
-    for (std::size_t index = 0; index < route.size(); ++index)
-    {
-        const auto& point = route[index];
-        if (!IsCoordinate(point.x) || !IsCoordinate(point.y))
-            return Fail(error, wxS("连线路径坐标必须在 -1000000 至 1000000 之间。"));
-        if (index == 0) continue;
-        const auto& previous = route[index - 1];
-        if (point == previous || (point.x != previous.x && point.y != previous.y))
-            return Fail(error, wxS("连线路径相邻点必须形成非零长度的水平或垂直线段。"));
-    }
-    return true;
-}
-
-bool IsValidXmlText(const wxString& text)
-{
-    for (auto character : text)
-    {
-        const auto value = character.GetValue();
-        if (value != 9 && value != 10 && value != 13 &&
-            !(value >= 0x20 && value <= 0xd7ff) &&
-            !(value >= 0xe000 && value <= 0xfffd) &&
-            !(value >= 0x10000 && value <= 0x10ffff))
-            return false;
-    }
-    return true;
 }
 
 bool CheckXmlDeclaration(const std::string& declaration, wxString& error)
@@ -260,6 +201,39 @@ bool ReadInt(const wxXmlNode& node, const char* name, int& value, wxString& erro
     return true;
 }
 
+bool ReadInt64(const wxXmlNode& node, const char* name, std::int64_t& value, wxString& error)
+{
+    const auto attributeName = wxString::FromUTF8(name);
+    const auto text = node.GetAttribute(attributeName);
+    const std::size_t start = !text.empty() && text[0] == '-' ? 1 : 0;
+    bool valid = start < text.length();
+    for (std::size_t index = start; index < text.length(); ++index)
+        valid = valid && text[index] >= '0' && text[index] <= '9';
+    wxLongLong_t parsed = 0;
+    if (!valid || !text.ToLongLong(&parsed))
+        return Fail(error, wxString::Format(wxS("元素 <%s> 的属性 %s 必须是有效的 64 位整数。"), node.GetName(), attributeName));
+    value = static_cast<std::int64_t>(parsed);
+    return true;
+}
+
+bool HasNoDataChildren(const wxXmlNode& node, wxString& error);
+
+bool ParseSimulation(const wxXmlNode& node, SimulationConfig& config, wxString& error)
+{
+    if (!CheckAttributes(node, {"stopTimeNs", "maxEvents", "maxDeltaCycles", "maxTraceSamples"}, error) ||
+        !HasNoDataChildren(node, error)) return false;
+    std::int64_t events = 0, deltas = 0, samples = 0;
+    if (!ReadInt64(node, "stopTimeNs", config.stopTimeNs, error) ||
+        !ReadInt64(node, "maxEvents", events, error) || !ReadInt64(node, "maxDeltaCycles", deltas, error) ||
+        !ReadInt64(node, "maxTraceSamples", samples, error)) return false;
+    if (events < 1 || events > 10000000 || deltas < 1 || deltas > 100000 || samples < 1 || samples > 10000000)
+        return Fail(error, wxS("仿真事件、delta 或采样数量超出支持范围。"));
+    config.maxEvents = static_cast<std::size_t>(events);
+    config.maxDeltaCycles = static_cast<std::size_t>(deltas);
+    config.maxTraceSamples = static_cast<std::size_t>(samples);
+    return true;
+}
+
 bool HasNoDataChildren(const wxXmlNode& node, wxString& error)
 {
     for (auto* child = node.GetChildren(); child; child = child->GetNext())
@@ -271,6 +245,11 @@ bool HasNoDataChildren(const wxXmlNode& node, wxString& error)
 void AddInt(wxXmlNode& node, const char* name, int value)
 {
     node.AddAttribute(wxString::FromUTF8(name), wxString::Format(wxS("%d"), value));
+}
+
+void AddInt64(wxXmlNode& node, const char* name, std::int64_t value)
+{
+    node.AddAttribute(wxString::FromUTF8(name), wxString::FromUTF8(std::to_string(value)));
 }
 
 wxXmlNode* AddElement(wxXmlNode& parent, const wxString& name)
@@ -291,10 +270,25 @@ bool ParseComponents(const wxXmlNode& section, CircuitDocument& document, wxStri
             return Fail(error, wxS("components 中只能包含 component 元件。"));
         if (document.components.size() >= MaxComponents)
             return Fail(error, wxS("元件数量超过上限（1000）。"));
-        if (!CheckAttributes(*node, { "id", "type", "x", "y", "inputCount", "high" }, error, { "rotation" }) ||
-            !HasNoDataChildren(*node, error)) return false;
         CircuitComponentData data;
         data.type = node->GetAttribute(wxS("type")).ToStdString(wxConvUTF8);
+        if (document.formatVersion < 3 && (data.type == "CLOCK" || data.type == "DFF" || data.type == "PROBE" ||
+            data.type == "BUTTON" || data.type == "LED" || data.type == "CONSTANT"))
+            return Fail(error, wxS("此元件需要 version=3 数字时序文件格式。"));
+        if (document.formatVersion >= 3 && data.type == "CLOCK")
+        {
+            if (!CheckAttributes(*node, {"id", "type", "x", "y", "inputCount", "high", "clockPeriodNs", "clockHighNs", "clockStartNs"}, error, {"rotation"}) ||
+                !ReadInt64(*node, "clockPeriodNs", data.clockPeriodNs, error) ||
+                !ReadInt64(*node, "clockHighNs", data.clockHighNs, error) ||
+                !ReadInt64(*node, "clockStartNs", data.clockStartNs, error)) return false;
+        }
+        else if (document.formatVersion >= 3 && data.type == "PROBE")
+        {
+            if (!CheckAttributes(*node, {"id", "type", "x", "y", "inputCount", "high"}, error, {"rotation", "probeLabel"})) return false;
+            data.probeLabel = node->GetAttribute(wxS("probeLabel")).ToStdString(wxConvUTF8);
+        }
+        else if (!CheckAttributes(*node, { "id", "type", "x", "y", "inputCount", "high" }, error, { "rotation" })) return false;
+        if (!HasNoDataChildren(*node, error)) return false;
         if (!ReadInt(*node, "id", data.id, error) || !ReadInt(*node, "x", data.x, error) ||
             !ReadInt(*node, "y", data.y, error) ||
             !ReadInt(*node, "inputCount", data.inputCount, error)) return false;
@@ -309,9 +303,51 @@ bool ParseComponents(const wxXmlNode& section, CircuitDocument& document, wxStri
     return true;
 }
 
+using ComponentsById = std::unordered_map<int, std::unique_ptr<Component>>;
+
+// A v2 pin name is resolved against the registered component definition, never
+// against XML ordering or a temporary canvas object. Build each definition once.
+bool BuildComponentIndex(const CircuitDocument& document, ComponentsById& components, wxString& error)
+{
+    components.reserve(document.components.size());
+    for (const auto& data : document.components)
+    {
+        if (data.id <= 0 || components.contains(data.id))
+            return Fail(error, wxS("元件 id 必须为正整数且不能重复。"));
+        auto component = CircuitFile::CreateComponent(data);
+        if (!component)
+            return Fail(error, wxString::Format(wxS("元件 %d 的类型、输入数量或电平无效。"), data.id));
+        components.emplace(data.id, std::move(component));
+    }
+    return true;
+}
+
+bool ResolvePinId(const ComponentsById& components, int componentId, PinType direction,
+    const wxString& pinId, int& index, wxString& error)
+{
+    const auto found = components.find(componentId);
+    if (found == components.end()) return Fail(error, wxS("连线引用了不存在的元件。"));
+    if (pinId.empty()) return Fail(error, wxS("v2 连线的引脚标识不能为空。"));
+    const auto& pins = direction == PinType::Output ? found->second->outputs : found->second->inputs;
+    int resolved = -1;
+    for (std::size_t pin = 0; pin < pins.size(); ++pin)
+    {
+        if (wxString::FromUTF8(pins[pin].name) != pinId) continue;
+        if (resolved >= 0)
+            return Fail(error, wxString::Format(wxS("元件 %d 的引脚标识 %s 存在歧义。"), componentId, pinId));
+        resolved = static_cast<int>(pin);
+    }
+    if (resolved < 0)
+        return Fail(error, wxString::Format(wxS("元件 %d 不存在对应方向的引脚 %s。"), componentId, pinId));
+    index = resolved;
+    return true;
+}
+
 bool ParseWires(const wxXmlNode& section, CircuitDocument& document, wxString& error)
 {
     if (!CheckAttributes(section, {}, error)) return false;
+    ComponentsById components;
+    if (document.formatVersion >= 2 && !BuildComponentIndex(document, components, error)) return false;
     std::size_t totalRoutePoints = 0;
     for (auto* node = section.GetChildren(); node; node = node->GetNext())
     {
@@ -320,13 +356,27 @@ bool ParseWires(const wxXmlNode& section, CircuitDocument& document, wxString& e
             return Fail(error, wxS("wires 中只能包含 wire 连线。"));
         if (document.wires.size() >= MaxWires)
             return Fail(error, wxS("连线数量超过上限（4000）。"));
-        if (!CheckAttributes(*node, { "sourceId", "sourcePin", "targetId", "targetPin" }, error))
-            return false;
         CircuitWireData data;
-        if (!ReadInt(*node, "sourceId", data.sourceId, error) ||
-            !ReadInt(*node, "sourcePin", data.sourcePin, error) ||
-            !ReadInt(*node, "targetId", data.targetId, error) ||
-            !ReadInt(*node, "targetPin", data.targetPin, error)) return false;
+        if (document.formatVersion == 1)
+        {
+            if (!CheckAttributes(*node, { "sourceId", "sourcePin", "targetId", "targetPin" }, error) ||
+                !ReadInt(*node, "sourceId", data.sourceId, error) ||
+                !ReadInt(*node, "sourcePin", data.sourcePin, error) ||
+                !ReadInt(*node, "targetId", data.targetId, error) ||
+                !ReadInt(*node, "targetPin", data.targetPin, error)) return false;
+        }
+        else
+        {
+            // Strict per-version schemas reject numeric/name mixtures rather
+            // than silently choosing whichever attribute happens to be read.
+            if (!CheckAttributes(*node, { "sourceId", "sourcePinId", "targetId", "targetPinId" }, error) ||
+                !ReadInt(*node, "sourceId", data.sourceId, error) ||
+                !ReadInt(*node, "targetId", data.targetId, error) ||
+                !ResolvePinId(components, data.sourceId, PinType::Output,
+                    node->GetAttribute(wxS("sourcePinId")), data.sourcePin, error) ||
+                !ResolvePinId(components, data.targetId, PinType::Input,
+                    node->GetAttribute(wxS("targetPinId")), data.targetPin, error)) return false;
+        }
         for (auto* point = node->GetChildren(); point; point = point->GetNext())
         {
             if (IsFormattingNode(*point)) continue;
@@ -341,7 +391,7 @@ bool ParseWires(const wxXmlNode& section, CircuitDocument& document, wxString& e
             data.route.push_back(position);
             ++totalRoutePoints;
         }
-        if (!ValidateRoute(data.route, error)) return false;
+        if (!CircuitValidation::ValidateRoute(data.route, error)) return false;
         document.wires.push_back(std::move(data));
     }
     return true;
@@ -385,121 +435,13 @@ bool ParseTexts(const wxXmlNode& section, CircuitDocument& document, wxString& e
 
 std::unique_ptr<Component> CircuitFile::CreateComponent(const CircuitComponentData& data)
 {
-    if (data.type == "INPUT")
-    {
-        if (data.inputCount != 0) return nullptr;
-        auto component = std::make_unique<InputComponent>();
-        component->outputs[0].value = data.high ? LogicValue::High : LogicValue::Low;
-        return component;
-    }
-    if (data.high) return nullptr;
-    if (data.type == "OUTPUT")
-        return data.inputCount == 1 ? std::make_unique<OutputComponent>() : nullptr;
-    if (data.type == "NOT")
-        return data.inputCount == 1 ? std::make_unique<NotGate>() : nullptr;
-    if (data.inputCount < MultiInputGate::MinInputCount || data.inputCount > MultiInputGate::MaxInputCount)
-        return nullptr;
-    if (data.type == "AND") return std::make_unique<AndGate>(data.inputCount);
-    if (data.type == "OR") return std::make_unique<OrGate>(data.inputCount);
-    if (data.type == "NAND") return std::make_unique<NandGate>(data.inputCount);
-    if (data.type == "NOR") return std::make_unique<NorGate>(data.inputCount);
-    if (data.type == "XOR") return std::make_unique<XorGate>(data.inputCount);
-    return nullptr;
+    if (data.inputCount < 0) return nullptr;
+    return ComponentRegistry::Create(data.type, data.inputCount, data.high);
 }
 
 bool CircuitFile::Validate(const CircuitDocument& document, wxString& error)
 {
-    error.clear();
-    if (document.components.size() > MaxComponents || document.wires.size() > MaxWires ||
-        document.texts.size() > MaxTexts)
-        return Fail(error, wxS("电路过大：最多允许 1000 个元件、4000 条连线、1000 个文本框。"));
-    std::unordered_map<int, std::size_t> indices;
-    std::vector<std::unique_ptr<Component>> components;
-    components.reserve(document.components.size());
-    for (const auto& data : document.components)
-    {
-        if (data.id <= 0 || !indices.emplace(data.id, components.size()).second)
-            return Fail(error, wxS("元件 id 必须为正整数且不能重复。"));
-        if (!IsCoordinate(data.x) || !IsCoordinate(data.y))
-            return Fail(error, wxS("元件坐标必须在 -1000000 至 1000000 之间。"));
-        if (!IsRotation(data.rotation))
-            return Fail(error, wxS("元件旋转角度只能是 0、90、180 或 270 度。"));
-        auto component = CreateComponent(data);
-        if (!component)
-            return Fail(error, wxString::Format(wxS("元件 %d 的类型、输入数量或电平无效。"), data.id));
-        components.push_back(std::move(component));
-    }
-    std::size_t totalLength = 0;
-    for (const auto& data : document.texts)
-    {
-        if (!IsCoordinate(data.rect.x) || !IsCoordinate(data.rect.y) ||
-            data.rect.width <= 0 || data.rect.width > MaxDimension ||
-            data.rect.height <= 0 || data.rect.height > MaxDimension)
-            return Fail(error, wxS("文本框坐标或尺寸无效（坐标范围 ±1000000，宽高范围 1 至 1000000）。"));
-        if (data.pointSize < 6 || data.pointSize > 96)
-            return Fail(error, wxS("文本字号必须在 6 至 96 之间。"));
-        totalLength += data.text.length();
-        if (data.text.length() > MaxTextLength || totalLength > MaxTotalTextLength)
-            return Fail(error, wxS("文本过长：单框最多 65536 个字符，全部文本最多 262144 个字符。"));
-        if (!IsValidXmlText(data.text))
-            return Fail(error, wxS("文本包含 XML 1.0 不支持的控制字符或无效 Unicode 字符。"));
-    }
-    std::vector<std::vector<std::size_t>> outgoing(components.size());
-    std::vector<std::size_t> indegree(components.size(), 0);
-    std::size_t totalRoutePoints = 0;
-    for (const auto& wire : document.wires)
-    {
-        if (!ValidateRoute(wire.route, error)) return false;
-        totalRoutePoints += wire.route.size();
-        if (totalRoutePoints > MaxTotalRoutePoints)
-            return Fail(error, wxS("全部连线的路径点总数不能超过 4000 个。"));
-        const auto source = indices.find(wire.sourceId), target = indices.find(wire.targetId);
-        if (source == indices.end() || target == indices.end())
-            return Fail(error, wxS("连线引用了不存在的元件。"));
-        if (wire.sourcePin < 0 || wire.targetPin < 0 ||
-            static_cast<std::size_t>(wire.sourcePin) >= components[source->second]->outputs.size() ||
-            static_cast<std::size_t>(wire.targetPin) >= components[target->second]->inputs.size())
-            return Fail(error, wxS("连线引脚越界，源端必须是输出引脚，目标端必须是输入引脚。"));
-        outgoing[source->second].push_back(target->second);
-        ++indegree[target->second];
-    }
-    std::queue<std::size_t> ready;
-    for (std::size_t index = 0; index < indegree.size(); ++index)
-        if (indegree[index] == 0) ready.push(index);
-    std::vector<std::size_t> order(components.size());
-    std::size_t visited = 0;
-    while (!ready.empty())
-    {
-        const auto source = ready.front();
-        ready.pop();
-        order[source] = visited++;
-        for (const auto target : outgoing[source])
-            if (--indegree[target] == 0) ready.push(target);
-    }
-    if (visited != components.size())
-        return Fail(error, wxS("电路包含反馈环路，当前组合逻辑电路不支持环路。"));
-    std::vector<std::size_t> wireOrder(document.wires.size());
-    for (std::size_t index = 0; index < wireOrder.size(); ++index) wireOrder[index] = index;
-    // 先连接拓扑靠前的源端，Connect 的环路检查不必反复遍历整条链。
-    std::stable_sort(wireOrder.begin(), wireOrder.end(), [&](std::size_t left, std::size_t right) {
-        return order[indices.at(document.wires[left].sourceId)] <
-            order[indices.at(document.wires[right].sourceId)];
-    });
-    Circuit circuit;
-    for (const auto index : wireOrder)
-    {
-        const auto& wire = document.wires[index];
-        const auto result = circuit.Connect(
-            { components[indices.at(wire.sourceId)].get(), PinType::Output, static_cast<std::size_t>(wire.sourcePin) },
-            { components[indices.at(wire.targetId)].get(), PinType::Input, static_cast<std::size_t>(wire.targetPin) });
-        if (result == ConnectionResult::Duplicate)
-            return Fail(error, wxS("电路包含重复连线。"));
-        if (result == ConnectionResult::InputOccupied)
-            return Fail(error, wxS("同一个输入引脚不能连接多个信号源。"));
-        if (result != ConnectionResult::Added)
-            return Fail(error, wxS("电路包含无效连线或反馈环路。"));
-    }
-    return true;
+    return CircuitValidation::Validate(document, error);
 }
 
 bool CircuitFile::Save(const wxString& path, const CircuitDocument& document, wxString& error)
@@ -507,11 +449,23 @@ bool CircuitFile::Save(const wxString& path, const CircuitDocument& document, wx
     error.clear();
     if (path.empty()) return Fail(error, wxS("保存路径不能为空。"));
     if (!Validate(document, error)) return false;
+    ComponentsById definitions;
+    if (document.formatVersion < 3)
+    {
+        if (!(document.simulation == SimulationConfig{}))
+            return Fail(error, wxS("保存仿真配置需要 version=3，请将文档升级为新格式。"));
+        for (const auto& data : document.components)
+            if (data.type == "CLOCK" || data.type == "DFF" || data.type == "PROBE" || data.type == "BUTTON" ||
+                data.type == "LED" || data.type == "CONSTANT" || data.clockPeriodNs != 20 ||
+                data.clockHighNs != 10 || data.clockStartNs != 0 || !data.probeLabel.empty())
+                return Fail(error, wxS("保存时序元件及参数需要 version=3，请将文档升级为新格式。"));
+    }
+    if (document.formatVersion >= 2 && !BuildComponentIndex(document, definitions, error)) return false;
     wxXmlDocument xml;
     xml.SetVersion(wxS("1.0"));
     xml.SetFileEncoding(wxS("UTF-8"));
     auto* root = new wxXmlNode(wxXML_ELEMENT_NODE, wxS("circuit"));
-    root->AddAttribute(wxS("version"), wxS("1"));
+    AddInt(*root, "version", document.formatVersion);
     xml.SetRoot(root);
     auto* components = AddElement(*root, wxS("components"));
     for (const auto& data : document.components)
@@ -524,15 +478,37 @@ bool CircuitFile::Save(const wxString& path, const CircuitDocument& document, wx
         AddInt(*node, "inputCount", data.inputCount);
         AddInt(*node, "high", data.high ? 1 : 0);
         if (data.rotation != 0) AddInt(*node, "rotation", data.rotation);
+        if (document.formatVersion >= 3 && data.type == "CLOCK")
+        {
+            AddInt64(*node, "clockPeriodNs", data.clockPeriodNs);
+            AddInt64(*node, "clockHighNs", data.clockHighNs);
+            AddInt64(*node, "clockStartNs", data.clockStartNs);
+        }
+        if (document.formatVersion >= 3 && data.type == "PROBE" && !data.probeLabel.empty())
+            node->AddAttribute(wxS("probeLabel"), wxString::FromUTF8(data.probeLabel));
     }
     auto* wires = AddElement(*root, wxS("wires"));
     for (const auto& data : document.wires)
     {
         auto* node = AddElement(*wires, wxS("wire"));
         AddInt(*node, "sourceId", data.sourceId);
-        AddInt(*node, "sourcePin", data.sourcePin);
         AddInt(*node, "targetId", data.targetId);
-        AddInt(*node, "targetPin", data.targetPin);
+        if (document.formatVersion == 1)
+        {
+            AddInt(*node, "sourcePin", data.sourcePin);
+            AddInt(*node, "targetPin", data.targetPin);
+        }
+        else
+        {
+            const auto sourcePinId = wxString::FromUTF8(definitions.at(data.sourceId)->outputs[data.sourcePin].name);
+            const auto targetPinId = wxString::FromUTF8(definitions.at(data.targetId)->inputs[data.targetPin].name);
+            int resolvedSource = -1, resolvedTarget = -1;
+            if (!ResolvePinId(definitions, data.sourceId, PinType::Output, sourcePinId, resolvedSource, error) ||
+                !ResolvePinId(definitions, data.targetId, PinType::Input, targetPinId, resolvedTarget, error))
+                return false;
+            node->AddAttribute(wxS("sourcePinId"), sourcePinId);
+            node->AddAttribute(wxS("targetPinId"), targetPinId);
+        }
         for (const auto& position : data.route)
         {
             auto* point = AddElement(*node, wxS("point"));
@@ -550,6 +526,14 @@ bool CircuitFile::Save(const wxString& path, const CircuitDocument& document, wx
         AddInt(*node, "height", data.rect.height);
         AddInt(*node, "pointSize", data.pointSize);
         new wxXmlNode(node, wxXML_TEXT_NODE, wxEmptyString, data.text);
+    }
+    if (document.formatVersion >= 3)
+    {
+        auto* simulation = AddElement(*root, wxS("simulation"));
+        AddInt64(*simulation, "stopTimeNs", document.simulation.stopTimeNs);
+        AddInt64(*simulation, "maxEvents", static_cast<std::int64_t>(document.simulation.maxEvents));
+        AddInt64(*simulation, "maxDeltaCycles", static_cast<std::int64_t>(document.simulation.maxDeltaCycles));
+        AddInt64(*simulation, "maxTraceSamples", static_cast<std::int64_t>(document.simulation.maxTraceSamples));
     }
     // 先完成序列化再打开临时文件，任何验证/编码错误都不会触及旧文件。
     wxMemoryOutputStream memory;
@@ -599,14 +583,16 @@ bool CircuitFile::Load(const wxString& path, CircuitDocument& document, wxString
     if (!root || root->GetName() != wxS("circuit"))
         return Fail(error, wxS("这不是受支持的电路文件：缺少 circuit 根元素。"));
     if (!CheckAttributes(*root, { "version" }, error)) return false;
-    if (root->GetAttribute(wxS("version")) != wxS("1"))
-        return Fail(error, wxS("不支持此电路文件版本，目前仅支持 version=1。"));
+    const auto version = root->GetAttribute(wxS("version"));
+    if (version != wxS("1") && version != wxS("2") && version != wxS("3"))
+        return Fail(error, wxS("不支持此电路文件版本，目前支持 version=1、2 或 3。"));
     for (auto* node = xml.GetDocumentNode()->GetChildren(); node; node = node->GetNext())
         if (node != root && !IsFormattingNode(*node))
             return Fail(error, wxS("电路文件包含不支持的顶层节点。"));
     const wxXmlNode* components = nullptr;
     const wxXmlNode* wires = nullptr;
     const wxXmlNode* texts = nullptr;
+    const wxXmlNode* simulation = nullptr;
     for (auto* node = root->GetChildren(); node; node = node->GetNext())
     {
         if (IsFormattingNode(*node)) continue;
@@ -616,6 +602,7 @@ bool CircuitFile::Load(const wxString& path, CircuitDocument& document, wxString
         if (node->GetName() == wxS("components")) section = &components;
         else if (node->GetName() == wxS("wires")) section = &wires;
         else if (node->GetName() == wxS("texts")) section = &texts;
+        else if (node->GetName() == wxS("simulation") && version == wxS("3")) section = &simulation;
         else return Fail(error, wxString::Format(wxS("未知的电路元素 <%s>。"), node->GetName()));
         if (*section)
             return Fail(error, wxString::Format(wxS("电路元素 <%s> 不能重复。"), node->GetName()));
@@ -623,7 +610,11 @@ bool CircuitFile::Load(const wxString& path, CircuitDocument& document, wxString
     }
     if (!components || !wires || !texts)
         return Fail(error, wxS("电路文件必须包含 components、wires、texts 三个区域。"));
+    if (version == wxS("3") && !simulation)
+        return Fail(error, wxS("version=3 电路必须包含 simulation 配置。"));
     CircuitDocument loaded;
+    loaded.formatVersion = version == wxS("1") ? 1 : (version == wxS("2") ? 2 : 3);
+    if (simulation && !ParseSimulation(*simulation, loaded.simulation, error)) return false;
     if (!ParseComponents(*components, loaded, error) || !ParseWires(*wires, loaded, error) ||
         !ParseTexts(*texts, loaded, error) || !Validate(loaded, error)) return false;
     document = std::move(loaded);

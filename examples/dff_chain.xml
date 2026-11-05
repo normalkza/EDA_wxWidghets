@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<circuit version="3">
+  <components>
+    <component id="1" type="INPUT" x="60" y="60" inputCount="0" high="1"/>
+    <component id="2" type="CLOCK" x="60" y="190" inputCount="0" high="0" clockPeriodNs="20" clockHighNs="10" clockStartNs="5"/>
+    <component id="3" type="INPUT" x="60" y="310" inputCount="0" high="0"/>
+    <component id="4" type="DFF" x="300" y="160" inputCount="3" high="0"/>
+    <component id="5" type="DFF" x="540" y="160" inputCount="3" high="0"/>
+    <component id="6" type="PROBE" x="420" y="50" inputCount="1" high="0" probeLabel="Q1 · 第一级"/>
+    <component id="7" type="PROBE" x="680" y="160" inputCount="1" high="0" probeLabel="Q2 · 第二级"/>
+    <component id="8" type="PROBE" x="180" y="50" inputCount="1" high="0" probeLabel="CLK · 共用时钟"/>
+  </components>
+  <wires>
+    <wire sourceId="1" sourcePinId="OUT" targetId="4" targetPinId="D">
+      <point x="100" y="80"/><point x="120" y="80"/><point x="120" y="40"/><point x="280" y="40"/><point x="280" y="180"/><point x="300" y="180"/>
+    </wire>
+    <wire sourceId="2" sourcePinId="OUT" targetId="4" targetPinId="CLK">
+      <point x="140" y="230"/><point x="240" y="230"/><point x="240" y="200"/><point x="300" y="200"/>
+    </wire>
+    <wire sourceId="2" sourcePinId="OUT" targetId="5" targetPinId="CLK">
+      <point x="140" y="230"/><point x="180" y="230"/><point x="180" y="270"/><point x="520" y="270"/><point x="520" y="200"/><point x="540" y="200"/>
+    </wire>
+    <wire sourceId="2" sourcePinId="OUT" targetId="8" targetPinId="IN">
+      <point x="140" y="230"/><point x="160" y="230"/><point x="160" y="90"/><point x="180" y="90"/>
+    </wire>
+    <wire sourceId="4" sourcePinId="Q" targetId="5" targetPinId="D">
+      <point x="380" y="200"/><point x="480" y="200"/><point x="480" y="180"/><point x="540" y="180"/>
+    </wire>
+    <wire sourceId="4" sourcePinId="Q" targetId="6" targetPinId="IN">
+      <point x="380" y="200"/><point x="400" y="200"/><point x="400" y="90"/><point x="420" y="90"/>
+    </wire>
+    <wire sourceId="5" sourcePinId="Q" targetId="7" targetPinId="IN">
+      <point x="620" y="200"/><point x="680" y="200"/>
+    </wire>
+    <wire sourceId="3" sourcePinId="OUT" targetId="4" targetPinId="RESET">
+      <point x="100" y="330"/><point x="280" y="330"/><point x="280" y="220"/><point x="300" y="220"/>
+    </wire>
+    <wire sourceId="3" sourcePinId="OUT" targetId="5" targetPinId="RESET">
+      <point x="100" y="330"/><point x="500" y="330"/><point x="500" y="220"/><point x="540" y="220"/>
+    </wire>
+  </wires>
+  <texts>
+    <text x="30" y="8" width="770" height="28" pointSize="17">两级 DFF：同一上升沿只前进一级</text>
+    <text x="40" y="112" width="100" height="24" pointSize="12">D = 1</text>
+    <text x="35" y="281" width="200" height="24" pointSize="12">RESET：高有效异步复位</text>
+    <text x="30" y="370" width="780" height="52" pointSize="13">首次上升沿 5 ns：Q1 = 1、Q2 = 0；第二次 25 ns：Q1 = Q2 = 1。
+点击 D 可改变运行激励；RESET 置高立即清零，释放后等待上升沿。</text>
+  </texts>
+  <simulation stopTimeNs="205" maxEvents="100000" maxDeltaCycles="128" maxTraceSamples="200000"/>
+</circuit>

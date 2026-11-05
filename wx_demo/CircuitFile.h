@@ -1,53 +1,18 @@
 #pragma once
 
 #include "Component.h"
-#include <wx/gdicmn.h>
-#include <wx/string.h>
+#include "CircuitDocument.h"
+#include "CircuitLimits.h"
 #include <memory>
-#include <string>
-#include <vector>
 
-// 文件中的 id 仅用于建立连线，不依赖内存地址或画布下标。
-struct CircuitComponentData
-{
-    int id = 0;
-    std::string type;
-    int x = 0;
-    int y = 0;
-    int inputCount = 0;
-    bool high = false;
-    int rotation = 0;
-};
-
-struct CircuitWireData
-{
-    int sourceId = 0;
-    int sourcePin = 0;
-    int targetId = 0;
-    int targetPin = 0;
-    // 空路径使用自动布线；非空路径包含源端、拐点及目标端。
-    std::vector<wxPoint> route;
-};
-
-struct CircuitTextData
-{
-    wxRect rect;
-    int pointSize = 14;
-    wxString text;
-};
-
-struct CircuitDocument
-{
-    std::vector<CircuitComponentData> components;
-    std::vector<CircuitWireData> wires;
-    std::vector<CircuitTextData> texts;
-};
-
-// UTF-8 XML，<circuit version="1">。Load 失败不改变 document；
+// UTF-8 XML。v1 使用引脚下标，v2 使用稳定引脚名，v3 增加数字时序参数和配置。
+// 读取后统一为 CircuitDocument；保留原版本，保存时不会自动升级旧文件。
+// Load 失败不改变 document；
 // Save 先写同目录临时文件，验证及写入成功后再替换目标文件。
 class CircuitFile
 {
 public:
+    static constexpr int CurrentVersion = CircuitLimits::CurrentFormatVersion;
     static bool Save(const wxString& path, const CircuitDocument& document, wxString& error);
     static bool Load(const wxString& path, CircuitDocument& document, wxString& error);
     static bool Validate(const CircuitDocument& document, wxString& error);

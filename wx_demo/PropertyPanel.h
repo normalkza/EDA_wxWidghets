@@ -25,6 +25,10 @@ public:
     {
         m_gateInputCountCallback = std::move(callback);
     }
+    void SetEditTimingCallback(std::function<void()> callback)
+    {
+        m_editTimingCallback = std::move(callback);
+    }
     void Clear();
 
 private:
@@ -43,6 +47,8 @@ private:
     wxSpinCtrl* m_gateInputCount;
     bool m_updatingGateSettings = false;
     std::function<void(int)> m_gateInputCountCallback;
+    wxPanel* m_timingSettings;
+    std::function<void()> m_editTimingCallback;
     void ShowGateSettings(int inputCount);
     void ShowTextSettings(int pointSize);
     void SetRows(const wxString& title, const std::vector<std::pair<wxString, wxString>>& rows);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Pin.h"
+#include <cstddef>
 #include <string>
 #include <vector>
 #include <stdexcept>
@@ -18,6 +19,13 @@ public:
     virtual void Evaluate() = 0;
     virtual bool SupportsVariableInputs() const { return false; }
     virtual bool SetInputCount(int count) { return false; }
+    // Only immediate input-to-output dependencies participate in combinational
+    // cycle checks. A future state element can cut D->Q while retaining its
+    // asynchronous control paths. This does not itself add a timing engine.
+    virtual bool HasCombinationalPath(std::size_t inputIndex, std::size_t outputIndex) const
+    {
+        return inputIndex < inputs.size() && outputIndex < outputs.size();
+    }
 
     std::string name;
     std::vector<Pin> inputs;

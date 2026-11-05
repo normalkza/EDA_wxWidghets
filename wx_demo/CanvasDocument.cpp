@@ -1,4 +1,6 @@
 #include "Canvas.h"
+#include "ComponentRegistry.h"
+#include <algorithm>
 
 #include <memory>
 #include <stdexcept>
@@ -10,7 +12,7 @@ namespace
 {
     bool SameDocument(const CircuitDocument& first, const CircuitDocument& second)
     {
-        if (first.components.size() != second.components.size() ||
+        if (first.simulation != second.simulation || first.formatVersion != second.formatVersion || first.components.size() != second.components.size() ||
             first.wires.size() != second.wires.size() || first.texts.size() != second.texts.size())
             return false;
         for (std::size_t i = 0; i < first.components.size(); ++i)
@@ -18,7 +20,9 @@ namespace
             const auto& a = first.components[i];
             const auto& b = second.components[i];
             if (a.id != b.id || a.type != b.type || a.x != b.x || a.y != b.y ||
-                a.inputCount != b.inputCount || a.high != b.high || a.rotation != b.rotation) return false;
+                a.inputCount != b.inputCount || a.high != b.high || a.rotation != b.rotation ||
+                a.clockPeriodNs != b.clockPeriodNs || a.clockHighNs != b.clockHighNs ||
+                a.clockStartNs != b.clockStartNs || a.probeLabel != b.probeLabel) return false;
         }
         for (std::size_t i = 0; i < first.wires.size(); ++i)
         {
@@ -150,6 +154,9 @@ void Canvas::RefreshModifiedState()
 void Canvas::MarkModified(bool textTransform)
 {
     if (m_loadingDocument) return;
+    // Every edit invalidates results, including subsequent edits while dirty.
+    ++m_documentRevision;
+    if (m_documentChangedCallback) m_documentChangedCallback();
     // 取消文本框拖动时，只撤销这次几何变更，保留其他编辑产生的脏状态。
     if (!textTransform && m_textTransformIndex >= 0) m_textTransformWasModified = true;
     if (m_modified) return;
@@ -180,6 +187,8 @@ int Canvas::NextComponentId() const
 CircuitDocument Canvas::ExportDocument() const
 {
     CircuitDocument document;
+    document.formatVersion = m_formatVersion;
+    document.simulation = m_simulationConfig;
     document.components.reserve(m_components.size());
     document.texts.reserve(m_textBoxes.size());
     document.wires.reserve(m_circuit.GetConnections().size());
@@ -199,15 +208,15 @@ CircuitDocument Canvas::ExportDocument() const
             usedIds.insert(id);
         }
         ids.emplace(pc.comp, id);
-        CircuitComponentData component;
+        CircuitComponentData component = pc.parameters;
         component.id = id;
         component.type = pc.comp->name;
         component.x = pc.x;
         component.y = pc.y;
         component.rotation = pc.rotation;
         component.inputCount = static_cast<int>(pc.comp->inputs.size());
-        component.high = pc.comp->name == "INPUT" && !pc.comp->outputs.empty() &&
-            pc.comp->outputs[0].value == LogicValue::High;
+        component.high = ComponentRegistry::SupportsInitialLevel(pc.comp->name) &&
+            pc.initialHigh.value_or(!pc.comp->outputs.empty() && pc.comp->outputs[0].value == LogicValue::High);
         document.components.push_back(std::move(component));
     }
     for (const auto& connection : m_circuit.GetConnections())
@@ -224,6 +233,8 @@ CircuitDocument Canvas::ExportDocument() const
 
 void Canvas::ResetDocument()
 {
+    ++m_documentRevision;
+    if (m_documentChangedCallback) m_documentChangedCallback();
     m_dragTimer.Stop();
     m_dragUndoDocument.reset();
     m_textTransformUndoDocument.reset();
@@ -261,7 +272,10 @@ void Canvas::ResetDocument()
 void Canvas::ClearDocument()
 {
     ResetDocument();
+    m_formatVersion = CircuitFile::CurrentVersion;
+    m_simulationConfig = SimulationConfig{};
     m_undoHistory.clear();
+    if (m_documentChangedCallback) m_documentChangedCallback();
     MarkSaved();
     Refresh(false);
 }
@@ -293,21 +307,25 @@ bool Canvas::ReplaceDocument(const CircuitDocument& document, wxString& error, b
             if (!component) throw std::runtime_error("Unsupported component");
             Component* pointer = component.get();
             ownedComponents.push_back(std::move(component));
-            components.push_back({ pointer, data.x, data.y, data.id, data.rotation });
+            components.push_back({ pointer, data.x, data.y, data.id, data.rotation, data.high, data });
             nodes.push_back(pointer);
             ids.emplace(data.id, pointer);
         }
+        std::vector<WireConnection> connections;
+        connections.reserve(document.wires.size());
         for (const auto& wire : document.wires)
         {
-            if (circuit.Connect({ ids.at(wire.sourceId), PinType::Output,
-                    static_cast<std::size_t>(wire.sourcePin) },
-                { ids.at(wire.targetId), PinType::Input,
-                    static_cast<std::size_t>(wire.targetPin) }) != ConnectionResult::Added)
-                throw std::runtime_error("Invalid wire connection");
-            if (!circuit.SetConnectionRoute(circuit.GetConnections().size() - 1, wire.route))
-                throw std::runtime_error("Invalid wire route");
+            connections.push_back({
+                {ids.at(wire.sourceId), PinType::Output, static_cast<std::size_t>(wire.sourcePin)},
+                {ids.at(wire.targetId), PinType::Input, static_cast<std::size_t>(wire.targetPin)}, wire.route});
         }
-        if (!circuit.Evaluate(nodes)) throw std::runtime_error("Invalid circuit");
+        // The document validator already checked geometry. Import topology in
+        // one pass rather than re-running cycle search for each individual wire.
+        if (circuit.ReplaceConnections(nodes, connections) != ConnectionResult::Added)
+            throw std::runtime_error("Invalid wire connection");
+        const bool hasState = std::any_of(document.components.begin(), document.components.end(),
+            [](const auto& data) { return data.type == "DFF"; });
+        if (!hasState && !circuit.Evaluate(nodes)) throw std::runtime_error("Invalid circuit");
 
         // 只读几何预检使用已构建的新模型，期间不创建窗口、派发事件或通知属性面板。
         // 旧模型在所有退出路径上恢复，过量的端点重接不会留下无法保存的新文档。
@@ -371,11 +389,14 @@ bool Canvas::ReplaceDocument(const CircuitDocument& document, wxString& error, b
     }
 
     ResetDocument();
+    m_formatVersion = document.formatVersion;
+    m_simulationConfig = document.simulation;
     m_components = std::move(components);
     m_circuit = std::move(circuit);
     m_textBoxes = std::move(textBoxes);
     for (auto& component : ownedComponents) component.release();
     m_loadingDocument = false;
+    if (m_documentChangedCallback) m_documentChangedCallback();
     if (resetHistory)
     {
         m_undoHistory.clear();

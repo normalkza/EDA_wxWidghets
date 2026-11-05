@@ -7,6 +7,8 @@
 
 struct PinReference
 {
+    // Borrowed, synchronous model reference. Remove its wires before releasing
+    // the owner; persistent documents and simulation results use IDs instead.
     Component* component = nullptr;
     PinType type = PinType::Input;
     std::size_t index = 0;
@@ -33,6 +35,13 @@ class Circuit
 {
 public:
     ConnectionResult Connect(PinReference first, PinReference second);
+    // Atomic bulk import after one shared topology validation. This API checks
+    // electrical connections only; callers validate document route geometry.
+    // Invalid input leaves the existing connections unchanged.
+    ConnectionResult ReplaceConnections(const std::vector<Component*>& components,
+        const std::vector<WireConnection>& connections);
+    ConnectionResult ValidateConnection(PinReference first, PinReference second) const;
+    ConnectionResult ValidateTopology(const std::vector<Component*>& components) const;
     void RemoveConnection(std::size_t index);
     bool SetConnectionRoute(std::size_t index, const std::vector<wxPoint>& route);
     void RemoveComponent(const Component* component);
@@ -41,6 +50,5 @@ public:
     const std::vector<WireConnection>& GetConnections() const { return m_connections; }
 
 private:
-    bool WouldCreateCycle(Component* output, Component* input) const;
     std::vector<WireConnection> m_connections;
 };

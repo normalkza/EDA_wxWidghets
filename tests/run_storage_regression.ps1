@@ -1,4 +1,4 @@
-param([switch]$WithoutDebugSymbols)
+﻿param([switch]$WithoutDebugSymbols)
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $buildDir = Join-Path $PSScriptRoot 'build\storage'
@@ -11,7 +11,7 @@ foreach ($item in @($project.SelectNodes('//m:ItemGroup/m:ClCompile | //m:ItemGr
     $item.ParentNode.RemoveChild($item) | Out-Null
 }
 $sources = $project.CreateElement('ItemGroup', $namespace)
-foreach ($sourcePath in @('wx_demo\Canvas.cpp', 'wx_demo\CanvasWiring.cpp', 'wx_demo\CanvasDocument.cpp', 'wx_demo\Circuit.cpp', 'wx_demo\CircuitFile.cpp', 'wx_demo\Wire.cpp', 'wx_demo\SelectionState.cpp', 'tests\storage_regression.cpp')) {
+foreach ($sourcePath in @('wx_demo\DigitalSimulator.cpp', 'wx_demo\TraceRecorder.cpp', 'wx_demo\CanvasTiming.cpp', 'wx_demo\ComponentRegistry.cpp', 'wx_demo\TopologyRules.cpp', 'wx_demo\Connectivity.cpp', 'wx_demo\SimulationSnapshot.cpp', 'wx_demo\Canvas.cpp', 'wx_demo\CanvasWiring.cpp', 'wx_demo\CanvasDocument.cpp', 'wx_demo\Circuit.cpp', 'wx_demo\CircuitValidation.cpp', 'wx_demo\CircuitFile.cpp', 'wx_demo\Wire.cpp', 'wx_demo\SelectionState.cpp', 'tests\storage_regression.cpp')) {
     $item = $project.CreateElement('ClCompile', $namespace)
     $item.SetAttribute('Include', (Join-Path $repoRoot $sourcePath))
     $sources.AppendChild($item) | Out-Null

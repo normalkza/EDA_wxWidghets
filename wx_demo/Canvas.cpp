@@ -18,33 +18,10 @@
 #endif
 
 #include "Toolbox.h"
-#include "AndGate.h"
-#include "OrGate.h"
-#include "NotGate.h"
-#include "NandGate.h"
-#include "NorGate.h"
-#include "XorGate.h"
-#include "IOComponent.h"
+#include "ComponentRegistry.h"
 
 namespace
 {
-    Component* CreateComponent(const wxString& type, int inputCount = 2)
-    {
-        const bool variable = type == "AND" || type == "OR" || type == "NAND" ||
-            type == "NOR" || type == "XOR";
-        if (variable && (inputCount < MultiInputGate::MinInputCount ||
-            inputCount > MultiInputGate::MaxInputCount)) return nullptr;
-        if (type == "AND") return new AndGate(inputCount);
-        if (type == "OR") return new OrGate(inputCount);
-        if (type == "NOT") return new NotGate();
-        if (type == "NAND") return new NandGate(inputCount);
-        if (type == "NOR") return new NorGate(inputCount);
-        if (type == "XOR") return new XorGate(inputCount);
-        if (type == "INPUT") return new InputComponent();
-        if (type == "OUTPUT") return new OutputComponent();
-        return nullptr;
-    }
-
     wxDataFormat CanvasClipboardFormat()
     {
         return wxDataFormat("wx_demo.canvas.object.v1");
@@ -77,6 +54,7 @@ Canvas::Canvas(wxWindow* parent, wxClipboard* clipboard)
     Bind(wxEVT_TIMER, [this](wxTimerEvent&) { UpdateTextInput(); }, m_textTimer.GetId());
     Bind(wxEVT_TIMER, &Canvas::OnDragTimer, this, m_dragTimer.GetId());
     m_textTimer.Start(150);
+    m_savedDocument.formatVersion = m_formatVersion;
 }
 
 void Canvas::OnLeftDown(wxMouseEvent& event)
@@ -142,9 +120,10 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
         m_pressPosition = mouse;
         m_dragging = false;
         const auto& pc = m_components[hit];
-        m_togglePending = pc.comp->name == "INPUT" &&
+        m_togglePending = (pc.comp->name == "INPUT" || pc.comp->name == "BUTTON") &&
             g_selectedType != "DELETE" && g_selectedType != "TEXT" &&
-            wxRect(0, 0, m_portSize + 1, m_portSize + 1).Contains(WorldToComponent(pc, mouse));
+            wxRect(0, 0, pc.comp->name == "BUTTON" ? 81 : m_portSize + 1,
+                pc.comp->name == "BUTTON" ? 81 : m_portSize + 1).Contains(WorldToComponent(pc, mouse));
         m_dragOffset = mouse - wxPoint(m_components[hit].x, m_components[hit].y);
         if (m_selectionCallback)
             m_selectionCallback(m_components[hit].comp, m_components[hit].x, m_components[hit].y);
@@ -161,12 +140,19 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
     int x = SnapToGrid(event.GetX());
     int y = SnapToGrid(event.GetY());
 
-    Component* comp = CreateComponent(type, m_defaultGateInputCount);
+    const auto typeId = type.ToStdString(wxConvUTF8);
+    const auto* definition = ComponentRegistry::Find(typeId);
+    auto owned = ComponentRegistry::Create(typeId,
+        definition && definition->SupportsVariableInputs() ? m_defaultGateInputCount : -1);
+    Component* comp = owned.get();
 
     if (comp)
     {
         RecordUndo();
-        m_components.push_back({ comp, x, y, NextComponentId() });
+        if (typeId == "CLOCK" || typeId == "DFF" || typeId == "PROBE" ||
+            typeId == "BUTTON" || typeId == "LED" || typeId == "CONSTANT") m_formatVersion = 3;
+        m_components.push_back({ comp, x, y, NextComponentId(), 0, false });
+        owned.release();
         MarkModified();
         m_selectedIndex = static_cast<int>(m_components.size()) - 1;
         RecomputeCircuit();
@@ -261,11 +247,18 @@ void Canvas::OnLeftUp(wxMouseEvent& event)
             g_selectedType != "WIRE" && g_selectedType != "DELETE" &&
             g_selectedType != "TEXT" &&
             HitTest(mouse.x, mouse.y) == m_pressedIndex &&
-            wxRect(0, 0, m_portSize + 1, m_portSize + 1).Contains(WorldToComponent(pc, mouse)))
+            wxRect(0, 0, pc.comp->name == "BUTTON" ? 81 : m_portSize + 1,
+                pc.comp->name == "BUTTON" ? 81 : m_portSize + 1).Contains(WorldToComponent(pc, mouse)))
         {
+            if (m_runtimeInputCallback && m_runtimeInputCallback(pc.id))
+            {
+                CancelMouseInteraction();
+                return;
+            }
             RecordUndo();
             auto& value = pc.comp->outputs[0].value;
-            value = value == LogicValue::Low ? LogicValue::High : LogicValue::Low;
+            value = pc.initialHigh.value_or(value == LogicValue::High) ? LogicValue::Low : LogicValue::High;
+            pc.initialHigh = value == LogicValue::High;
             MarkModified();
             RecomputeCircuit();
         }
@@ -519,15 +512,19 @@ bool Canvas::CopySelection()
     std::ostringstream stream;
     wxString plainText;
     bool text = false;
-    stream << "WX_DEMO_1 ";
+    stream << "WX_DEMO_2 ";
     if (m_selectedIndex >= 0 && m_selectedIndex < static_cast<int>(m_components.size()))
     {
         const auto& pc = m_components[m_selectedIndex];
         std::string inputs, outputs;
         for (const auto& pin : pc.comp->inputs) inputs += pin.value == LogicValue::High ? '1' : '0';
         for (const auto& pin : pc.comp->outputs) outputs += pin.value == LogicValue::High ? '1' : '0';
+        if (ComponentRegistry::SupportsInitialLevel(pc.comp->name) && pc.initialHigh)
+            outputs = *pc.initialHigh ? "1" : "0";
         stream << "COMPONENT " << std::quoted(pc.comp->name) << ' ' << pc.x << ' ' << pc.y
-            << ' ' << std::quoted(inputs) << ' ' << std::quoted(outputs) << ' ' << pc.rotation;
+            << ' ' << std::quoted(inputs) << ' ' << std::quoted(outputs) << ' ' << pc.rotation
+            << ' ' << pc.parameters.clockPeriodNs << ' ' << pc.parameters.clockHighNs
+            << ' ' << pc.parameters.clockStartNs << ' ' << std::quoted(pc.parameters.probeLabel);
     }
     else if (m_selectedTextIndex >= 0 && m_selectedTextIndex < static_cast<int>(m_textBoxes.size()))
     {
@@ -585,7 +582,8 @@ bool Canvas::PasteSelection()
     std::istringstream stream(payload);
     std::string magic, kind, type, inputs, outputs, text;
     int x = 0, y = 0, width = 0, height = 0, pointSize = 14, scrollY = 0, rotation = 0;
-    if (!(stream >> magic >> kind) || magic != "WX_DEMO_1") return false;
+    if (!(stream >> magic >> kind) || (magic != "WX_DEMO_1" && magic != "WX_DEMO_2")) return false;
+    CircuitComponentData parameters;
     std::unique_ptr<Component> component;
     if (kind == "COMPONENT")
     {
@@ -595,8 +593,10 @@ bool Canvas::PasteSelection()
         // 旧剪贴板未写入角度，仍按 0 度粘贴。
         if (!stream.eof() && (!(stream >> rotation) || rotation < 0 || rotation >= 360 || rotation % 90 != 0))
             return false;
+        if (magic == "WX_DEMO_2" && !(stream >> parameters.clockPeriodNs >> parameters.clockHighNs >>
+            parameters.clockStartNs >> std::quoted(parameters.probeLabel))) return false;
         if (inputs.size() > MultiInputGate::MaxInputCount) return false;
-        component.reset(CreateComponent(wxString::FromUTF8(type), static_cast<int>(inputs.size())));
+        component = ComponentRegistry::Create(type, static_cast<int>(inputs.size()));
         if (!component || inputs.size() != component->inputs.size() ||
             outputs.size() != component->outputs.size() ||
             inputs.find_first_not_of("01") != std::string::npos ||
@@ -605,6 +605,17 @@ bool Canvas::PasteSelection()
             component->inputs[i].value = inputs[i] == '1' ? LogicValue::High : LogicValue::Low;
         for (std::size_t i = 0; i < outputs.size(); ++i)
             component->outputs[i].value = outputs[i] == '1' ? LogicValue::High : LogicValue::Low;
+        parameters = [&] {
+            parameters.id = 1; parameters.type = type; parameters.inputCount = static_cast<int>(inputs.size());
+            parameters.high = ComponentRegistry::SupportsInitialLevel(type) && outputs == "1";
+            parameters.rotation = rotation;
+            return parameters;
+        }();
+        CircuitDocument check;
+        check.formatVersion = 3;
+        check.components.push_back(parameters);
+        wxString parameterError;
+        if (!CircuitFile::Validate(check, parameterError)) return false;
         const wxRect bounds = GetComponentRect({ component.get(), 0, 0, 0, rotation });
         width = bounds.GetRight() + 1;
         height = bounds.GetBottom() + 1;
@@ -632,7 +643,12 @@ bool Canvas::PasteSelection()
         x = std::max(SnapToGrid(x), m_snapEnabled ? ((minX + m_gridSize - 1) / m_gridSize) * m_gridSize : minX);
         y = std::max(SnapToGrid(y), m_snapEnabled ? ((minY + m_gridSize - 1) / m_gridSize) * m_gridSize : minY);
         RecordUndo();
-        m_components.push_back({ component.get(), x, y, NextComponentId(), rotation });
+        const bool initialHigh = ComponentRegistry::SupportsInitialLevel(component->name) &&
+            component->outputs[0].value == LogicValue::High;
+        if (component->name == "CLOCK" || component->name == "DFF" || component->name == "PROBE" ||
+            component->name == "BUTTON" || component->name == "LED" || component->name == "CONSTANT" ||
+            !parameters.probeLabel.empty()) m_formatVersion = 3;
+        m_components.push_back({ component.get(), x, y, NextComponentId(), rotation, initialHigh, parameters });
         component.release();
         m_selectedIndex = static_cast<int>(m_components.size()) - 1;
         m_selectedTextIndex = -1;
@@ -808,6 +824,14 @@ Canvas::GateGeometry Canvas::GetGateGeometry(const Component& component) const
 {
     const auto& type = component.name;
     if (type == "NOT") return { 40, 40, 0, 60, { wxPoint(0, 20) } };
+    if (type == "CLOCK" || type == "DFF" || type == "PROBE" || type == "LED" ||
+        type == "BUTTON" || type == "CONSTANT")
+    {
+        GateGeometry result{80, 80, 0, 80, {}};
+        for (std::size_t i = 0; i < component.inputs.size(); ++i)
+            result.inputs.emplace_back(0, component.inputs.size() == 1 ? 40 : 20 + static_cast<int>(i) * 20);
+        return result;
+    }
     const bool andShape = type == "AND" || type == "NAND";
     const bool inverted = type == "NAND" || type == "NOR";
     const bool leftPins = type == "NOR" || type == "XOR";
@@ -904,7 +928,8 @@ bool Canvas::HasSelectedComponent() const
 
 bool Canvas::HasSelectedInput() const
 {
-    return HasSelectedComponent() && m_components[m_selectedIndex].comp->name == "INPUT";
+    return HasSelectedComponent() && (m_components[m_selectedIndex].comp->name == "INPUT" ||
+        m_components[m_selectedIndex].comp->name == "BUTTON");
 }
 
 int Canvas::GetSelectedRotation() const
@@ -922,13 +947,13 @@ bool Canvas::CanPersistWireGeometry() const
         ++manualWires;
     }
     // 重接两端最多增加十个点；普通规模的电路无需额外生成全部路径。
-    if (rawPoints + manualWires * 16 <= 4000) return true;
+    if (rawPoints + manualWires * 16 <= CircuitLimits::MaxTotalRoutePoints) return true;
     std::size_t points = 0;
     for (const auto& connection : m_circuit.GetConnections())
     {
         if (connection.route.empty() || !connection.output.IsValid() || !connection.input.IsValid()) continue;
         points += GetWirePath(connection).size();
-        if (points > 4000) return false;
+        if (points > CircuitLimits::MaxTotalRoutePoints) return false;
     }
     return true;
 }
@@ -963,9 +988,12 @@ bool Canvas::ToggleSelectedInput()
 {
     if (IsEditingText() || !HasSelectedInput()) return false;
     CancelMouseInteraction(true);
+    if (m_runtimeInputCallback && m_runtimeInputCallback(m_components[m_selectedIndex].id)) return true;
     RecordUndo();
     auto& value = m_components[m_selectedIndex].comp->outputs[0].value;
-    value = value == LogicValue::Low ? LogicValue::High : LogicValue::Low;
+    auto& initialHigh = m_components[m_selectedIndex].initialHigh;
+    value = initialHigh.value_or(value == LogicValue::High) ? LogicValue::Low : LogicValue::High;
+    initialHigh = value == LogicValue::High;
     MarkModified();
     RecomputeCircuit();
     return true;
@@ -974,8 +1002,7 @@ bool Canvas::ToggleSelectedInput()
 void Canvas::EvaluateCircuit()
 {
     CancelMouseInteraction(true);
-    RecomputeCircuit();
-    ReportStatus(wxT("逻辑已重新计算"));
+    if (RecomputeCircuit()) ReportStatus(wxT("逻辑已重新计算"));
 }
 
 void Canvas::DeselectAll()
@@ -1210,6 +1237,15 @@ void Canvas::OnDoubleClick(wxMouseEvent& event)
 {
     if (g_selectedType == "WIRE" || g_selectedType == "DELETE") return;
     const wxPoint point = event.GetPosition();
+    if (g_selectedType.IsEmpty())
+    {
+        const int component = HitTest(point.x, point.y);
+        if (component >= 0)
+        {
+            m_selectedIndex = component;
+            if (EditSelectedTimingParameters()) return;
+        }
+    }
     const int index = HitTestText(point, true);
     if (index < 0 || (g_selectedType != "TEXT" && HitTest(point.x, point.y) >= 0)) return;
     CancelMouseInteraction();
@@ -1432,7 +1468,37 @@ void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
     const int curveLeft = (type == "NOR" || type == "XOR") ? -10 : 0;
     dc.SetPen(wxPen(wxColour(36, 50, 71), 2));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    if (type == "NOT")
+    const bool timing = type == "CLOCK" || type == "DFF" || type == "PROBE" || type == "LED" ||
+        type == "BUTTON" || type == "CONSTANT";
+    if (timing)
+    {
+        dc.SetBrush(wxBrush(wxColour(244, 248, 255)));
+        dc.DrawRoundedRectangle(x, y, w, h, 5);
+        dc.SetFont(wxFontInfo(9).Bold());
+        dc.SetTextForeground(wxColour(36, 50, 71));
+        dc.DrawLabel(wxString::FromUTF8(type), wxRect(x + 14, y + 4, w - 20, 20), wxALIGN_CENTER);
+        dc.SetFont(wxFontInfo(8));
+        for (std::size_t i = 0; i < geometry.inputs.size(); ++i)
+        {
+            const auto pin = geometry.inputs[i];
+            dc.DrawText(wxString::FromUTF8(pc.comp->inputs[i].name), x + 7, y + pin.y - 7);
+            if (type == "DFF" && i == 1)
+            {
+                wxPoint triangle[]{wxPoint(x, y + pin.y - 5), wxPoint(x + 5, y + pin.y), wxPoint(x, y + pin.y + 5)};
+                dc.DrawLines(3, triangle);
+            }
+        }
+        const LogicValue value = pc.comp->outputs.empty() ? pc.comp->inputs[0].value : pc.comp->outputs[0].value;
+        dc.SetTextForeground(value == LogicValue::High ? wxColour(22, 139, 88) : wxColour(100, 116, 139));
+        dc.DrawText(value == LogicValue::High ? "1" : "0", x + w - 14, midY - 7);
+        if (type == "CLOCK")
+        {
+            wxPoint pulse[]{wxPoint(x + 25,y + 58),wxPoint(x + 25,y + 44),wxPoint(x + 37,y + 44),
+                wxPoint(x + 37,y + 58),wxPoint(x + 49,y + 58),wxPoint(x + 49,y + 44),wxPoint(x + 61,y + 44)};
+            dc.DrawLines(7, pulse);
+        }
+    }
+    else if (type == "NOT")
     {
         dc.DrawLine(x, y, x, y + h);
         dc.DrawLine(x, y, x + w, midY);
@@ -1496,5 +1562,5 @@ void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
         dc.DrawCircle(x + pin.x, y + pin.y, 3);
     dc.SetBrush(wxBrush(wxColour(225, 92, 99)));
     dc.SetPen(wxPen(wxColour(225, 92, 99), 1));
-    dc.DrawCircle(x + geometry.outputX, midY, 3);
+    if (!pc.comp->outputs.empty()) dc.DrawCircle(x + geometry.outputX, midY, 3);
 }

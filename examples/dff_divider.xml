@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<circuit version="3">
+  <components>
+    <component id="1" type="CLOCK" x="60" y="160" inputCount="0" high="0" clockPeriodNs="20" clockHighNs="10" clockStartNs="0"/>
+    <component id="2" type="DFF" x="340" y="160" inputCount="3" high="0"/>
+    <component id="3" type="NOT" x="500" y="80" inputCount="1" high="0"/>
+    <component id="4" type="INPUT" x="60" y="280" inputCount="0" high="0"/>
+    <component id="5" type="PROBE" x="180" y="80" inputCount="1" high="0" probeLabel="CLK · 20 ns"/>
+    <component id="6" type="PROBE" x="660" y="160" inputCount="1" high="0" probeLabel="Q · 二分频"/>
+  </components>
+  <wires>
+    <wire sourceId="1" sourcePinId="OUT" targetId="2" targetPinId="CLK">
+      <point x="140" y="200"/><point x="340" y="200"/>
+    </wire>
+    <wire sourceId="1" sourcePinId="OUT" targetId="5" targetPinId="IN">
+      <point x="140" y="200"/><point x="160" y="200"/><point x="160" y="120"/><point x="180" y="120"/>
+    </wire>
+    <wire sourceId="2" sourcePinId="Q" targetId="3" targetPinId="IN">
+      <point x="420" y="200"/><point x="460" y="200"/><point x="460" y="100"/><point x="500" y="100"/>
+    </wire>
+    <wire sourceId="3" sourcePinId="OUT" targetId="2" targetPinId="D">
+      <point x="560" y="100"/><point x="600" y="100"/><point x="600" y="60"/><point x="300" y="60"/><point x="300" y="180"/><point x="340" y="180"/>
+    </wire>
+    <wire sourceId="2" sourcePinId="Q" targetId="6" targetPinId="IN">
+      <point x="420" y="200"/><point x="660" y="200"/>
+    </wire>
+    <wire sourceId="4" sourcePinId="OUT" targetId="2" targetPinId="RESET">
+      <point x="100" y="300"/><point x="280" y="300"/><point x="280" y="220"/><point x="340" y="220"/>
+    </wire>
+  </wires>
+  <texts>
+    <text x="30" y="10" width="770" height="34" pointSize="18">DFF 二分频：Q → NOT → D</text>
+    <text x="40" y="245" width="220" height="28" pointSize="12">RESET：点击输入置高，异步清零</text>
+    <text x="30" y="365" width="780" height="54" pointSize="13">运行或步进：CLK 周期 20 ns，Q 周期 40 ns；首次上升沿在 0 ns。
+RESET 高有效、优先于采样；释放复位后等待下一个上升沿。</text>
+  </texts>
+  <simulation stopTimeNs="200" maxEvents="100000" maxDeltaCycles="128" maxTraceSamples="200000"/>
+</circuit>

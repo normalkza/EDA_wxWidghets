@@ -19,7 +19,21 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="wx_demo\KiCadSExpr.cpp" />
+    <ClCompile Include="wx_demo\KiCadPcbImporter.cpp" />
+    <ClCompile Include="wx_demo\PcbCanvas.cpp" />
+    <ClCompile Include="wx_demo\PcbFrame.cpp" />
+    <ClCompile Include="wx_demo\DigitalSimulator.cpp" />
+    <ClCompile Include="wx_demo\TraceRecorder.cpp" />
+    <ClCompile Include="wx_demo\WaveformPanel.cpp" />
+    <ClCompile Include="wx_demo\SimulationPanel.cpp" />
+    <ClCompile Include="wx_demo\CanvasTiming.cpp" />
+    <ClCompile Include="wx_demo\ComponentRegistry.cpp" />
+    <ClCompile Include="wx_demo\TopologyRules.cpp" />
+    <ClCompile Include="wx_demo\Connectivity.cpp" />
+    <ClCompile Include="wx_demo\SimulationSnapshot.cpp" />
     <ClCompile Include="wx_demo\Circuit.cpp" />
+    <ClCompile Include="wx_demo\CircuitValidation.cpp" />
     <ClCompile Include="wx_demo\CircuitFile.cpp" />
     <ClCompile Include="wx_demo\CanvasDocument.cpp" />
     <ClCompile Include="wx_demo\Wire.cpp" />
@@ -41,9 +55,27 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="NandGate.h" />
+    <ClInclude Include="wx_demo\KiCadSExpr.h" />
+    <ClInclude Include="wx_demo\KiCadPcbImporter.h" />
+    <ClInclude Include="wx_demo\PcbDocument.h" />
+    <ClInclude Include="wx_demo\PcbCanvas.h" />
+    <ClInclude Include="wx_demo\PcbFrame.h" />
+    <ClInclude Include="wx_demo\DigitalSimulator.h" />
+    <ClInclude Include="wx_demo\TraceRecorder.h" />
+    <ClInclude Include="wx_demo\WaveformPanel.h" />
+    <ClInclude Include="wx_demo\SimulationPanel.h" />
+    <ClInclude Include="wx_demo\SimulationConfig.h" />
+    <ClInclude Include="wx_demo\TimingComponents.h" />
+    <ClInclude Include="wx_demo\NandGate.h" />
     <ClInclude Include="wx_demo\AndGate.h" />
+    <ClInclude Include="wx_demo\ComponentRegistry.h" />
+    <ClInclude Include="wx_demo\TopologyRules.h" />
+    <ClInclude Include="wx_demo\Connectivity.h" />
+    <ClInclude Include="wx_demo\SimulationSnapshot.h" />
+    <ClInclude Include="wx_demo\CircuitDocument.h" />
     <ClInclude Include="wx_demo\Circuit.h" />
+    <ClInclude Include="wx_demo\CircuitValidation.h" />
+    <ClInclude Include="wx_demo\CircuitLimits.h" />
     <ClInclude Include="wx_demo\CircuitFile.h" />
     <ClInclude Include="wx_demo\Wire.h" />
     <ClInclude Include="wx_demo\Canvas.h" />
@@ -61,26 +93,27 @@
     <ClInclude Include="wx_demo\SelectionState.h" />
     <ClInclude Include="wx_demo\ToolBar.h" />
     <ClInclude Include="wx_demo\Toolbox.h" />
-    <ClInclude Include="XorGate.h" />
+    <ClInclude Include="wx_demo\XorGate.h" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="x64\Debug\res\and.png" />
-    <Image Include="x64\Debug\res\delete.png" />
-    <Image Include="x64\Debug\res\input.png" />
-    <Image Include="x64\Debug\res\nand.png" />
-    <Image Include="x64\Debug\res\nor.png" />
-    <Image Include="x64\Debug\res\not.png" />
-    <Image Include="x64\Debug\res\or.png" />
-    <Image Include="x64\Debug\res\output.png" />
-    <Image Include="x64\Debug\res\probe.png" />
-    <Image Include="x64\Debug\res\select.png" />
-    <Image Include="x64\Debug\res\text.png" />
-    <Image Include="x64\Debug\res\wire.png" />
-    <Image Include="x64\Debug\res\xor.png" />
+    <Image Include="wx_demo\res\and.png" />
+    <Image Include="wx_demo\res\delete.png" />
+    <Image Include="wx_demo\res\input.png" />
+    <Image Include="wx_demo\res\nand.png" />
+    <Image Include="wx_demo\res\nor.png" />
+    <Image Include="wx_demo\res\not.png" />
+    <Image Include="wx_demo\res\or.png" />
+    <Image Include="wx_demo\res\output.png" />
+    <Image Include="wx_demo\res\probe.png" />
+    <Image Include="wx_demo\res\select.png" />
+    <Image Include="wx_demo\res\text.png" />
+    <Image Include="wx_demo\res\wire.png" />
+    <Image Include="wx_demo\res\xor.png" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
+    <WXWIN Condition="'$(WXWIN)'==''">D:\wxWidgets-3.3.3</WXWIN>
     <ProjectGuid>{aa8e5bef-2a30-46d9-9046-e8e19079fcaa}</ProjectGuid>
     <RootNamespace>wxdemo</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
@@ -119,23 +152,26 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="D:\wxWidgets-3.3.3\wxwidgets.props" />
+    <Import Project="$(WXWIN)\wxwidgets.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="D:\wxWidgets-3.3.3\wxwidgets.props" />
+    <Import Project="$(WXWIN)\wxwidgets.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="D:\wxWidgets-3.3.3\wxwidgets.props" />
+    <Import Project="$(WXWIN)\wxwidgets.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="D:\wxWidgets-3.3.3\wxwidgets.props" />
+    <Import Project="$(WXWIN)\wxwidgets.props" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="UserMacros">
+    <OutDir>$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)$(Platform)\obj\$(MSBuildProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
+    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -144,7 +180,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>D:\wxWidgets-3.3.3\include;D:\wxWidgets-3.3.3\lib\vc_x64_lib\mswud;D:\wxWidgets-3.3.3\include\msvc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -167,7 +203,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>D:\wxWidgets-3.3.3\include;D:\wxWidgets-3.3.3\lib\vc_x64_lib\mswud;D:\wxWidgets-3.3.3\include\msvc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -188,7 +224,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>D:\wxWidgets-3.3.3\include;D:\wxWidgets-3.3.3\include\mscv;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -211,7 +247,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>D:\wxWidgets-3.3.3\include;D:\wxWidgets-3.3.3\include\mscv;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -222,7 +258,7 @@
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy /Y /E /I "$(ProjectDir)res\*" "$(OutDir)res\"</Command>
+      <Command>xcopy /Y /E /I "$(ProjectDir)wx_demo\res" "$(OutDir)res"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
