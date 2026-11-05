@@ -41,6 +41,7 @@ SimulationPanel::SimulationPanel(wxWindow* parent, Canvas* canvas)
     settings->Add(new wxStaticText(this, wxID_ANY, wxT("周期步进时钟")), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(5));
     m_clock = new wxChoice(this, wxID_ANY);
     m_clock->SetMinSize(FromDIP(wxSize(125, -1)));
+    m_clock->SetToolTip(wxT("选择用于“一个周期”步进的 CLOCK；未放置 CLOCK 时无可用选项。"));
     settings->Add(m_clock, 0, wxRIGHT, FromDIP(12));
     m_state = new wxStaticText(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
     settings->Add(m_state, 1, wxALIGN_CENTER_VERTICAL);
@@ -49,11 +50,43 @@ SimulationPanel::SimulationPanel(wxWindow* parent, Canvas* canvas)
     root->Add(m_waveform, 1, wxEXPAND);
     m_log = new wxTextCtrl(this, wxID_ANY, wxT("连接 CLOCK → DFF.CLK，Q → NOT → D 可构成二分频；RESET 悬空默认为 0。"),
         wxDefaultPosition, FromDIP(wxSize(-1, 38)), wxTE_MULTILINE | wxTE_READONLY | wxBORDER_SIMPLE);
-    root->Add(m_log, 0, wxEXPAND | wxALL, FromDIP(4));
+    m_log->Hide();
+    // 日志仍由控制器维护，独立仿真窗口不再显示底部日志区域。
     SetSizer(root);
     Bind(wxEVT_TIMER, &SimulationPanel::OnTimer, this, m_timer.GetId());
     m_stopTime->Bind(wxEVT_TEXT_ENTER, [this](wxCommandEvent&) { ApplyStopTime(); });
     UpdateControls();
+}
+
+void SimulationPanel::RefreshClockChoices()
+{
+    const int oldSelection = m_clock->GetSelection();
+    int oldId = (oldSelection >= 0 && static_cast<std::size_t>(oldSelection) < m_clockIds.size())
+        ? m_clockIds[static_cast<std::size_t>(oldSelection)] : -1;
+    std::vector<int> ids;
+    if (m_active && m_simulator.IsCompiled())
+        ids = m_simulator.GetClockIds();
+    else
+    {
+        for (const auto& component : m_canvas->ExportDocument().components)
+            if (component.type == "CLOCK") ids.push_back(component.id);
+    }
+    m_clockIds = std::move(ids);
+    m_clock->Clear();
+    for (int id : m_clockIds)
+    {
+        wxString label = wxString::Format(wxT("CLOCK #%d"), id);
+        if (m_active && m_simulator.IsCompiled())
+        {
+            if (const auto period = m_simulator.GetClockPeriod(id))
+                label += wxString::Format(wxT(" (%lld ns)"), static_cast<long long>(*period));
+        }
+        m_clock->Append(label);
+    }
+    int selection = 0;
+    for (std::size_t i = 0; i < m_clockIds.size(); ++i)
+        if (m_clockIds[i] == oldId) { selection = static_cast<int>(i); break; }
+    if (!m_clockIds.empty()) m_clock->SetSelection(selection);
 }
 
 void SimulationPanel::InvalidateDocument()
@@ -67,6 +100,7 @@ void SimulationPanel::InvalidateDocument()
     m_clockIds.clear(); m_clock->Clear();
     m_stopTime->ChangeValue(wxString::Format("%lld", static_cast<long long>(m_canvas->ExportDocument().simulation.stopTimeNs)));
     m_log->ChangeValue(wxT("设计已改变，旧波形已清除。运行或步进将编译新的独立仿真快照。"));
+    RefreshClockChoices();
     UpdateControls();
 }
 
@@ -93,10 +127,7 @@ bool SimulationPanel::Prepare()
     if (!m_simulator.Compile(m_canvas->ExportDocument(), m_canvas->GetDocumentRevision(), error))
     { ShowError(error); return false; }
     m_active = true;
-    m_clockIds = m_simulator.GetClockIds();
-    m_clock->Clear();
-    for (int id : m_clockIds) m_clock->Append(wxString::Format("CLOCK #%d", id));
-    if (!m_clockIds.empty()) m_clock->SetSelection(0);
+    RefreshClockChoices();
     wxString warnings;
     const auto design = m_canvas->ExportDocument();
     for (const auto& component : design.components)

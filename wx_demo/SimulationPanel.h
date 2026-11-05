@@ -31,6 +31,7 @@ private:
     bool ApplyStopTime();
     void RefreshResult();
     void UpdateControls();
+    void RefreshClockChoices();
     void ShowError(const wxString& error);
     void Export(bool vcd);
     void Configure();

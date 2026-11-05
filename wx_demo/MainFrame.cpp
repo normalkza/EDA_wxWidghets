@@ -42,15 +42,16 @@ MainFrame::MainFrame()
     sidebar->SetBackgroundColour(divider);
     auto* toolbox = new Toolbox(sidebar);
     auto* properties = new PropertyPanel(sidebar);
-    auto* editor = new wxSplitterWindow(workspace, wxID_ANY,
-        wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
+    auto* editor = new wxPanel(workspace, wxID_ANY);
     auto* canvas = new Canvas(editor);
     m_editor = editor;
     m_simulation = new SimulationPanel(editor, canvas);
-    editor->SetMinimumPaneSize(FromDIP(150));
-    editor->SetSashGravity(0.62);
-    editor->SplitHorizontally(canvas, m_simulation, FromDIP(450));
-    editor->Bind(wxEVT_SPLITTER_DOUBLECLICKED, [](wxSplitterEvent& event) { event.Veto(); });
+    // 仿真面板只在独立窗口中显示，默认不占用主编辑网格的空间。
+    m_simulation->Hide();
+    auto* editorSizer = new wxBoxSizer(wxVERTICAL);
+    editorSizer->Add(canvas, 1, wxEXPAND);
+    editorSizer->Add(m_simulation, 0, wxEXPAND);
+    editor->SetSizer(editorSizer);
     m_canvas = canvas;
     m_workspace = workspace;
     m_sidebar = sidebar;
@@ -182,6 +183,7 @@ MainFrame::MainFrame()
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { m_simulation->Step(); }, ID_SIMULATE_STEP);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { m_simulation->StepPeriod(); }, ID_SIMULATE_PERIOD);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { LoadTimingExample(); }, ID_SIMULATE_EXAMPLE);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenSimulationWindow(); }, ID_SIMULATE_WINDOW);
     Bind(wxEVT_MENU, [canvas](wxCommandEvent&) { canvas->EditSelectedTimingParameters(); }, ID_COMPONENT_TIMING);
     Bind(wxEVT_UPDATE_UI, [canvas](wxUpdateUIEvent& event) { event.Enable(canvas->CanEditTimingParameters()); }, ID_COMPONENT_TIMING);
     Bind(wxEVT_MENU, [canvas](wxCommandEvent&) {
@@ -234,13 +236,48 @@ MainFrame::MainFrame()
     root->Add(workspace, 1, wxEXPAND | wxALL, FromDIP(12));
     SetSizer(root);
     Layout();
-    // Split only after the workspace receives its actual size. Gravity during
-    // the initial layout otherwise leaves the waveform at its minimum height.
-    editor->SetSashPosition(editor->GetClientSize().GetHeight() * 52 / 100);
     // 按实际可用高度初始化，让状态区占左栏约 45%。
     sidebar->SetSashPosition(sidebar->GetClientSize().GetHeight() * 55 / 100);
     m_sidebarSash = sidebar->GetSashPosition();
     UpdateDocumentTitle();
+}
+
+void MainFrame::OpenSimulationWindow()
+{
+    if (m_simulationFrame)
+    {
+        m_simulationFrame->Raise();
+        return;
+    }
+    m_simulationFrame = new wxFrame(this, wxID_ANY, wxT("数字时序仿真"),
+        wxDefaultPosition, FromDIP(wxSize(1100, 650)),
+        wxDEFAULT_FRAME_STYLE | wxRESIZE_BORDER);
+    if (auto* sizer = m_editor->GetSizer()) sizer->Detach(m_simulation);
+    m_simulation->Reparent(m_simulationFrame);
+    m_simulation->Show();
+    auto* sizer = new wxBoxSizer(wxVERTICAL);
+    sizer->Add(m_simulation, 1, wxEXPAND);
+    m_simulationFrame->SetSizer(sizer);
+    m_simulationFrame->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& event) {
+        RestoreSimulationPanel();
+        event.Skip();
+    });
+    m_simulationFrame->CentreOnParent();
+    m_simulationFrame->Show();
+}
+
+void MainFrame::RestoreSimulationPanel()
+{
+    if (!m_simulationFrame) return;
+    if (auto* frameSizer = m_simulationFrame->GetSizer())
+        frameSizer->Detach(m_simulation);
+    m_simulation->Reparent(m_editor);
+    m_simulation->Hide();
+    if (auto* sizer = m_editor->GetSizer()) sizer->Add(m_simulation, 0, wxEXPAND);
+    m_editor->Layout();
+    m_simulationFrame->SetSizer(nullptr);
+    m_simulationFrame->Destroy();
+    m_simulationFrame = nullptr;
 }
 
 void MainFrame::UpdateSidebarVisibility()
