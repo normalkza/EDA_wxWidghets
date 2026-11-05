@@ -77,6 +77,8 @@ wxMenuBar* CreateMainMenuBar()
     simulationMenu->AppendSeparator();
     simulationMenu->Append(ID_SIMULATE_TOGGLE_INPUT, wxT("切换输入电平\tF6"));
     simulationMenu->Append(ID_SIMULATE_EXAMPLE, wxT("载入 DFF 二分频示例"));
+    simulationMenu->AppendSeparator();
+    simulationMenu->Append(ID_SIMULATE_WINDOW, wxT("在独立窗口打开仿真面板"));
     menuBar->Append(simulationMenu, wxT("仿真"));
 
     auto* helpMenu = new wxMenu();

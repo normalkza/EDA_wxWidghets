@@ -282,6 +282,17 @@ bool ParseComponents(const wxXmlNode& section, CircuitDocument& document, wxStri
                 !ReadInt64(*node, "clockHighNs", data.clockHighNs, error) ||
                 !ReadInt64(*node, "clockStartNs", data.clockStartNs, error)) return false;
         }
+        else if (document.formatVersion >= 3 && data.type == "DFF")
+        {
+            if (!CheckAttributes(*node, {"id", "type", "x", "y", "inputCount", "high"}, error, {"rotation", "fallingEdge"})) return false;
+            if (node->HasAttribute(wxS("fallingEdge")))
+            {
+                const wxString value = node->GetAttribute(wxS("fallingEdge"));
+                if (value != wxS("0") && value != wxS("1"))
+                    return Fail(error, wxS("DFF 的 fallingEdge 属性只能是 0 或 1。"));
+                data.fallingEdge = value == wxS("1");
+            }
+        }
         else if (document.formatVersion >= 3 && data.type == "PROBE")
         {
             if (!CheckAttributes(*node, {"id", "type", "x", "y", "inputCount", "high"}, error, {"rotation", "probeLabel"})) return false;
@@ -484,6 +495,8 @@ bool CircuitFile::Save(const wxString& path, const CircuitDocument& document, wx
             AddInt64(*node, "clockHighNs", data.clockHighNs);
             AddInt64(*node, "clockStartNs", data.clockStartNs);
         }
+        if (document.formatVersion >= 3 && data.type == "DFF" && data.fallingEdge)
+            AddInt(*node, "fallingEdge", 1);
         if (document.formatVersion >= 3 && data.type == "PROBE" && !data.probeLabel.empty())
             node->AddAttribute(wxS("probeLabel"), wxString::FromUTF8(data.probeLabel));
     }
