@@ -22,6 +22,7 @@ private:
     void OnNew(wxCommandEvent& event);
     void OnOpen(wxCommandEvent& event);
     void OnImportKiCadPcb(wxCommandEvent& event);
+    void OnExportKiCadPcb(wxCommandEvent& event);
     void OnClose(wxCloseEvent& event);
     void LoadTimingExample();
 

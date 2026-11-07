@@ -4,6 +4,8 @@
 #include <wx/gdicmn.h>
 #include <cstddef>
 #include <vector>
+#include <string>
+#include <unordered_map>
 
 struct PinReference
 {
@@ -48,6 +50,9 @@ public:
     void PruneInvalidConnections();
     bool Evaluate(const std::vector<Component*>& components);
     const std::vector<WireConnection>& GetConnections() const { return m_connections; }
+
+    bool ExportPcb(const std::string& filename, const std::vector<Component*>& components,
+        const std::vector<std::pair<Component*, std::pair<int, int>>>& layout);
 
 private:
     std::vector<WireConnection> m_connections;

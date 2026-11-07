@@ -64,6 +64,7 @@ MainFrame::MainFrame()
     Bind(wxEVT_MENU, &MainFrame::OnNew, this, wxID_NEW);
     Bind(wxEVT_MENU, &MainFrame::OnOpen, this, wxID_OPEN);
     Bind(wxEVT_MENU, &MainFrame::OnImportKiCadPcb, this, ID_FILE_IMPORT_KICAD_PCB);
+    Bind(wxEVT_MENU, &MainFrame::OnExportKiCadPcb, this, ID_FILE_EXPORT_KICAD_PCB);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveDocument(); }, wxID_SAVE);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveDocument(true); }, wxID_SAVEAS);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { Close(); }, wxID_EXIT);
@@ -420,4 +421,28 @@ void MainFrame::LoadTimingExample()
     m_simulation->InvalidateDocument();
     UpdateDocumentTitle();
     SetStatusText(wxT("已载入二分频示例，点击“运行”查看 CLK 与 Q_div2；双击时钟可修改参数。"));
+}
+
+void MainFrame::OnExportKiCadPcb(wxCommandEvent&)
+{
+    wxFileDialog dialog(this, wxT("导出为 KiCad PCB"), "", "circuit.kicad_pcb",
+        wxT("KiCad PCB 板图 (*.kicad_pcb)|*.kicad_pcb"), wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+    if (dialog.ShowModal() != wxID_OK) return;
+
+    std::vector<Component*> comps;
+    std::vector<std::pair<Component*, std::pair<int, int>>> layout;
+
+    // 从画布提取真实元件数据
+    for (const auto& pc : m_canvas->GetComponents()) {
+        comps.push_back(pc.comp);
+        layout.push_back({ pc.comp, {pc.x, pc.y} });
+    }
+
+    // 调用 Circuit 里的导出函数
+    if (m_canvas->GetCircuit().ExportPcb(dialog.GetPath().ToStdString(), comps, layout)) {
+        wxMessageBox(wxT("PCB 导出成功！\n你可以用 KiCad 打开查看。"), wxT("提示"), wxOK | wxICON_INFORMATION, this);
+    }
+    else {
+        wxMessageBox(wxT("PCB 导出失败！"), wxT("错误"), wxOK | wxICON_ERROR, this);
+    }
 }
