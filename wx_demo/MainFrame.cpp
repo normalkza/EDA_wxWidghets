@@ -105,7 +105,8 @@ MainFrame::MainFrame()
         {ID_TOOL_AND, "AND"}, {ID_TOOL_OR, "OR"}, {ID_TOOL_NOT, "NOT"},
         {ID_TOOL_NAND, "NAND"}, {ID_TOOL_NOR, "NOR"}, {ID_TOOL_XOR, "XOR"},
         {ID_TOOL_TEXT, "TEXT"}, {ID_TOOL_WIRE, "WIRE"},
-        {ID_TOOL_CLOCK, "CLOCK"}, {ID_TOOL_DFF, "DFF"}, {ID_TOOL_PROBE, "PROBE"},
+        {ID_TOOL_CLOCK, "CLOCK"}, {ID_TOOL_DFF, "DFF"}, {ID_TOOL_MUX, "MUX"},
+        {ID_TOOL_COMPARATOR, "COMPARATOR"}, {ID_TOOL_PROBE, "PROBE"},
         {ID_TOOL_CONSTANT, "CONSTANT"}, {ID_TOOL_BUTTON, "BUTTON"}, {ID_TOOL_LED, "LED"}
     };
     for (const auto& [id, type] : menuTools)

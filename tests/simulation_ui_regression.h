@@ -26,7 +26,13 @@ struct SimulationUiRegressionAccess
         auto frame = std::make_unique<MainFrame>();
         auto& panel = *frame->m_simulation;
         auto& canvas = *frame->m_canvas;
-        Require(panel.GetSize().y > panel.FromDIP(260), "initial split leaves a usable waveform region");
+        Require(!panel.IsShown() && canvas.GetParent() == frame->m_editor,
+            "canvas owns the editor while simulation is initially hidden");
+        frame->Show();
+        frame->OpenSimulationWindow();
+        Require(frame->m_simulationFrame && panel.GetParent() == frame->m_simulationFrame &&
+            panel.GetSize().y > panel.FromDIP(260),
+            "separate simulation window leaves a usable waveform region");
         frame->LoadTimingExample();
         Require(canvas.ExportDocument().simulation.stopTimeNs == 200 && panel.m_stopTime->GetValue() == "200",
             "example config reaches controls");
@@ -121,5 +127,8 @@ struct SimulationUiRegressionAccess
             }
             Require(simulator.AdvanceTo(document.simulation.stopTimeNs, error), "shipped example reaches its horizon");
         }
+        frame->RestoreSimulationPanel();
+        Require(!frame->m_simulationFrame && !panel.IsShown() && panel.GetParent() == frame->m_editor,
+            "closing simulation keeps the canvas unobstructed");
     }
 };

@@ -175,6 +175,8 @@
     <ClInclude Include="wx_demo\SimulationPanel.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\SimulationConfig.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\TimingComponents.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\MuxComponent.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\ComparatorComponent.h"><Filter>头文件</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="wx_demo\KiCadSExpr.cpp"><Filter>源文件</Filter></ClCompile>

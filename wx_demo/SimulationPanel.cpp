@@ -48,10 +48,6 @@ SimulationPanel::SimulationPanel(wxWindow* parent, Canvas* canvas)
     root->Add(settings, 0, wxEXPAND | wxALL, FromDIP(8));
     m_waveform = new WaveformPanel(this);
     root->Add(m_waveform, 1, wxEXPAND);
-    m_log = new wxTextCtrl(this, wxID_ANY, wxT("连接 CLOCK → DFF.CLK，Q → NOT → D 可构成二分频；RESET 悬空默认为 0。"),
-        wxDefaultPosition, FromDIP(wxSize(-1, 38)), wxTE_MULTILINE | wxTE_READONLY | wxBORDER_SIMPLE);
-    m_log->Hide();
-    // 日志仍由控制器维护，独立仿真窗口不再显示底部日志区域。
     SetSizer(root);
     Bind(wxEVT_TIMER, &SimulationPanel::OnTimer, this, m_timer.GetId());
     m_stopTime->Bind(wxEVT_TEXT_ENTER, [this](wxCommandEvent&) { ApplyStopTime(); });
@@ -97,9 +93,9 @@ void SimulationPanel::InvalidateDocument()
     m_active = m_running = false;
     m_simulator = DigitalSimulator{};
     m_waveform->Clear();
+    m_warnings.clear();
     m_clockIds.clear(); m_clock->Clear();
     m_stopTime->ChangeValue(wxString::Format("%lld", static_cast<long long>(m_canvas->ExportDocument().simulation.stopTimeNs)));
-    m_log->ChangeValue(wxT("设计已改变，旧波形已清除。运行或步进将编译新的独立仿真快照。"));
     RefreshClockChoices();
     UpdateControls();
 }
@@ -128,7 +124,7 @@ bool SimulationPanel::Prepare()
     { ShowError(error); return false; }
     m_active = true;
     RefreshClockChoices();
-    wxString warnings;
+    m_warnings.clear();
     const auto design = m_canvas->ExportDocument();
     for (const auto& component : design.components)
         for (int pin = 0; pin < component.inputCount; ++pin)
@@ -138,10 +134,9 @@ bool SimulationPanel::Prepare()
                 return wire.targetId == component.id && wire.targetPin == pin;
             });
             if (!connected)
-                warnings += wxString::Format(wxT("警告：%s #%d 输入 %d 悬空，按 0 处理。\n"),
+                m_warnings += wxString::Format(wxT("警告：%s #%d 输入 %d 悬空，按 0 处理。\n"),
                     wxString::FromUTF8(component.type), component.id, pin);
         }
-    m_log->ChangeValue(warnings.empty() ? wxString(wxT("快照已编译；二态零延迟仿真。同刻外部激励批量传播后采样；DFF 统一提交。")) : warnings);
     RefreshResult();
     return true;
 }
@@ -165,7 +160,6 @@ void SimulationPanel::Stop()
 {
     Pause(); m_active = false;
     m_canvas->EvaluateCircuit();
-    m_log->AppendText(wxT("\n已停止，画布恢复设计初值；已记录波形仍可导出。"));
     UpdateControls();
 }
 
@@ -173,7 +167,7 @@ void SimulationPanel::Reset()
 {
     Pause();
     m_active = false;
-    if (Prepare()) m_log->AppendText(wxT("\n已复位到 t=0 初始基线，运行激励及历史波形已清空。"));
+    Prepare();
 }
 
 void SimulationPanel::Step()
@@ -254,8 +248,10 @@ void SimulationPanel::UpdateControls()
 {
     const wxString state = m_running ? (m_periodTarget ? wxT("周期步进中") : wxT("运行中")) : !m_active ? wxT("就绪") :
         m_simulator.HasFailed() ? wxT("已中止") : m_simulator.IsFinished() ? wxT("已完成") : wxT("已暂停");
-    m_state->SetLabel(wxString::Format(wxT("%s · t=%lld ns · %llu 事件"), state,
-        static_cast<long long>(m_simulator.GetTime()), static_cast<unsigned long long>(m_simulator.GetEventCount())));
+    m_state->SetLabel(wxString::Format(wxT("%s · t=%lld ns · %llu 事件%s"), state,
+        static_cast<long long>(m_simulator.GetTime()), static_cast<unsigned long long>(m_simulator.GetEventCount()),
+        m_warnings.empty() ? wxT("") : wxT(" · 输入悬空")));
+    m_state->SetToolTip(m_warnings);
     m_pause->Enable(m_running);
     m_run->Enable(!m_running);
     m_stop->Enable(m_active);
@@ -269,7 +265,8 @@ void SimulationPanel::UpdateControls()
 void SimulationPanel::ShowError(const wxString& error)
 {
     Pause();
-    m_log->AppendText(wxT("\n") + (error.empty() ? wxString(wxT("仿真已停止。")) : error));
+    wxMessageBox(error.empty() ? wxString(wxT("仿真已停止。")) : error,
+        wxT("数字时序仿真"), wxOK | wxICON_ERROR, this);
 }
 
 void SimulationPanel::Export(bool vcd)
@@ -297,8 +294,9 @@ void SimulationPanel::Export(bool vcd)
         ShowError(error.empty() ? wxString(wxT("波形写入失败。")) : error);
         return;
     }
-    m_log->AppendText(wxString::Format(wxT("\n已导出有效记录 0…%lld ns："),
-        static_cast<long long>(m_simulator.GetRecordedUntil())) + path);
+    wxMessageBox(wxString::Format(wxT("已导出有效记录 0…%lld ns：\n"),
+        static_cast<long long>(m_simulator.GetRecordedUntil())) + path,
+        wxT("数字时序仿真"), wxOK | wxICON_INFORMATION, this);
 }
 
 void SimulationPanel::Configure()

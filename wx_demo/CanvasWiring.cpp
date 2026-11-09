@@ -25,7 +25,7 @@ wxPoint Canvas::GetPinPosition(const PinReference& pin) const
         if (pc.comp->name == "OUTPUT") return ComponentToWorld(pc, wxPoint(0, m_portSize / 2));
         const auto geometry = GetGateGeometry(*pc.comp);
         const wxPoint offset = pin.type == PinType::Input ? geometry.inputs.at(pin.index) :
-            wxPoint(geometry.outputX, geometry.height / 2);
+            (geometry.outputs.empty() ? wxPoint(geometry.outputX, geometry.height / 2) : geometry.outputs.at(pin.index));
         return ComponentToWorld(pc, offset);
     }
     return wxPoint();

@@ -138,6 +138,7 @@ private:
     {
         int width, height, left, outputX;
         std::vector<wxPoint> inputs;
+        std::vector<wxPoint> outputs;
     };
     GateGeometry GetGateGeometry(const Component& component) const;
     wxPoint GetComponentCenter(const PlacedComponent& pc) const;

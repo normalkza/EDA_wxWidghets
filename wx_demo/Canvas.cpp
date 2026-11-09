@@ -824,7 +824,10 @@ Canvas::GateGeometry Canvas::GetGateGeometry(const Component& component) const
 {
     const auto& type = component.name;
     if (type == "NOT") return { 40, 40, 0, 60, { wxPoint(0, 20) } };
-    if (type == "CLOCK" || type == "DFF" || type == "PROBE" || type == "LED" ||
+    if (type == "COMPARATOR") return { 100, 80, 0, 100,
+        { wxPoint(0, 20), wxPoint(0, 60) },
+        { wxPoint(100, 20), wxPoint(100, 40), wxPoint(100, 60) } };
+    if (type == "CLOCK" || type == "DFF" || type == "MUX" || type == "PROBE" || type == "LED" ||
         type == "BUTTON" || type == "CONSTANT")
     {
         GateGeometry result{80, 80, 0, 80, {}};
@@ -1468,7 +1471,7 @@ void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
     const int curveLeft = (type == "NOR" || type == "XOR") ? -10 : 0;
     dc.SetPen(wxPen(wxColour(36, 50, 71), 2));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    const bool timing = type == "CLOCK" || type == "DFF" || type == "PROBE" || type == "LED" ||
+    const bool timing = type == "CLOCK" || type == "DFF" || type == "MUX" || type == "COMPARATOR" || type == "PROBE" || type == "LED" ||
         type == "BUTTON" || type == "CONSTANT";
     if (timing)
     {
@@ -1488,9 +1491,22 @@ void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
                 dc.DrawLines(3, triangle);
             }
         }
-        const LogicValue value = pc.comp->outputs.empty() ? pc.comp->inputs[0].value : pc.comp->outputs[0].value;
-        dc.SetTextForeground(value == LogicValue::High ? wxColour(22, 139, 88) : wxColour(100, 116, 139));
-        dc.DrawText(value == LogicValue::High ? "1" : "0", x + w - 14, midY - 7);
+        if (type == "COMPARATOR")
+        {
+            for (std::size_t i = 0; i < pc.comp->outputs.size(); ++i)
+            {
+                const auto& output = pc.comp->outputs[i];
+                dc.SetTextForeground(output.value == LogicValue::High ? wxColour(22, 139, 88) : wxColour(100, 116, 139));
+                dc.DrawText(wxString::FromUTF8(output.name) + " " +
+                    (output.value == LogicValue::High ? "1" : "0"), x + 56, y + geometry.outputs[i].y - 7);
+            }
+        }
+        else
+        {
+            const LogicValue value = pc.comp->outputs.empty() ? pc.comp->inputs[0].value : pc.comp->outputs[0].value;
+            dc.SetTextForeground(value == LogicValue::High ? wxColour(22, 139, 88) : wxColour(100, 116, 139));
+            dc.DrawText(value == LogicValue::High ? "1" : "0", x + w - 14, midY - 7);
+        }
         if (type == "CLOCK")
         {
             wxPoint pulse[]{wxPoint(x + 25,y + 58),wxPoint(x + 25,y + 44),wxPoint(x + 37,y + 44),
@@ -1562,5 +1578,10 @@ void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
         dc.DrawCircle(x + pin.x, y + pin.y, 3);
     dc.SetBrush(wxBrush(wxColour(225, 92, 99)));
     dc.SetPen(wxPen(wxColour(225, 92, 99), 1));
-    if (!pc.comp->outputs.empty()) dc.DrawCircle(x + geometry.outputX, midY, 3);
+    if (geometry.outputs.empty())
+    {
+        if (!pc.comp->outputs.empty()) dc.DrawCircle(x + geometry.outputX, midY, 3);
+    }
+    else for (const auto& pin : geometry.outputs)
+        dc.DrawCircle(x + pin.x, y + pin.y, 3);
 }

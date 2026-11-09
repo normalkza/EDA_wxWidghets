@@ -86,6 +86,46 @@ public:
 
 void TestLogic()
 {
+    auto mux = ComponentRegistry::Create("MUX");
+    Check(mux != nullptr, "MUX is available");
+    for (unsigned mask = 0; mask < 8; ++mask)
+    {
+        for (unsigned i = 0; i < 3; ++i)
+            mux->inputs[i].value = (mask & (1u << i)) ? LogicValue::High : LogicValue::Low;
+        mux->Evaluate();
+        const bool expected = (mask & 4u) ? (mask & 2u) != 0 : (mask & 1u) != 0;
+        Check((mux->outputs[0].value == LogicValue::High) == expected, "MUX truth table");
+    }
+    Circuit circuit;
+    InputComponent a, b, select;
+    OutputComponent result;
+    std::vector<Component*> nodes{ &result, mux.get(), &select, &b, &a };
+    for (const auto& [source, input] : { std::pair<Component*, std::size_t>{ &a, 0 },
+        { &b, 1 }, { &select, 2 } })
+        Check(circuit.Connect({ source, PinType::Output, 0 }, { mux.get(), PinType::Input, input }) ==
+            ConnectionResult::Added, "connect MUX input");
+    Check(circuit.Connect({ mux.get(), PinType::Output, 0 }, { &result, PinType::Input, 0 }) ==
+        ConnectionResult::Added, "connect MUX output");
+    for (unsigned mask = 0; mask < 8; ++mask)
+    {
+        a.outputs[0].value = (mask & 1u) ? LogicValue::High : LogicValue::Low;
+        b.outputs[0].value = (mask & 2u) ? LogicValue::High : LogicValue::Low;
+        select.outputs[0].value = (mask & 4u) ? LogicValue::High : LogicValue::Low;
+        Check(circuit.Evaluate(nodes), "MUX circuit evaluates");
+        const auto expected = (mask & 4u) ? b.outputs[0].value : a.outputs[0].value;
+        Check(result.inputs[0].value == expected, "MUX connected output");
+    }
+    auto comparator = ComponentRegistry::Create("COMPARATOR");
+    Check(comparator != nullptr, "comparator is available");
+    for (unsigned mask = 0; mask < 4; ++mask)
+    {
+        comparator->inputs[0].value = (mask & 1u) ? LogicValue::High : LogicValue::Low;
+        comparator->inputs[1].value = (mask & 2u) ? LogicValue::High : LogicValue::Low;
+        comparator->Evaluate();
+        Check((comparator->outputs[0].value == LogicValue::High) == (mask == 1), "comparator greater output");
+        Check((comparator->outputs[1].value == LogicValue::High) == (mask == 0 || mask == 3), "comparator equal output");
+        Check((comparator->outputs[2].value == LogicValue::High) == (mask == 2), "comparator less output");
+    }
     for (const auto& type : { "AND", "OR", "NAND", "NOR", "XOR" })
     {
         for (int count : { 2, 3, 5, 16 })
