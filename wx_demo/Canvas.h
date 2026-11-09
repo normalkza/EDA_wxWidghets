@@ -18,9 +18,18 @@
 
 class wxClipboard;
 
-
 class Canvas : public wxPanel
 {
+    struct PlacedComponent
+    {
+        Component* comp;
+        int x, y;
+        int id = 0;
+        int rotation = 0;
+        std::optional<bool> initialHigh;
+        CircuitComponentData parameters;
+    };
+
 public:
     Canvas(wxWindow* parent, wxClipboard* clipboard = nullptr);
     ~Canvas() override;
@@ -39,8 +48,6 @@ public:
     void SetDocumentChangedCallback(std::function<void()> callback) { m_documentChangedCallback = std::move(callback); }
     void SetRuntimeInputCallback(std::function<bool(int)> callback) { m_runtimeInputCallback = std::move(callback); }
     void EvaluateCircuit();
-    // Call on the UI thread. Worker code owns the returned independent snapshot
-    // and sends back values, never pointers into this canvas.
     std::unique_ptr<SimulationSnapshot> CreateSimulationSnapshot(wxString& error) const;
     bool ApplySimulationResult(const SimulationResult& result);
     std::uint64_t GetDocumentRevision() const { return m_documentRevision; }
@@ -62,31 +69,14 @@ public:
     void ClearDocument();
     bool IsModified() const { return m_modified; }
     void MarkSaved();
-    void SetModifiedCallback(std::function<void()> callback)
-    {
-        m_modifiedCallback = std::move(callback);
-    }
-    void SetStatusCallback(std::function<void(const wxString&)> callback)
-    {
-        m_statusCallback = std::move(callback);
-    }
-    void SetWireSelectionCallback(std::function<void(const WireConnection*)> callback)
-    {
-        m_wireSelectionCallback = std::move(callback);
-    }
-    void SetTextSelectionCallback(std::function<void(const wxRect&, int)> callback)
-    {
-        m_textSelectionCallback = std::move(callback);
-    }
-    void SetSelectionCallback(std::function<void(const Component*, int, int)> callback)
-    {
-        m_selectionCallback = std::move(callback);
-    }
-    void SetComponentPlacedCallback(std::function<void()> callback)
-    {
-        m_componentPlacedCallback = std::move(callback);
-    }
-
+    void SetModifiedCallback(std::function<void()> callback) { m_modifiedCallback = std::move(callback); }
+    void SetStatusCallback(std::function<void(const wxString&)> callback) { m_statusCallback = std::move(callback); }
+    void SetWireSelectionCallback(std::function<void(const WireConnection*)> callback) { m_wireSelectionCallback = std::move(callback); }
+    void SetTextSelectionCallback(std::function<void(const wxRect&, int)> callback) { m_textSelectionCallback = std::move(callback); }
+    void SetSelectionCallback(std::function<void(const Component*, int, int)> callback) { m_selectionCallback = std::move(callback); }
+    void SetComponentPlacedCallback(std::function<void()> callback) { m_componentPlacedCallback = std::move(callback); }
+    Circuit& GetCircuit() { return m_circuit; }
+    const std::vector<Canvas::PlacedComponent>& GetComponents() const { return m_components; }
 
 private:
     friend struct CanvasRegressionAccess;
@@ -143,18 +133,6 @@ private:
     void DrawInput(wxDC& dc, int x, int y, LogicValue value);
     void DrawOutput(wxDC& dc, int x, int y, LogicValue value);
 
-    // 画布上的元件
-    struct PlacedComponent
-    {
-        Component* comp;
-        int x, y;
-        int id = 0;
-        int rotation = 0;
-        // A missing value supports legacy/test view objects. Real editor
-        // objects always retain their design stimulus separately from results.
-        std::optional<bool> initialHigh;
-        CircuitComponentData parameters;
-    };
     // 绘制、点击判定和局部刷新统一使用同一份几何信息。
     struct GateGeometry
     {
@@ -234,7 +212,6 @@ private:
     int m_pasteCount = 0;
     struct TextBox
     {
-        // 原生控件只负责键盘、剪贴板和输入法，放在画布外；画布绘制透明文字。
         wxTextCtrl* editor;
         int pointSize;
         wxRect rect;
@@ -258,15 +235,13 @@ private:
     std::function<void(const wxRect&, int)> m_textSelectionCallback;
     wxTimer m_textTimer;
     int m_textTransformIndex = -1;
-    int m_textTransformHandle = -1; // 0..7 为八个缩放手柄，8 为移动。
+    int m_textTransformHandle = -1;
     wxRect m_textTransformRect;
     wxPoint m_textTransformStart;
     bool m_textTransformMoved = false;
     bool m_textTransformWasModified = false;
     int m_textTransformScrollY = 0;
 
-
-    // 网格
     int m_gridSize = 20;
     bool m_gridVisible = true;
     bool m_snapEnabled = true;
