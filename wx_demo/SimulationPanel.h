@@ -31,6 +31,7 @@ private:
     bool ApplyStopTime();
     void RefreshResult();
     void UpdateControls();
+    void RefreshClockChoices();
     void ShowError(const wxString& error);
     void Export(bool vcd);
     void Configure();
@@ -43,11 +44,11 @@ private:
     WaveformPanel* m_waveform;
     wxStaticText* m_state;
     wxTextCtrl* m_stopTime;
-    wxTextCtrl* m_log;
     wxChoice* m_clock;
     wxButton *m_run, *m_pause, *m_stop, *m_reset, *m_step, *m_period, *m_csv, *m_vcd;
     std::vector<int> m_clockIds;
     std::function<void()> m_exampleCallback;
+    wxString m_warnings;
     bool m_active = false;
     bool m_running = false;
     std::optional<std::int64_t> m_periodTarget;

@@ -58,6 +58,15 @@ inline void TestComponentRegistry()
             std::string(type) + " restores configured initial level");
     }
     auto dff = ComponentRegistry::Create("DFF");
+    auto mux = ComponentRegistry::Create("MUX");
+    require(mux && mux->inputs[0].name == "A" && mux->inputs[1].name == "B" &&
+        mux->inputs[2].name == "S" && mux->outputs[0].name == "OUT",
+        "MUX has stable data and select pins");
+    auto comparator = ComponentRegistry::Create("COMPARATOR");
+    require(comparator && comparator->inputs[0].name == "A" && comparator->inputs[1].name == "B" &&
+        comparator->outputs.size() == 3 && comparator->outputs[0].name == "A>B" &&
+        comparator->outputs[1].name == "A=B" && comparator->outputs[2].name == "A<B",
+        "comparator has stable comparison outputs");
     require(dff && dff->inputs.size() == 3 && dff->inputs[0].name == "D" &&
         dff->inputs[1].name == "CLK" && dff->inputs[2].name == "RESET" && dff->outputs[0].name == "Q",
         "DFF has stable named data, clock, asynchronous reset and Q pins");

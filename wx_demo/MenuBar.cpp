@@ -50,6 +50,8 @@ wxMenuBar* CreateMainMenuBar()
     componentMenu->AppendSeparator();
     componentMenu->AppendCheckItem(ID_TOOL_CLOCK, wxT("时钟 CLOCK"));
     componentMenu->AppendCheckItem(ID_TOOL_DFF, wxT("D 触发器 DFF"));
+    componentMenu->AppendCheckItem(ID_TOOL_MUX, wxT("数据选择器 MUX"));
+    componentMenu->AppendCheckItem(ID_TOOL_COMPARATOR, wxT("单比特比较器"));
     componentMenu->AppendCheckItem(ID_TOOL_PROBE, wxT("探针 PROBE"));
     componentMenu->AppendCheckItem(ID_TOOL_CONSTANT, wxT("常量 CONSTANT"));
     componentMenu->AppendCheckItem(ID_TOOL_BUTTON, wxT("按钮 BUTTON"));
@@ -79,6 +81,8 @@ wxMenuBar* CreateMainMenuBar()
     simulationMenu->AppendSeparator();
     simulationMenu->Append(ID_SIMULATE_TOGGLE_INPUT, wxT("切换输入电平\tF6"));
     simulationMenu->Append(ID_SIMULATE_EXAMPLE, wxT("载入 DFF 二分频示例"));
+    simulationMenu->AppendSeparator();
+    simulationMenu->Append(ID_SIMULATE_WINDOW, wxT("在独立窗口打开仿真面板"));
     menuBar->Append(simulationMenu, wxT("仿真"));
 
     auto* helpMenu = new wxMenu();

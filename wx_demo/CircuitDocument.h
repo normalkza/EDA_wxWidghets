@@ -21,6 +21,8 @@ struct CircuitComponentData
     std::int64_t clockHighNs = 10;
     std::int64_t clockStartNs = 0;
     std::string probeLabel;
+    // DFF sampling edge; false preserves the original rising-edge behavior.
+    bool fallingEdge = false;
 };
 
 struct CircuitWireData

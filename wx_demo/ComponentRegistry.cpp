@@ -7,6 +7,8 @@
 #include "XorGate.h"
 #include "IOComponent.h"
 #include "TimingComponents.h"
+#include "MuxComponent.h"
+#include "ComparatorComponent.h"
 
 namespace
 {
@@ -40,11 +42,11 @@ const std::vector<ComponentDefinition>& ComponentRegistry::All()
         {"PROBE", "探针", "线路", "probe", 1, 1, 1, 0, FixedComponent<ProbeComponent>},
         {"CLOCK", "时钟", "线路", "clock", 0, 0, 0, 1, FixedComponent<ClockComponent>},
         {"CONSTANT", "常量", "线路", "constant", 0, 0, 0, 1, FixedComponent<ConstantComponent>},
-        {"MUX", "数据选择器", "复用器", "mux", 3, 3, 3, 1},
+        {"MUX", "数据选择器", "复用器", "mux", 3, 3, 3, 1, FixedComponent<MuxComponent>},
         {"DEMUX", "解复用器", "复用器", "demux", 2, 2, 2, 2},
         {"ADDER", "加法器", "运算器", "adder", 2, 2, 2, 1},
         {"SUBTRACTOR", "减法器", "运算器", "subtractor", 2, 2, 2, 1},
-        {"COMPARATOR", "比较器", "运算器", "comparator", 2, 2, 2, 1},
+        {"COMPARATOR", "比较器", "运算器", "comparator", 2, 2, 2, 3, FixedComponent<ComparatorComponent>},
         {"DFF", "D 触发器", "存储", "dff", 3, 3, 3, 1, FixedComponent<DffComponent>},
         {"REGISTER", "寄存器", "存储", "register", 2, 2, 2, 1},
         {"COUNTER", "计数器", "存储", "counter", 1, 1, 1, 1}

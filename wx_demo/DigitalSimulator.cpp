@@ -331,8 +331,10 @@ bool DigitalSimulator::ProcessTimeUnchecked(std::int64_t timeNs, wxString& error
         if (node.design.type != "DFF") continue;
         const auto& inputs = node.component->inputs;
         const bool rising = node.previousClock == LogicValue::Low && inputs[1].value == LogicValue::High;
+        const bool falling = node.previousClock == LogicValue::High && inputs[1].value == LogicValue::Low;
+        const bool activeEdge = node.design.fallingEdge ? falling : rising;
         const auto next = inputs[2].value == LogicValue::High ? LogicValue::Low :
-            rising ? inputs[0].value : node.component->outputs[0].value;
+            activeEdge ? inputs[0].value : node.component->outputs[0].value;
         node.previousClock = inputs[1].value;
         if (next != node.component->outputs[0].value) commits.emplace_back(index, next);
     }
