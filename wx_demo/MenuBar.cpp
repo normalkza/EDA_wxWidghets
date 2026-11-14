@@ -1,3 +1,4 @@
+
 #include "MenuBar.h"
 
 wxMenuBar* CreateMainMenuBar()
@@ -8,13 +9,13 @@ wxMenuBar* CreateMainMenuBar()
     fileMenu->Append(wxID_NEW, wxT("新建\tCtrl+N"));
     fileMenu->Append(wxID_OPEN, wxT("打开...\tCtrl+O"));
     fileMenu->Append(ID_FILE_IMPORT_KICAD_PCB, wxT("从 KiCad 导入 PCB…"));
-    fileMenu->Append(ID_FILE_EXPORT_KICAD_PCB, wxT("导出为 KiCad PCB..."));
+    fileMenu->Append(ID_FILE_EXPORT_GEDA_NETLIST, wxT("导出 gEDA 网表 (.net)"));
+    fileMenu->Append(ID_EXPORT_KICAD_SCHEMATIC, wxT("导出 KiCad 原理图与网表"));
     fileMenu->Append(wxID_SAVE, wxT("保存\tCtrl+S"));
     fileMenu->Append(wxID_SAVEAS, wxT("另存为...\tCtrl+Shift+S"));
     fileMenu->AppendSeparator();
     fileMenu->Append(wxID_EXIT, wxT("退出"));
     menuBar->Append(fileMenu, wxT("文件"));
-
 
     wxMenu* editMenu = new wxMenu();
     editMenu->Append(wxID_UNDO, wxT("撤销\tCtrl+Z"));
@@ -85,9 +86,11 @@ wxMenuBar* CreateMainMenuBar()
     simulationMenu->Append(ID_SIMULATE_WINDOW, wxT("在独立窗口打开仿真面板"));
     menuBar->Append(simulationMenu, wxT("仿真"));
 
+    // 帮助菜单
     auto* helpMenu = new wxMenu();
-    helpMenu->Append(wxID_HELP, wxT("快捷键\tF1"));
+    helpMenu->Append(ID_START_TUTORIAL, wxT("新手教程\tCtrl+T"));
     helpMenu->AppendSeparator();
+    helpMenu->Append(wxID_HELP, wxT("快捷键\tF1"));
     helpMenu->Append(wxID_ABOUT, wxT("关于"));
     menuBar->Append(helpMenu, wxT("帮助"));
 

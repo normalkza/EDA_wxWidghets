@@ -8,13 +8,21 @@
 #include "CircuitFile.h"
 #include "SimulationPanel.h"
 #include "PcbFrame.h"
-#include <wx/splitter.h>
-#include <wx/filedlg.h>
+#include "KiCadSchematicExporter.h"
+#include <wx/utils.h>
 #include <wx/filename.h>
 #include <wx/filefn.h>
+#include <wx/splitter.h>
+#include <wx/filedlg.h>
+#include <wx/choicdlg.h>
 #include <algorithm>
 #include <utility>
 #include <vector>
+#include <wx/dir.h>
+#include <wx/arrstr.h>
+#include <wx/tokenzr.h>
+#include "KiCadNetlistExporter.h"
+
 
 MainFrame::MainFrame()
     : wxFrame(nullptr, wxID_ANY, wxT("数字电路编辑器"),
@@ -29,6 +37,7 @@ MainFrame::MainFrame()
     SetBackgroundColour(background);
     SetForegroundColour(text);
     SetMenuBar(CreateMainMenuBar());
+
     auto* status = CreateStatusBar();
     status->SetFont(uiFont);
     status->SetBackgroundColour(*wxWHITE);
@@ -65,7 +74,100 @@ MainFrame::MainFrame()
     Bind(wxEVT_MENU, &MainFrame::OnNew, this, wxID_NEW);
     Bind(wxEVT_MENU, &MainFrame::OnOpen, this, wxID_OPEN);
     Bind(wxEVT_MENU, &MainFrame::OnImportKiCadPcb, this, ID_FILE_IMPORT_KICAD_PCB);
-    Bind(wxEVT_MENU, &MainFrame::OnExportKiCadPcb, this, ID_FILE_EXPORT_KICAD_PCB);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+        if (!m_canvas) return;
+        wxFileDialog dialog(this, wxT("导出 KiCad 原理图与网表"), wxEmptyString,
+            wxT("circuit.kicad_sch"),
+            wxT("KiCad 原理图文件 (*.kicad_sch)|*.kicad_sch"),
+            wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+        if (dialog.ShowModal() != wxID_OK) return;
+
+        const wxString path = dialog.GetPath();
+        const CircuitDocument document = m_canvas->ExportDocument();
+        std::string error;
+        if (!KiCadSchematicExporter::ExportSchematic(
+            document,
+            path.ToStdString(wxConvUTF8),
+            std::string(),
+            error,
+            this))
+        {
+            const wxString message = wxString::FromUTF8(error);
+            SetStatusText(wxT("KiCad 原理图导出失败：") + message);
+            wxMessageBox(message, wxT("原理图导出失败"), wxOK | wxICON_ERROR, this);
+            return;
+        }
+        // 原理图导出成功后，自动确定网表保存路径
+        wxFileName netlistFile(path);
+        netlistFile.SetExt(wxT("net"));
+        const wxString netlistPath = netlistFile.GetFullPath();
+
+        // 先自动查找 KiCad CLI
+        wxString cliPath = KiCadNetlistExporter::FindKiCadCli();
+
+        // 如果自动查找失败，让用户手动选择
+        if (cliPath.IsEmpty())
+        {
+            wxFileDialog cliDialog(
+                this,
+                wxT("请选择 KiCad CLI 程序"),
+                wxEmptyString,
+                wxT("kicad-cli.exe"),
+                wxT("KiCad CLI 程序 (kicad-cli.exe)|kicad-cli.exe|所有文件 (*.*)|*.*"),
+                wxFD_OPEN | wxFD_FILE_MUST_EXIST
+            );
+
+            if (cliDialog.ShowModal() != wxID_OK)
+            {
+                SetStatusText(wxT("原理图已导出，用户取消了 KiCad CLI 选择。"));
+
+                wxMessageBox(
+                    wxT("原理图已经成功导出，但没有选择 KiCad CLI，网表未生成。"),
+                    wxT("网表导出已取消"),
+                    wxOK | wxICON_INFORMATION,
+                    this
+                );
+                return;
+            }
+
+            cliPath = cliDialog.GetPath();
+        }
+
+        // 使用找到或用户选择的 CLI 导出网表
+        std::string netlistError;
+
+        if (KiCadNetlistExporter::ExportFromSchematic(
+            path.ToStdString(wxConvUTF8),
+            netlistPath.ToStdString(wxConvUTF8),
+            cliPath,
+            netlistError))
+        {
+            SetStatusText(wxT("原理图和网表导出成功：") + netlistPath);
+
+            wxMessageBox(
+                wxT("导出成功！\n\n")
+                wxT("原理图：\n") + path + wxT("\n\n")
+                wxT("网表：\n") + netlistPath,
+                wxT("导出完成"),
+                wxOK | wxICON_INFORMATION,
+                this
+            );
+        }
+        else
+        {
+            const wxString message = wxString::FromUTF8(netlistError);
+
+            SetStatusText(wxT("原理图已导出，但网表生成失败。"));
+
+            wxMessageBox(
+                wxT("原理图已经成功导出，但网表生成失败：\n\n") + message,
+                wxT("网表导出失败"),
+                wxOK | wxICON_WARNING,
+                this
+            );
+        }
+
+        }, ID_EXPORT_KICAD_SCHEMATIC);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveDocument(); }, wxID_SAVE);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveDocument(true); }, wxID_SAVEAS);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { Close(); }, wxID_EXIT);
@@ -74,11 +176,11 @@ MainFrame::MainFrame()
     {
         Bind(wxEVT_MENU, [canvas](wxCommandEvent& event) {
             canvas->HandleEditCommand(event.GetId());
-        }, command);
+            }, command);
     }
     Bind(wxEVT_UPDATE_UI, [canvas](wxUpdateUIEvent& event) {
         event.Enable(canvas->CanUndo());
-    }, wxID_UNDO);
+        }, wxID_UNDO);
 
     // 左栏加宽，状态区不再按全部内容高度挤压树状列表。
     workspace->SetMinimumPaneSize(FromDIP(220));
@@ -95,7 +197,12 @@ MainFrame::MainFrame()
         UpdateMainToolBarSelection(GetToolBar(), type);
         canvas->OnToolChanged();
         properties->ShowTool(type, canvas->GetTextFontSize(), canvas->GetGateInputCount());
-    };
+
+        // 通知教程：用户选择了哪个工具
+        if (m_tutorialManager)
+            m_tutorialManager->NotifyToolSelected(type);
+        };
+
     if (auto* toolbar = CreateMainToolBar(this, showTool)) SetToolBar(toolbar);
     toolbox->SetSelectionCallback(showTool);
 
@@ -115,69 +222,69 @@ MainFrame::MainFrame()
             g_selectedType = type;
             showTool(type);
             canvas->SetFocusIgnoringChildren();
-        }, id);
+            }, id);
         Bind(wxEVT_UPDATE_UI, [type](wxUpdateUIEvent& event) {
             event.Check(g_selectedType == type);
-        }, id);
+            }, id);
     }
     Bind(wxEVT_MENU, [canvas, showTool](wxCommandEvent&) {
         g_selectedType.Clear();
         showTool(wxEmptyString);
         canvas->DeselectAll();
-    }, ID_EDIT_DESELECT);
+        }, ID_EDIT_DESELECT);
 
     Bind(wxEVT_MENU, [canvas](wxCommandEvent& event) {
         canvas->SetGridVisible(event.IsChecked());
-    }, ID_VIEW_GRID);
+        }, ID_VIEW_GRID);
     Bind(wxEVT_UPDATE_UI, [canvas](wxUpdateUIEvent& event) {
         event.Check(canvas->IsGridVisible());
-    }, ID_VIEW_GRID);
+        }, ID_VIEW_GRID);
     Bind(wxEVT_MENU, [canvas](wxCommandEvent& event) {
         canvas->SetSnapEnabled(event.IsChecked());
-    }, ID_VIEW_SNAP);
+        }, ID_VIEW_SNAP);
     Bind(wxEVT_UPDATE_UI, [canvas](wxUpdateUIEvent& event) {
         event.Check(canvas->IsSnapEnabled());
-    }, ID_VIEW_SNAP);
+        }, ID_VIEW_SNAP);
     Bind(wxEVT_MENU, [this](wxCommandEvent& event) {
         m_showToolbox = event.IsChecked();
         UpdateSidebarVisibility();
-    }, ID_VIEW_TOOLBOX);
+        }, ID_VIEW_TOOLBOX);
     Bind(wxEVT_MENU, [this](wxCommandEvent& event) {
         m_showProperties = event.IsChecked();
         UpdateSidebarVisibility();
-    }, ID_VIEW_PROPERTIES);
+        }, ID_VIEW_PROPERTIES);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& event) {
         event.Check(m_showToolbox);
-    }, ID_VIEW_TOOLBOX);
+        }, ID_VIEW_TOOLBOX);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& event) {
         event.Check(m_showProperties);
-    }, ID_VIEW_PROPERTIES);
+        }, ID_VIEW_PROPERTIES);
 
     Bind(wxEVT_MENU, [canvas](wxCommandEvent&) {
         canvas->RotateSelection(90);
-    }, ID_COMPONENT_ROTATE_CW);
+        }, ID_COMPONENT_ROTATE_CW);
     Bind(wxEVT_MENU, [canvas](wxCommandEvent&) {
         canvas->RotateSelection(-90);
-    }, ID_COMPONENT_ROTATE_CCW);
+        }, ID_COMPONENT_ROTATE_CCW);
     for (int id : {ID_COMPONENT_ROTATE_CW, ID_COMPONENT_ROTATE_CCW})
     {
         Bind(wxEVT_UPDATE_UI, [canvas](wxUpdateUIEvent& event) {
             event.Enable(canvas->HasSelectedComponent());
-        }, id);
+            }, id);
     }
     Bind(wxEVT_MENU, [canvas](wxCommandEvent&) {
         canvas->ResetSelectedWireRoute();
-    }, ID_WIRE_RESET_ROUTE);
+        }, ID_WIRE_RESET_ROUTE);
     Bind(wxEVT_UPDATE_UI, [canvas](wxUpdateUIEvent& event) {
         event.Enable(canvas->CanResetWireRoute());
-    }, ID_WIRE_RESET_ROUTE);
+        }, ID_WIRE_RESET_ROUTE);
     Bind(wxEVT_MENU, [canvas](wxCommandEvent&) {
         canvas->SetFocusIgnoringChildren();
         canvas->HandleEditCommand(wxID_DELETE);
-    }, ID_WIRE_DELETE);
+        }, ID_WIRE_DELETE);
     Bind(wxEVT_UPDATE_UI, [canvas](wxUpdateUIEvent& event) {
         event.Enable(canvas->HasSelectedWire());
-    }, ID_WIRE_DELETE);
+        }, ID_WIRE_DELETE);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { m_simulation->Reset(); }, ID_SIMULATE_EVALUATE);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { m_simulation->Run(); }, ID_SIMULATE_RUN);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { m_simulation->Pause(); }, ID_SIMULATE_PAUSE);
@@ -190,10 +297,10 @@ MainFrame::MainFrame()
     Bind(wxEVT_UPDATE_UI, [canvas](wxUpdateUIEvent& event) { event.Enable(canvas->CanEditTimingParameters()); }, ID_COMPONENT_TIMING);
     Bind(wxEVT_MENU, [canvas](wxCommandEvent&) {
         canvas->ToggleSelectedInput();
-    }, ID_SIMULATE_TOGGLE_INPUT);
+        }, ID_SIMULATE_TOGGLE_INPUT);
     Bind(wxEVT_UPDATE_UI, [canvas](wxUpdateUIEvent& event) {
         event.Enable(canvas->HasSelectedInput());
-    }, ID_SIMULATE_TOGGLE_INPUT);
+        }, ID_SIMULATE_TOGGLE_INPUT);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) {
         wxMessageBox(
             wxT("Ctrl+N  新建\nCtrl+O  打开\nCtrl+S  保存\nCtrl+Shift+S  另存为\n\n")
@@ -204,46 +311,100 @@ MainFrame::MainFrame()
             wxT("F5  复位仿真\nF6  切换选中输入电平\nF7  下一事件\nF8  运行 / 继续\n")
             wxT("双击 CLOCK / DFF / PROBE  编辑参数\nF1  快捷键"),
             wxT("快捷键"), wxOK | wxICON_INFORMATION, this);
-    }, wxID_HELP);
+        }, wxID_HELP);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) {
         wxMessageBox(wxT("数字电路编辑器\n\n逻辑电路绘制与实时模拟\n")
             wxT("支持 XML 保存、元件旋转、正交连线与撤销。"),
             wxT("关于"), wxOK | wxICON_INFORMATION, this);
-    }, wxID_ABOUT);
-
-    canvas->SetComponentPlacedCallback([this, toolbox] {
-        toolbox->SelectTool(wxEmptyString);
-        UpdateMainToolBarSelection(GetToolBar(), wxEmptyString);
-    });
-    canvas->SetSelectionCallback([properties, canvas](const Component* component, int x, int y) {
-        if (component) properties->ShowComponent(component, x, y, canvas->GetSelectedRotation());
-        else properties->ShowTool(g_selectedType, canvas->GetTextFontSize(), canvas->GetGateInputCount());
-    });
-    canvas->SetTextSelectionCallback([properties](const wxRect& rect, int pointSize) {
-        properties->ShowTextBox(rect, pointSize);
-    });
-    properties->SetEditTimingCallback([canvas] { canvas->EditSelectedTimingParameters(); });
-    properties->SetTextFontSizeCallback([canvas](int pointSize) {
-        canvas->SetTextFontSize(pointSize);
-    });
-    properties->SetGateInputCountCallback([canvas](int count) {
-        canvas->SetGateInputCount(count);
-    });
-    canvas->SetWireSelectionCallback([properties](const WireConnection* connection) {
-        properties->ShowConnection(connection);
-    });
-    canvas->SetStatusCallback([this](const wxString& message) { SetStatusText(message); });
+        }, wxID_ABOUT);
 
     auto* root = new wxBoxSizer(wxVERTICAL);
     root->Add(workspace, 1, wxEXPAND | wxALL, FromDIP(12));
     SetSizer(root);
     Layout();
+
     // 按实际可用高度初始化，让状态区占左栏约 45%。
     sidebar->SetSashPosition(sidebar->GetClientSize().GetHeight() * 55 / 100);
     m_sidebarSash = sidebar->GetSashPosition();
     UpdateDocumentTitle();
-}
 
+    // 必须放在 canvas->SetComponentPlacedCallback 之前，否则点击会崩溃
+    m_tutorialManager = new TutorialManager(this);
+
+    canvas->SetComponentPlacedCallback([this, toolbox](const wxString& type, int componentId) {
+        // 普通放置后恢复选择工具；教程管理器会在需要时重新选择下一种工具。
+        toolbox->SelectTool(wxEmptyString);
+        UpdateMainToolBarSelection(GetToolBar(), wxEmptyString);
+        if (m_tutorialManager) m_tutorialManager->NotifyComponentPlaced(type, componentId);
+        });
+    canvas->SetWireCreatedCallback(
+        [this](const CircuitWireData& wire)
+        {
+            if (m_tutorialManager)
+            {
+                m_tutorialManager->NotifyWireCreated(wire);
+            }
+        }
+    );
+    canvas->SetSelectionCallback([properties, canvas](const Component* component, int x, int y) {
+        if (component) properties->ShowComponent(component, x, y, canvas->GetSelectedRotation());
+        else properties->ShowTool(g_selectedType, canvas->GetTextFontSize(), canvas->GetGateInputCount());
+        });
+    canvas->SetTextSelectionCallback([properties](const wxRect& rect, int pointSize) {
+        properties->ShowTextBox(rect, pointSize);
+        });
+    properties->SetEditTimingCallback([canvas] { canvas->EditSelectedTimingParameters(); });
+    properties->SetTextFontSizeCallback([canvas](int pointSize) {
+        canvas->SetTextFontSize(pointSize);
+        });
+    properties->SetGateInputCountCallback([canvas](int count) {
+        canvas->SetGateInputCount(count);
+        });
+    canvas->SetWireSelectionCallback([properties](const WireConnection* connection) {
+        properties->ShowConnection(connection);
+        });
+    canvas->SetStatusCallback([this](const wxString& message) { SetStatusText(message); });
+
+
+    // 绑定新手教程菜单
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+        if (!m_tutorialManager) return;
+
+        wxArrayString choices;
+        choices.Add(wxT("半加器教程 "));
+        choices.Add(wxT("全加器教程 "));
+
+        wxSingleChoiceDialog dialog(
+            this,
+            wxT("请选择要学习的教程："),
+            wxT("新手教程"),
+            choices
+        );
+
+        if (dialog.ShowModal() != wxID_OK) return;
+
+        const int selection = dialog.GetSelection();
+
+        if (selection == 0) {
+            m_tutorialManager->StartTutorial(
+                wxT("半加器 (Half Adder)")
+            );
+        }
+        else if (selection == 1) {
+            m_tutorialManager->StartTutorial(
+                wxT("全加器 (Full Adder)")
+            );
+        }
+        }, ID_START_TUTORIAL);
+
+    // 注册快捷键
+    wxAcceleratorEntry entry;
+    entry.Set(wxACCEL_CTRL, (int)'T', ID_START_TUTORIAL);
+
+    wxAcceleratorTable accel(1, &entry);
+    SetAcceleratorTable(accel);
+
+}
 void MainFrame::OpenSimulationWindow()
 {
     if (m_simulationFrame)
@@ -263,7 +424,7 @@ void MainFrame::OpenSimulationWindow()
     m_simulationFrame->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& event) {
         RestoreSimulationPanel();
         event.Skip();
-    });
+        });
     m_simulationFrame->CentreOnParent();
     m_simulationFrame->Show();
 }
@@ -281,6 +442,7 @@ void MainFrame::RestoreSimulationPanel()
     m_simulationFrame->Destroy();
     m_simulationFrame = nullptr;
 }
+
 
 void MainFrame::UpdateSidebarVisibility()
 {
@@ -427,6 +589,11 @@ void MainFrame::OnImportKiCadPcb(wxCommandEvent&)
 
 void MainFrame::OnClose(wxCloseEvent& event)
 {
+
+    if (m_tutorialManager) {
+        m_tutorialManager->CancelTutorial();
+    }
+
     if (event.CanVeto() && !ConfirmDiscardChanges())
     {
         event.Veto();
@@ -444,43 +611,21 @@ void MainFrame::LoadTimingExample()
     design.components = {
         {1, "CLOCK", 60, 60, 0, false}, {2, "DFF", 340, 100, 3, false},
         {3, "NOT", 180, 240, 1, false}, {4, "PROBE", 580, 60, 1, false},
-        {5, "PROBE", 580, 200, 1, false}, {6, "INPUT", 60, 360, 0, false}};
+        {5, "PROBE", 580, 200, 1, false}, {6, "INPUT", 60, 360, 0, false} };
     design.components[0].clockPeriodNs = 20;
     design.components[0].clockHighNs = 10;
     design.components[3].probeLabel = "CLK";
     design.components[4].probeLabel = "Q_div2";
-    design.wires = {{1, 0, 2, 1}, {1, 0, 4, 0}, {2, 0, 3, 0},
-        {3, 0, 2, 0}, {2, 0, 5, 0}, {6, 0, 2, 2}};
-    design.texts = {{wxRect(40, 10, 660, 35), 12, wxT("DFF 二分频 · Q 经 NOT 反馈到 D · INPUT 控制高有效异步 RESET")}};
+    design.wires = { {1, 0, 2, 1}, {1, 0, 4, 0}, {2, 0, 3, 0},
+        {3, 0, 2, 0}, {2, 0, 5, 0}, {6, 0, 2, 2} };
+    design.texts = { {wxRect(40, 10, 660, 35), 12, wxT("DFF 二分频 · Q 经 NOT 反馈到 D · INPUT 控制高有效异步 RESET")} };
     wxString error;
     if (!m_canvas->ImportDocument(design, error))
-    { wxMessageBox(error, wxT("无法载入示例"), wxOK | wxICON_ERROR, this); return; }
+    {
+        wxMessageBox(error, wxT("无法载入示例"), wxOK | wxICON_ERROR, this); return;
+    }
     m_filePath.Clear();
     m_simulation->InvalidateDocument();
     UpdateDocumentTitle();
     SetStatusText(wxT("已载入二分频示例，点击“运行”查看 CLK 与 Q_div2；双击时钟可修改参数。"));
-}
-
-void MainFrame::OnExportKiCadPcb(wxCommandEvent&)
-{
-    wxFileDialog dialog(this, wxT("导出为 KiCad PCB"), "", "circuit.kicad_pcb",
-        wxT("KiCad PCB 板图 (*.kicad_pcb)|*.kicad_pcb"), wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-    if (dialog.ShowModal() != wxID_OK) return;
-
-    std::vector<Component*> comps;
-    std::vector<std::pair<Component*, std::pair<int, int>>> layout;
-
-    // 从画布提取真实元件数据
-    for (const auto& pc : m_canvas->GetComponents()) {
-        comps.push_back(pc.comp);
-        layout.push_back({ pc.comp, {pc.x, pc.y} });
-    }
-
-    // 调用 Circuit 里的导出函数
-    if (m_canvas->GetCircuit().ExportPcb(dialog.GetPath().ToStdString(), comps, layout)) {
-        wxMessageBox(wxT("PCB 导出成功！\n你可以用 KiCad 打开查看。"), wxT("提示"), wxOK | wxICON_INFORMATION, this);
-    }
-    else {
-        wxMessageBox(wxT("PCB 导出失败！"), wxT("错误"), wxOK | wxICON_ERROR, this);
-    }
 }

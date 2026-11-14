@@ -9,8 +9,6 @@
 
 struct PinReference
 {
-    // Borrowed, synchronous model reference. Remove its wires before releasing
-    // the owner; persistent documents and simulation results use IDs instead.
     Component* component = nullptr;
     PinType type = PinType::Input;
     std::size_t index = 0;
@@ -51,8 +49,6 @@ public:
     bool Evaluate(const std::vector<Component*>& components);
     const std::vector<WireConnection>& GetConnections() const { return m_connections; }
 
-    bool ExportPcb(const std::string& filename, const std::vector<Component*>& components,
-        const std::vector<std::pair<Component*, std::pair<int, int>>>& layout);
 
 private:
     std::vector<WireConnection> m_connections;

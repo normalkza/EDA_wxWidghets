@@ -1,6 +1,7 @@
 #pragma once
 
 #include <wx/wx.h>
+#include "TutorialManager.h"
 
 class Canvas;
 class Toolbox;
@@ -15,6 +16,12 @@ class MainFrame : public wxFrame
 public:
     MainFrame();
 
+    Toolbox* GetToolbox() const { return m_toolbox; }
+    Canvas* GetCanvas() const { return m_canvas; }
+    void StartTutorial();
+    void OnExportGedaNetlist(wxCommandEvent& event);
+    void OnExportKiCadSchematic(wxCommandEvent& event);
+    void OnExportKiCadPcb(wxCommandEvent& event);
 private:
     friend struct SimulationUiRegressionAccess;
     bool SaveDocument(bool saveAs = false);
@@ -24,7 +31,7 @@ private:
     void OnNew(wxCommandEvent& event);
     void OnOpen(wxCommandEvent& event);
     void OnImportKiCadPcb(wxCommandEvent& event);
-    void OnExportKiCadPcb(wxCommandEvent& event);
+
     void OnClose(wxCloseEvent& event);
     void LoadTimingExample();
     void OpenSimulationWindow();
@@ -42,5 +49,8 @@ private:
     int m_sidebarWidth = 0;
     int m_sidebarSash = 0;
     wxString m_filePath;
+
+
     wxFrame* m_simulationFrame = nullptr;
+    TutorialManager* m_tutorialManager = nullptr;
 };

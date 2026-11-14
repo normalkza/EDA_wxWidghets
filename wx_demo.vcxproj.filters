@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="wx_demo\MainFrame.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="wx_demo\MyApp.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -36,23 +33,64 @@
     <ClCompile Include="wx_demo\Toolbox.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="wx_demo\ComponentRegistry.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\TopologyRules.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\Connectivity.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\SimulationSnapshot.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\Circuit.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\CircuitValidation.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\CircuitFile.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\CanvasDocument.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\Wire.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\CanvasWiring.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\Canvas.cpp">
+    <ClCompile Include="wx_demo\ComponentRegistry.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\TopologyRules.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\Connectivity.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\SimulationSnapshot.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\Circuit.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\CircuitValidation.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\CircuitFile.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\CanvasDocument.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\Wire.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="wx_demo\SelectionState.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="wx_demo\PropertyPanel.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\GedaNetlistExporter.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\KiCadNetlistExporter.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\KiCadSchematicExporter.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\TutorialManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\TutorialOverlay.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\MainFrame.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\CanvasWiring.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\Canvas.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\CanvasTiming.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -84,17 +122,34 @@
     <ClInclude Include="wx_demo\Toolbox.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="wx_demo\ComponentRegistry.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\TopologyRules.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\Connectivity.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\SimulationSnapshot.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\CircuitDocument.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\Circuit.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\CircuitValidation.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\CircuitLimits.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\CircuitFile.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\Wire.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\Canvas.h">
+    <ClInclude Include="wx_demo\ComponentRegistry.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\TopologyRules.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\Connectivity.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\SimulationSnapshot.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\CircuitDocument.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\Circuit.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\CircuitValidation.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\CircuitLimits.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\CircuitFile.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\Wire.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="wx_demo\NotGate.h">
@@ -119,6 +174,24 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="wx_demo\PropertyPanel.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\GedaNetlistExporter.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\KiCadNetlistExporter.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\KiCadSchematicExporter.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\Canvas.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\TutorialManager.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\TutorialOverlay.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -164,29 +237,70 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="wx_demo\DigitalSimulator.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\TraceRecorder.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\WaveformPanel.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\SimulationPanel.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\CanvasTiming.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClInclude Include="wx_demo\DigitalSimulator.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\TraceRecorder.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\WaveformPanel.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\SimulationPanel.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\SimulationConfig.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\TimingComponents.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\MuxComponent.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\ComparatorComponent.h"><Filter>头文件</Filter></ClInclude>
+    <ClCompile Include="wx_demo\DigitalSimulator.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\TraceRecorder.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\WaveformPanel.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\SimulationPanel.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClInclude Include="wx_demo\DigitalSimulator.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\TraceRecorder.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\WaveformPanel.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\SimulationPanel.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\SimulationConfig.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\TimingComponents.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\MuxComponent.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\ComparatorComponent.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="wx_demo\KiCadSExpr.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\KiCadPcbImporter.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\PcbCanvas.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClCompile Include="wx_demo\PcbFrame.cpp"><Filter>源文件</Filter></ClCompile>
-    <ClInclude Include="wx_demo\KiCadSExpr.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\KiCadPcbImporter.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\PcbDocument.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\PcbCanvas.h"><Filter>头文件</Filter></ClInclude>
-    <ClInclude Include="wx_demo\PcbFrame.h"><Filter>头文件</Filter></ClInclude>
+    <ClCompile Include="wx_demo\KiCadSExpr.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\KiCadPcbImporter.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\PcbCanvas.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\PcbFrame.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClInclude Include="wx_demo\KiCadSExpr.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\KiCadPcbImporter.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\PcbDocument.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\PcbCanvas.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\PcbFrame.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

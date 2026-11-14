@@ -35,7 +35,7 @@ wxEND_EVENT_TABLE()
 Canvas::Canvas(wxWindow* parent, wxClipboard* clipboard)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize,
         wxFULL_REPAINT_ON_RESIZE), m_dragTimer(this),
-        m_clipboard(clipboard ? clipboard : wxTheClipboard), m_textTimer(this)
+    m_clipboard(clipboard ? clipboard : wxTheClipboard), m_textTimer(this)
 {
     SetBackgroundColour(wxColour(251, 252, 254));
     SetBackgroundStyle(wxBG_STYLE_PAINT);
@@ -50,7 +50,7 @@ Canvas::Canvas(wxWindow* parent, wxClipboard* clipboard)
     Bind(wxEVT_KILL_FOCUS, [this](wxFocusEvent& event) {
         CancelMouseInteraction(true);
         event.Skip();
-    });
+        });
     Bind(wxEVT_TIMER, [this](wxTimerEvent&) { UpdateTextInput(); }, m_textTimer.GetId());
     Bind(wxEVT_TIMER, &Canvas::OnDragTimer, this, m_dragTimer.GetId());
     m_textTimer.Start(150);
@@ -151,7 +151,8 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
         RecordUndo();
         if (typeId == "CLOCK" || typeId == "DFF" || typeId == "PROBE" ||
             typeId == "BUTTON" || typeId == "LED" || typeId == "CONSTANT") m_formatVersion = 3;
-        m_components.push_back({ comp, x, y, NextComponentId(), 0, false });
+        const int componentId = NextComponentId();
+        m_components.push_back({ comp, x, y, componentId, 0, false });
         owned.release();
         MarkModified();
         m_selectedIndex = static_cast<int>(m_components.size()) - 1;
@@ -159,7 +160,8 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
         // 单次放置后恢复选择/拖动模式，同时保留新元件的选中状态。
         g_selectedType.Clear();
         SetCursor(wxCursor(wxCURSOR_ARROW));
-        if (m_componentPlacedCallback) m_componentPlacedCallback();
+        if (m_componentPlacedCallback)
+            m_componentPlacedCallback(wxString::FromUTF8(comp->name), componentId);
         if (m_selectionCallback) m_selectionCallback(comp, x, y);
         Refresh();
     }
@@ -610,7 +612,7 @@ bool Canvas::PasteSelection()
             parameters.high = ComponentRegistry::SupportsInitialLevel(type) && outputs == "1";
             parameters.rotation = rotation;
             return parameters;
-        }();
+            }();
         CircuitDocument check;
         check.formatVersion = 3;
         check.components.push_back(parameters);
@@ -672,7 +674,9 @@ bool Canvas::PasteSelection()
     m_pasteCount = pasteCount;
     g_selectedType.Clear();
     SetCursor(wxCursor(wxCURSOR_ARROW));
-    if (m_componentPlacedCallback) m_componentPlacedCallback();
+    if (m_componentPlacedCallback && m_selectedIndex >= 0 &&
+        m_selectedIndex < static_cast<int>(m_components.size()))
+        m_componentPlacedCallback(wxString::FromUTF8(m_components[m_selectedIndex].comp->name), m_components[m_selectedIndex].id);
     SetFocusIgnoringChildren();
     if (m_selectedIndex >= 0 && m_selectionCallback)
     {
@@ -716,8 +720,7 @@ void Canvas::CreateTextBox(const wxRect& rect)
         m_selectedIndex = -1;
         if (!m_loadingDocument)
         {
-            // 离开编辑后，这段文字已经进入画布历史。新的编辑会话只撤销新输入，
-            // 避免原生控件跨越字号/对象操作撤销旧输入而使画布快照发生冲突。
+
 #ifdef __WXMSW__
             ::SendMessage(static_cast<HWND>(editor->GetHandle()), EM_EMPTYUNDOBUFFER, 0, 0);
 #endif
@@ -726,9 +729,9 @@ void Canvas::CreateTextBox(const wxRect& rect)
         NotifyTextSelection();
         Refresh();
         event.Skip();
-    });
+        });
     editor->Bind(wxEVT_TEXT, [this, editor](wxCommandEvent& event) {
-        // 已移除的文本控件可能仍有排队中的事件，不能改变新文档状态。
+
         const auto box = std::find_if(m_textBoxes.begin(), m_textBoxes.end(),
             [editor](const TextBox& text) { return text.editor == editor; });
         if (box != m_textBoxes.end() && box->lastValue != editor->GetValue())
@@ -745,12 +748,12 @@ void Canvas::CreateTextBox(const wxRect& rect)
         UpdateTextInput();
         Refresh();
         event.Skip();
-    });
+        });
     editor->Bind(wxEVT_KILL_FOCUS, [this](wxFocusEvent& event) {
         FinishTextEditing();
         Refresh();
         event.Skip();
-    });
+        });
     MarkModified();
     if (m_loadingDocument) return;
     m_selectedTextIndex = index;
@@ -758,6 +761,22 @@ void Canvas::CreateTextBox(const wxRect& rect)
     NotifyTextSelection();
     editor->SetFocus();
     Refresh();
+}
+
+bool Canvas::SetTutorialLabel(int componentId, const wxString& label)
+{
+    for (auto& pc : m_components)
+    {
+        if (pc.id != componentId)
+            continue;
+        const wxRect oldRect = GetComponentRect(pc);
+        pc.tutorialLabel = label;
+        const wxRect newRect = GetComponentRect(pc);
+        RefreshRect(oldRect, false);
+        RefreshRect(newRect, false);
+        return true;
+    }
+    return false;
 }
 
 void Canvas::NotifyTextSelection()
@@ -830,7 +849,7 @@ Canvas::GateGeometry Canvas::GetGateGeometry(const Component& component) const
     if (type == "CLOCK" || type == "DFF" || type == "MUX" || type == "PROBE" || type == "LED" ||
         type == "BUTTON" || type == "CONSTANT")
     {
-        GateGeometry result{80, 80, 0, 80, {}};
+        GateGeometry result{ 80, 80, 0, 80, {} };
         for (std::size_t i = 0; i < component.inputs.size(); ++i)
             result.inputs.emplace_back(0, component.inputs.size() == 1 ? 40 : 20 + static_cast<int>(i) * 20);
         return result;
@@ -870,7 +889,17 @@ wxRect Canvas::GetComponentRect(const PlacedComponent& pc) const
         left = std::min(left, point.x); right = std::max(right, point.x);
         top = std::min(top, point.y); bottom = std::max(bottom, point.y);
     }
-    return wxRect(wxPoint(left, top), wxPoint(right, bottom));
+    wxRect result(wxPoint(left, top), wxPoint(right, bottom));
+    if (!pc.tutorialLabel.IsEmpty() &&
+        (pc.comp->name == "INPUT" || pc.comp->name == "OUTPUT"))
+    {
+        const wxPoint anchor = ComponentToWorld(pc, wxPoint(m_portSize + 8, m_portSize / 2));
+        wxClientDC measureDC(const_cast<Canvas*>(this));
+        const wxSize labelSize = measureDC.GetTextExtent(pc.tutorialLabel);
+        result.Union(wxRect(anchor.x, anchor.y - labelSize.y / 2,
+            labelSize.x + 2, labelSize.y + 2));
+    }
+    return result;
 }
 
 wxPoint Canvas::GetComponentCenter(const PlacedComponent& pc) const
@@ -909,6 +938,16 @@ void Canvas::DrawPlacedComponent(wxDC& dc, const PlacedComponent& pc)
         const bool input = pc.comp->name == "INPUT";
         DrawPort(dc, pc.x, pc.y, input ? pc.comp->outputs[0].value : pc.comp->inputs[0].value,
             input ? PinType::Output : PinType::Input, pc.rotation);
+        if (!pc.tutorialLabel.IsEmpty())
+        {
+            const wxPoint anchor = ComponentToWorld(pc, wxPoint(m_portSize + 8, m_portSize / 2));
+            const wxFont oldFont = dc.GetFont();
+            dc.SetFont(wxFontInfo(11).Family(wxFONTFAMILY_SWISS).Bold());
+            dc.SetTextForeground(wxColour(35, 91, 160));
+            const wxSize size = dc.GetTextExtent(pc.tutorialLabel);
+            dc.DrawText(pc.tutorialLabel, anchor.x, anchor.y - size.y / 2);
+            dc.SetFont(oldFont);
+        }
         return;
     }
     if (pc.rotation == 0) { DrawGate(dc, pc); return; }
@@ -1014,7 +1053,6 @@ void Canvas::DeselectAll()
     SetFocusIgnoringChildren();
     m_selectedIndex = m_selectedTextIndex = m_selectedWireIndex = -1;
     g_selectedType.Clear();
-    if (m_componentPlacedCallback) m_componentPlacedCallback();
     if (m_selectionCallback) m_selectionCallback(nullptr, 0, 0);
     Refresh(false);
 }
@@ -1141,8 +1179,8 @@ std::array<wxPoint, 8> Canvas::GetTextHandles(const wxRect& rect) const
     const int left = rect.x, right = rect.GetRight();
     const int top = rect.y, bottom = rect.GetBottom();
     const int middleX = (left + right) / 2, middleY = (top + bottom) / 2;
-    return {{ {left, top}, {middleX, top}, {right, top}, {right, middleY},
-        {right, bottom}, {middleX, bottom}, {left, bottom}, {left, middleY} }};
+    return { { {left, top}, {middleX, top}, {right, top}, {right, middleY},
+        {right, bottom}, {middleX, bottom}, {left, bottom}, {left, middleY} } };
 }
 
 int Canvas::HitTestTextHandle(const wxPoint& point) const
@@ -1295,9 +1333,9 @@ std::vector<Canvas::TextLine> Canvas::LayoutText(const TextBox& box, wxDC& dc) c
             const int previousWidth = begin ? widths[begin - 1] : 0;
             while (end < text.length() &&
                 (end == begin || widths[end] - previousWidth <= box.rect.width)) ++end;
-            lines.push_back({text.Mid(begin, end - begin),
+            lines.push_back({ text.Mid(begin, end - begin),
                 box.editor->XYToPosition(static_cast<long>(begin), row),
-                wxPoint(box.rect.x, y), height});
+                wxPoint(box.rect.x, y), height });
             y += height;
             begin = end;
         } while (begin < text.length());
@@ -1375,11 +1413,11 @@ void Canvas::UpdateTextInput()
             const wxPoint local = box.editor->ScreenToClient(ClientToScreen(wxPoint(x, line.origin.y - offset)));
             COMPOSITIONFORM composition = {};
             composition.dwStyle = CFS_FORCE_POSITION;
-            composition.ptCurrentPos = {local.x, local.y};
+            composition.ptCurrentPos = { local.x, local.y };
             ImmSetCompositionWindow(context, &composition);
             CANDIDATEFORM candidate = {};
             candidate.dwStyle = CFS_CANDIDATEPOS;
-            candidate.ptCurrentPos = {local.x, local.y + line.height};
+            candidate.ptCurrentPos = { local.x, local.y + line.height };
             ImmSetCandidateWindow(context, &candidate);
             ImmReleaseContext(hwnd, context);
         }
@@ -1487,7 +1525,7 @@ void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
             dc.DrawText(wxString::FromUTF8(pc.comp->inputs[i].name), x + 7, y + pin.y - 7);
             if (type == "DFF" && i == 1)
             {
-                wxPoint triangle[]{wxPoint(x, y + pin.y - 5), wxPoint(x + 5, y + pin.y), wxPoint(x, y + pin.y + 5)};
+                wxPoint triangle[]{ wxPoint(x, y + pin.y - 5), wxPoint(x + 5, y + pin.y), wxPoint(x, y + pin.y + 5) };
                 dc.DrawLines(3, triangle);
             }
         }
@@ -1509,8 +1547,8 @@ void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
         }
         if (type == "CLOCK")
         {
-            wxPoint pulse[]{wxPoint(x + 25,y + 58),wxPoint(x + 25,y + 44),wxPoint(x + 37,y + 44),
-                wxPoint(x + 37,y + 58),wxPoint(x + 49,y + 58),wxPoint(x + 49,y + 44),wxPoint(x + 61,y + 44)};
+            wxPoint pulse[]{ wxPoint(x + 25,y + 58),wxPoint(x + 25,y + 44),wxPoint(x + 37,y + 44),
+                wxPoint(x + 37,y + 58),wxPoint(x + 49,y + 58),wxPoint(x + 49,y + 44),wxPoint(x + 61,y + 44) };
             dc.DrawLines(7, pulse);
         }
     }
@@ -1540,7 +1578,7 @@ void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
                     y + static_cast<int>(std::lround(t * h)));
             }
             dc.DrawLines(static_cast<int>(points.size()), points.data());
-        };
+            };
         drawLeft(curveLeft);
         if (type == "XOR") drawLeft(curveLeft - 8);
         for (const bool lower : { false, true })
@@ -1554,7 +1592,7 @@ void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
                 points[i] = wxPoint(static_cast<int>(std::lround(mt * mt * (x + curveLeft) +
                     2 * mt * t * (x + w * 0.65) + t * t * (x + w))),
                     static_cast<int>(std::lround(mt * mt * startY +
-                    2 * mt * t * controlY + t * t * midY)));
+                        2 * mt * t * controlY + t * t * midY)));
             }
             dc.DrawLines(static_cast<int>(points.size()), points.data());
         }

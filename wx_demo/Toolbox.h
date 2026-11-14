@@ -21,6 +21,7 @@ public:
     void SetSelectionCallback(std::function<void(const wxString&)> cb) { m_selectionCallback = std::move(cb); }
     void SelectTool(const wxString& type);
     bool IsToolAvailable(const wxString& type) const;
+    wxRect GetToolRect(const wxString& type);
 
 private:
     ActiveToolTree* m_treeCtrl;

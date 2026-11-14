@@ -247,4 +247,33 @@ void Toolbox::BuildTree()
     m_treeCtrl->Expand(baseId);
     m_treeCtrl->Expand(categories.at("输入 / 输出"));
     m_treeCtrl->Expand(categories.at("逻辑门"));
+
+    
+}
+wxRect Toolbox::GetToolRect(const wxString& type)
+{
+    for (const auto& tool : m_tools)
+    {
+        if (tool.first != type)
+            continue;
+
+        wxTreeItemId parent = m_treeCtrl->GetItemParent(tool.second);
+
+        if (parent.IsOk())
+            m_treeCtrl->Expand(parent);
+
+        m_treeCtrl->EnsureVisible(tool.second);
+
+        wxRect rect;
+
+        if (m_treeCtrl->GetBoundingRect(tool.second, rect, true))
+        {
+            wxPoint screenPos =
+                m_treeCtrl->ClientToScreen(rect.GetPosition());
+
+            return wxRect(screenPos, rect.GetSize());
+        }
+    }
+
+    return wxRect();
 }

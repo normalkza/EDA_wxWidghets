@@ -11,6 +11,8 @@
 #include "CircuitFile.h"
 #include "Wire.h"
 #include "SimulationSnapshot.h"
+#include "CircuitDocument.h"
+
 #include <optional>
 #include <functional>
 #include <utility>
@@ -28,6 +30,9 @@ class Canvas : public wxPanel
         int rotation = 0;
         std::optional<bool> initialHigh;
         CircuitComponentData parameters;
+
+        // 教程中自动显示的引脚名称
+        wxString tutorialLabel;
     };
 
 public:
@@ -62,6 +67,7 @@ public:
     void OnToolChanged();
     void SetTextFontSize(int pointSize);
     int GetTextFontSize() const;
+    bool SetTutorialLabel(int componentId, const wxString& label);
     void SetGateInputCount(int count);
     int GetGateInputCount() const;
     CircuitDocument ExportDocument() const;
@@ -74,7 +80,15 @@ public:
     void SetWireSelectionCallback(std::function<void(const WireConnection*)> callback) { m_wireSelectionCallback = std::move(callback); }
     void SetTextSelectionCallback(std::function<void(const wxRect&, int)> callback) { m_textSelectionCallback = std::move(callback); }
     void SetSelectionCallback(std::function<void(const Component*, int, int)> callback) { m_selectionCallback = std::move(callback); }
-    void SetComponentPlacedCallback(std::function<void()> callback) { m_componentPlacedCallback = std::move(callback); }
+    void SetComponentPlacedCallback(
+        std::function<void(const wxString&, int)> callback)
+    {
+        m_componentPlacedCallback = std::move(callback);
+    }
+    void SetWireCreatedCallback(std::function<void(const CircuitWireData&)> callback)
+    {
+        m_wireCreatedCallback = std::move(callback);
+    }
     Circuit& GetCircuit() { return m_circuit; }
     const std::vector<Canvas::PlacedComponent>& GetComponents() const { return m_components; }
 
@@ -124,7 +138,7 @@ private:
     void UpdateTextTransform(const wxPoint& point);
     void UpdateTextCursor(const wxPoint& point);
     void DrawTextSelection(wxDC& dc);
-
+    std::function<void()> m_documentChangedCallback;
     // 把坐标对齐到网格点
     int SnapToGrid(int value) const { return m_snapEnabled ? (value / m_gridSize) * m_gridSize : value; }
 
@@ -177,7 +191,7 @@ private:
     std::uint64_t m_documentRevision = 1;
     int m_formatVersion = CircuitFile::CurrentVersion;
     SimulationConfig m_simulationConfig;
-    std::function<void()> m_documentChangedCallback;
+    std::function<void(const CircuitWireData&)> m_wireCreatedCallback;
     std::function<bool(int)> m_runtimeInputCallback;
     std::optional<PinReference> m_pendingWire;
     wxPoint m_wirePreview;
@@ -197,7 +211,8 @@ private:
     wxTimer m_dragTimer;
     int m_dragFrame = 0;
     std::function<void(const Component*, int, int)> m_selectionCallback;
-    std::function<void()> m_componentPlacedCallback;
+    std::function<void(const wxString&, int)> m_componentPlacedCallback;
+
     std::function<void()> m_modifiedCallback;
     bool m_modified = false;
     bool m_loadingDocument = false;

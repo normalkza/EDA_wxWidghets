@@ -19,15 +19,23 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="wx_demo\Canvas.cpp" />
+    <ClCompile Include="wx_demo\CanvasTiming.cpp" />
+    <ClCompile Include="wx_demo\CanvasWiring.cpp" />
+    <ClCompile Include="wx_demo\GedaNetlistExporter.cpp" />
+    <ClCompile Include="wx_demo\KiCadNetlistExporter.cpp" />
+    <ClCompile Include="wx_demo\KiCadSchematicExporter.cpp" />
     <ClCompile Include="wx_demo\KiCadSExpr.cpp" />
     <ClCompile Include="wx_demo\KiCadPcbImporter.cpp" />
+    <ClCompile Include="wx_demo\MainFrame.cpp" />
     <ClCompile Include="wx_demo\PcbCanvas.cpp" />
     <ClCompile Include="wx_demo\PcbFrame.cpp" />
     <ClCompile Include="wx_demo\DigitalSimulator.cpp" />
     <ClCompile Include="wx_demo\TraceRecorder.cpp" />
+    <ClCompile Include="wx_demo\TutorialManager.cpp" />
+    <ClCompile Include="wx_demo\TutorialOverlay.cpp" />
     <ClCompile Include="wx_demo\WaveformPanel.cpp" />
     <ClCompile Include="wx_demo\SimulationPanel.cpp" />
-    <ClCompile Include="wx_demo\CanvasTiming.cpp" />
     <ClCompile Include="wx_demo\ComponentRegistry.cpp" />
     <ClCompile Include="wx_demo\TopologyRules.cpp" />
     <ClCompile Include="wx_demo\Connectivity.cpp" />
@@ -37,11 +45,8 @@
     <ClCompile Include="wx_demo\CircuitFile.cpp" />
     <ClCompile Include="wx_demo\CanvasDocument.cpp" />
     <ClCompile Include="wx_demo\Wire.cpp" />
-    <ClCompile Include="wx_demo\CanvasWiring.cpp" />
-    <ClCompile Include="wx_demo\Canvas.cpp" />
     <ClCompile Include="wx_demo\logic_test.cpp" />
     <ClCompile Include="wx_demo\main.cpp" />
-    <ClCompile Include="wx_demo\MainFrame.cpp" />
     <ClCompile Include="wx_demo\MenuBar.cpp" />
     <ClCompile Include="wx_demo\MyApp.cpp" />
     <ClCompile Include="wx_demo\PropertyPanel.cpp" />
@@ -55,6 +60,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="wx_demo\Canvas.h" />
+    <ClInclude Include="wx_demo\GedaNetlistExporter.h" />
+    <ClInclude Include="wx_demo\KiCadNetlistExporter.h" />
+    <ClInclude Include="wx_demo\KiCadSchematicExporter.h" />
     <ClInclude Include="wx_demo\KiCadSExpr.h" />
     <ClInclude Include="wx_demo\KiCadPcbImporter.h" />
     <ClInclude Include="wx_demo\PcbDocument.h" />
@@ -62,6 +71,8 @@
     <ClInclude Include="wx_demo\PcbFrame.h" />
     <ClInclude Include="wx_demo\DigitalSimulator.h" />
     <ClInclude Include="wx_demo\TraceRecorder.h" />
+    <ClInclude Include="wx_demo\TutorialManager.h" />
+    <ClInclude Include="wx_demo\TutorialOverlay.h" />
     <ClInclude Include="wx_demo\WaveformPanel.h" />
     <ClInclude Include="wx_demo\SimulationPanel.h" />
     <ClInclude Include="wx_demo\SimulationConfig.h" />
@@ -80,7 +91,6 @@
     <ClInclude Include="wx_demo\CircuitLimits.h" />
     <ClInclude Include="wx_demo\CircuitFile.h" />
     <ClInclude Include="wx_demo\Wire.h" />
-    <ClInclude Include="wx_demo\Canvas.h" />
     <ClInclude Include="wx_demo\Component.h" />
     <ClInclude Include="wx_demo\IOComponent.h" />
     <ClInclude Include="wx_demo\LogicValue.h" />

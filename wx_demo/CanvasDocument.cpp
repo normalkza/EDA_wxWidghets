@@ -1,9 +1,8 @@
 #include "Canvas.h"
 #include "ComponentRegistry.h"
 #include <algorithm>
-
-#include <memory>
 #include <stdexcept>
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
