@@ -2,9 +2,8 @@
 #include "ComponentRegistry.h"
 #include <wx/thread.h>
 #include <algorithm>
-
-#include <memory>
 #include <stdexcept>
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -235,6 +234,7 @@ CircuitDocument Canvas::ExportDocument() const
 
 void Canvas::ResetDocument()
 {
+    if (m_documentResetCallback) m_documentResetCallback();
     ++m_documentRevision;
     if (m_documentChangedCallback) m_documentChangedCallback();
     m_dragTimer.Stop();

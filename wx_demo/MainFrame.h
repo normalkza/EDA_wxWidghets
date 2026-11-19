@@ -2,6 +2,7 @@
 
 #include <wx/wx.h>
 #include <wx/weakref.h>
+#include "TutorialManager.h"
 
 class Canvas;
 class Toolbox;
@@ -16,9 +17,15 @@ class MainFrame : public wxFrame
 {
 public:
     MainFrame();
+    ~MainFrame() override;
 
+    Toolbox* GetToolbox() const { return m_toolbox; }
+    Canvas* GetCanvas() const { return m_canvas; }
+    void StartTutorial();
+    void OnExportGedaNetlist(wxCommandEvent& event);
 private:
     friend struct SimulationUiRegressionAccess;
+    friend struct CanvasTutorialRegressionAccess;
     bool SaveDocument(bool saveAs = false);
     bool ConfirmDiscardChanges();
     void UpdateDocumentTitle();
@@ -26,7 +33,7 @@ private:
     void OnNew(wxCommandEvent& event);
     void OnOpen(wxCommandEvent& event);
     void OnImportKiCadPcb(wxCommandEvent& event);
-    void OnExportKiCadPcb(wxCommandEvent& event);
+
     void OnClose(wxCloseEvent& event);
     void LoadTimingExample();
     void OpenSimulationWindow();
@@ -45,7 +52,10 @@ private:
     int m_sidebarWidth = 0;
     int m_sidebarSash = 0;
     wxString m_filePath;
+
+
     wxFrame* m_simulationFrame = nullptr;
     wxWeakRef<AiAssistantDialog> m_aiAssistant;
     bool m_aiClosePending = false;
+    TutorialManager* m_tutorialManager = nullptr;
 };

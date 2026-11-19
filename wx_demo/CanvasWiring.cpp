@@ -227,6 +227,15 @@ void Canvas::HandleWireClick(const wxPoint& point)
         MarkModified();
         RecomputeCircuit();
         SelectWire(static_cast<int>(m_circuit.GetConnections().size()) - 1);
+        if (m_wireCreatedCallback)
+        {
+            CircuitDocument document = ExportDocument();
+
+            if (!document.wires.empty())
+            {
+                m_wireCreatedCallback(document.wires.back());
+            }
+        }
         ReportStatus(wxT("连线完成"));
         break;
     case ConnectionResult::Duplicate:

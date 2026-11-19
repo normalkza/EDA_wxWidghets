@@ -34,6 +34,7 @@
 #include "pcb_import_regression.h"
 #include "pcb_workspace_regression.h"
 #include "pcb_view_regression.h"
+#include "tutorial_merge_regression.h"
 
 class TestApp : public wxApp
 {
@@ -757,6 +758,7 @@ int main(int argc, char** argv)
         CanvasRegressionAccess::TestWireGeometry();
         CanvasRegressionAccess::TestWireEditing(*canvas);
         CanvasRegressionAccess::TestProperties(*canvas, *properties);
+        RunTutorialMergeRegression(*canvas);
         std::cout << "PASS: native KiCad PCB parsing/view/workspace, async import, saved-file refresh, exact snapshot copy; "
             "digital timing engine, DFF chains/divider/reset, simultaneous sampling, resource rollback, CSV/VCD; "
             "timing canvas/controller integration and shipped examples; registry, disabled toolbox placeholders, undirected nets, shared topology and atomic bulk import, "
