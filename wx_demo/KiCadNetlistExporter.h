@@ -2,19 +2,15 @@
 
 #include "CircuitDocument.h"
 #include <string>
-#include <wx/string.h>
 
 class KiCadNetlistExporter
 {
 public:
-    // 自动查找 KiCad CLI
-    static wxString FindKiCadCli();
-
-    // 使用指定的 KiCad CLI 导出网表
-    static bool ExportFromSchematic(
-        const std::string& schematicFile,
-        const std::string& netlistFile,
-        const wxString& cliPath,
+    // 直接根据当前电路文档生成 KiCad PCB Editor 可读取的 S-expression 网表。
+    // 不调用 kicad-cli，也不弹出文件选择窗口。
+    static bool ExportFullAdder(
+        const CircuitDocument& document,
+        const std::string& filename,
         std::string& error
     );
 };

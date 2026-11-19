@@ -9,8 +9,8 @@ wxMenuBar* CreateMainMenuBar()
     fileMenu->Append(wxID_NEW, wxT("新建\tCtrl+N"));
     fileMenu->Append(wxID_OPEN, wxT("打开...\tCtrl+O"));
     fileMenu->Append(ID_FILE_IMPORT_KICAD_PCB, wxT("从 KiCad 导入 PCB…"));
-    fileMenu->Append(ID_FILE_EXPORT_GEDA_NETLIST, wxT("导出 gEDA 网表 (.net)"));
-    fileMenu->Append(ID_EXPORT_KICAD_SCHEMATIC, wxT("导出 KiCad 原理图与网表"));
+    fileMenu->Append(ID_EXPORT_KICAD_SCHEMATIC, wxT("导出 KiCad 原理图"));
+    fileMenu->Append(ID_EXPORT_KICAD_NETLIST, wxT("导出 KiCad 网表 (.net)"));
     fileMenu->Append(wxID_SAVE, wxT("保存\tCtrl+S"));
     fileMenu->Append(wxID_SAVEAS, wxT("另存为...\tCtrl+Shift+S"));
     fileMenu->AppendSeparator();
