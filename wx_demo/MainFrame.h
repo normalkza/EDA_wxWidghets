@@ -1,6 +1,7 @@
 #pragma once
 
 #include <wx/wx.h>
+#include <wx/weakref.h>
 
 class Canvas;
 class Toolbox;
@@ -9,6 +10,7 @@ class wxSplitterWindow;
 class wxPanel;
 class SimulationPanel;
 class wxFrame;
+class AiAssistantDialog;
 
 class MainFrame : public wxFrame
 {
@@ -29,6 +31,7 @@ private:
     void LoadTimingExample();
     void OpenSimulationWindow();
     void RestoreSimulationPanel();
+    void OpenAiAssistant();
 
     Canvas* m_canvas = nullptr;
     wxSplitterWindow* m_workspace = nullptr;
@@ -43,4 +46,6 @@ private:
     int m_sidebarSash = 0;
     wxString m_filePath;
     wxFrame* m_simulationFrame = nullptr;
+    wxWeakRef<AiAssistantDialog> m_aiAssistant;
+    bool m_aiClosePending = false;
 };

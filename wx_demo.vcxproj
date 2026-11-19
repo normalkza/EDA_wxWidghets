@@ -19,6 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="wx_demo\AiApiClient.cpp" />
+    <ClCompile Include="wx_demo\AiAssistantDialog.cpp" />
+    <ClCompile Include="wx_demo\AiCircuitExecutor.cpp" />
     <ClCompile Include="wx_demo\KiCadSExpr.cpp" />
     <ClCompile Include="wx_demo\KiCadPcbImporter.cpp" />
     <ClCompile Include="wx_demo\PcbCanvas.cpp" />
@@ -55,6 +58,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="wx_demo\AiApiClient.h" />
+    <ClInclude Include="wx_demo\AiAssistantDialog.h" />
+    <ClInclude Include="wx_demo\AiCircuitExecutor.h" />
     <ClInclude Include="wx_demo\KiCadSExpr.h" />
     <ClInclude Include="wx_demo\KiCadPcbImporter.h" />
     <ClInclude Include="wx_demo\PcbDocument.h" />

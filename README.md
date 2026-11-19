@@ -1,5 +1,34 @@
 # EDA_wxWidghets
 
+## DeepSeek 电路助手
+
+在 **PowerShell 7** 中切到本项目根目录，输入在 [DeepSeek 开放平台](https://platform.deepseek.com/) 创建的 API Key，再启动本地服务。服务仅监听 `127.0.0.1:8765`，使用 Python 标准库，无需安装 Python 包。密钥仅由该服务读取，不写入工程或电路文件。
+
+```powershell
+$env:DEEPSEEK_API_KEY = Read-Host -MaskInput 'DeepSeek API Key'
+py .\assistant_server.py
+```
+
+服务运行时打开 wx_demo，在 **帮助 → AI 助手** 中输入需求：
+
+- **给步骤**：只返回文字。例如“请说明如何用异或门和与门搭半加器”。
+- **直接完成**：例如“帮我搭一个双输入与门电路”。助手可新增输入、输出和六种基本逻辑门并连线；本地检查通过后才整批添加到当前电路，按一次 **Ctrl+Z** 可撤销。现有电路不会被清空；等待期间若改过画布，旧结果不会应用。
+
+模型默认 `deepseek-flash`，需要时在启动服务前设置 `DEEPSEEK_MODEL`。服务通过 DeepSeek 的 `/responses` 接口发送你输入的需求；现有画布、XML 和其他本地文件留在本机。退出时可在服务终端按 **Ctrl+C**。
+
+若提示连接失败，在启动服务的同一个 PowerShell 窗口按 **Ctrl+C**，运行 `py .\assistant_server.py --check-network`。它不读取 API Key，也不会调用模型；收到 **HTTP 401** 表示该连接路径可达。默认启动时优先探测 Python 的系统/环境代理设置，连接失败时再探测直连。
+
+如果代理探测失败而直连可达，可在该窗口执行以下命令，再回到助手重试：
+
+```powershell
+$env:DEEPSEEK_PROXY = 'direct'
+py .\assistant_server.py
+```
+
+`DEEPSEEK_PROXY` 也可设为 `auto`（默认）、`system`（使用系统/环境设置），或支持 HTTPS CONNECT 的 HTTP 代理地址，如 `http://127.0.0.1:7890`。指定 HTTP 代理时，Python 仍遵守 `NO_PROXY`。这些设置只影响本地助手服务，不改 Windows 的网络配置。
+
+服务测试：`py -m unittest discover -s tests -p test_assistant_server.py`；画布改图、校验和撤销测试包含在原存储回归中。
+
 ## KiCad PCB 导入与联动（2026-11-05）
 
 通过“文件 → 从 KiCad 导入 PCB…”或 Ctrl+O 打开 `.kicad_pcb`，在独立 PCB 工作区查看封装、焊盘、走线/圆弧、过孔、板框和网络。支持图层筛选、网络/元件搜索、网络高亮、缩放平移、原样另存快照，以及“在 KiCad 中打开”和保存后自动刷新。PCB 工作区用于导入查看和检查，板图编辑仍在 KiCad 中完成，现有数字原理图与仿真功能继续保留。

@@ -66,6 +66,8 @@ public:
     int GetGateInputCount() const;
     CircuitDocument ExportDocument() const;
     bool ImportDocument(const CircuitDocument& document, wxString& error);
+    // Apply a locally validated assistant proposal as one normal canvas edit.
+    bool ApplyAssistantDocument(const CircuitDocument& document, std::uint64_t expectedRevision, wxString& error);
     void ClearDocument();
     bool IsModified() const { return m_modified; }
     void MarkSaved();
@@ -82,6 +84,7 @@ private:
     friend struct CanvasRegressionAccess;
     friend struct CanvasStructureRegressionAccess;
     friend struct CanvasTimingRegressionAccess;
+    friend struct CanvasAiRegressionAccess;
     void MarkModified(bool textTransform = false);
     void RefreshModifiedState();
     void UndoText(wxTextCtrl& editor);

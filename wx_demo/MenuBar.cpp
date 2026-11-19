@@ -86,6 +86,7 @@ wxMenuBar* CreateMainMenuBar()
     menuBar->Append(simulationMenu, wxT("仿真"));
 
     auto* helpMenu = new wxMenu();
+    helpMenu->Append(ID_HELP_AI_ASSISTANT, wxT("AI 助手…"));
     helpMenu->Append(wxID_HELP, wxT("快捷键\tF1"));
     helpMenu->AppendSeparator();
     helpMenu->Append(wxID_ABOUT, wxT("关于"));

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MainFrame.h"
+#include "MenuBar.h"
 #include "SimulationPanel.h"
 #include "Canvas.h"
 #include "CircuitFile.h"
@@ -24,6 +25,8 @@ struct SimulationUiRegressionAccess
         // Missing optional toolbar images must not open a modal wxLogGui dialog.
         wxLogNull quiet;
         auto frame = std::make_unique<MainFrame>();
+        Require(frame->GetMenuBar()->FindItem(ID_HELP_AI_ASSISTANT) != nullptr,
+            "main window exposes the AI assistant menu");
         auto& panel = *frame->m_simulation;
         auto& canvas = *frame->m_canvas;
         Require(!panel.IsShown() && canvas.GetParent() == frame->m_editor,

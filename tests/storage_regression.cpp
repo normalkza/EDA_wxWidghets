@@ -16,6 +16,7 @@
 #endif
 #include "CircuitFile.h"
 #include "Canvas.h"
+#include "ai_circuit_regression.h"
 #include "SelectionState.h"
 #include "format_regression.h"
 
@@ -1008,6 +1009,7 @@ int main(int argc, char** argv)
         CanvasRegressionAccess::TestNativeTextUndo(*canvas);
         CanvasRegressionAccess::TestUndoTextSessionsAndSaveDuringTransform(*canvas);
         CanvasRegressionAccess::TestNativeUndoSessionBoundary(*canvas);
+        RunAiCircuitRegression(*canvas);
         std::cout << "PASS: v1/v2 version preservation and named-pin schema validation; "
             "XML round trips (8 types, 2/16 inputs, levels, fanout, UTF-8, escaping, whitespace), "
             "invalid XML/network rejection, transactional loads, failed write preservation, canvas reopen, dirty tracking, "

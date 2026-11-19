@@ -22,3 +22,7 @@ Release/
 
 # 回归测试编译产物
 /tests/build/
+
+# DeepSeek 本地服务
+__pycache__/
+.env

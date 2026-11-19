@@ -44,6 +44,9 @@
     <ClCompile Include="wx_demo\CircuitValidation.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="wx_demo\CircuitFile.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="wx_demo\CanvasDocument.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\AiApiClient.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\AiAssistantDialog.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="wx_demo\AiCircuitExecutor.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="wx_demo\Wire.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="wx_demo\CanvasWiring.cpp"><Filter>源文件</Filter></ClCompile>
     <ClCompile Include="wx_demo\Canvas.cpp">
@@ -89,6 +92,9 @@
     <ClInclude Include="wx_demo\Connectivity.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\SimulationSnapshot.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\CircuitDocument.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\AiApiClient.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\AiAssistantDialog.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="wx_demo\AiCircuitExecutor.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\Circuit.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\CircuitValidation.h"><Filter>头文件</Filter></ClInclude>
     <ClInclude Include="wx_demo\CircuitLimits.h"><Filter>头文件</Filter></ClInclude>

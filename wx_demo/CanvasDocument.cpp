@@ -1,5 +1,6 @@
 #include "Canvas.h"
 #include "ComponentRegistry.h"
+#include <wx/thread.h>
 #include <algorithm>
 
 #include <memory>
@@ -22,7 +23,8 @@ namespace
             if (a.id != b.id || a.type != b.type || a.x != b.x || a.y != b.y ||
                 a.inputCount != b.inputCount || a.high != b.high || a.rotation != b.rotation ||
                 a.clockPeriodNs != b.clockPeriodNs || a.clockHighNs != b.clockHighNs ||
-                a.clockStartNs != b.clockStartNs || a.probeLabel != b.probeLabel) return false;
+                a.clockStartNs != b.clockStartNs || a.probeLabel != b.probeLabel || a.fallingEdge != b.fallingEdge)
+                return false;
         }
         for (std::size_t i = 0; i < first.wires.size(); ++i)
         {
@@ -283,6 +285,42 @@ void Canvas::ClearDocument()
 bool Canvas::ImportDocument(const CircuitDocument& document, wxString& error)
 {
     return ReplaceDocument(document, error, true);
+}
+
+bool Canvas::ApplyAssistantDocument(const CircuitDocument& document, std::uint64_t expectedRevision, wxString& error)
+{
+    error.clear();
+    if (!wxIsMainThread())
+    {
+        error = wxS("请在主界面应用助手方案。");
+        return false;
+    }
+    if (expectedRevision != m_documentRevision)
+    {
+        error = wxS("画布在生成方案后已更改，请重新生成。");
+        return false;
+    }
+    if (m_loadingDocument || m_pendingWire || IsDraggingWire() || m_pressedIndex >= 0 || m_dragging ||
+        m_creatingText || m_textTransformIndex >= 0 || m_textEditUndoDocument || IsEditingText() || HasCapture())
+    {
+        error = wxS("请先结束当前的连线、拖动或文字编辑，再应用方案。");
+        return false;
+    }
+
+    auto before = ExportDocument();
+    if (SameDocument(before, document))
+    {
+        error = wxS("此方案没有更改画布。");
+        return false;
+    }
+    // Reserve the undo slot before replacement. Failed staging must not clear
+    // prior history or alter the saved baseline, unlike opening a file.
+    m_undoHistory.reserve(m_undoLimit);
+    if (!ReplaceDocument(document, error, false)) return false;
+    RecordUndo(std::move(before));
+    RefreshModifiedState();
+    SetFocusIgnoringChildren();
+    return true;
 }
 
 bool Canvas::ReplaceDocument(const CircuitDocument& document, wxString& error, bool resetHistory)

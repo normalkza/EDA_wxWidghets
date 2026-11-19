@@ -1,4 +1,5 @@
 #include "MainFrame.h"
+#include "AiAssistantDialog.h"
 #include "MenuBar.h"
 #include "ToolBar.h"
 #include "Toolbox.h"
@@ -210,6 +211,7 @@ MainFrame::MainFrame()
             wxT("支持 XML 保存、元件旋转、正交连线与撤销。"),
             wxT("关于"), wxOK | wxICON_INFORMATION, this);
     }, wxID_ABOUT);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenAiAssistant(); }, ID_HELP_AI_ASSISTANT);
 
     canvas->SetComponentPlacedCallback([this, toolbox] {
         toolbox->SelectTool(wxEmptyString);
@@ -242,6 +244,14 @@ MainFrame::MainFrame()
     sidebar->SetSashPosition(sidebar->GetClientSize().GetHeight() * 55 / 100);
     m_sidebarSash = sidebar->GetSashPosition();
     UpdateDocumentTitle();
+}
+
+void MainFrame::OpenAiAssistant()
+{
+    if (m_aiClosePending) return;
+    if (!m_aiAssistant.get())
+        m_aiAssistant = wxWeakRef<AiAssistantDialog>(new AiAssistantDialog(this, *m_canvas));
+    m_aiAssistant->ShowAssistant();
 }
 
 void MainFrame::OpenSimulationWindow()
@@ -427,11 +437,29 @@ void MainFrame::OnImportKiCadPcb(wxCommandEvent&)
 
 void MainFrame::OnClose(wxCloseEvent& event)
 {
+    // WinHTTP reports cancellation on the application event queue. Leave that
+    // queue running until the assistant has stopped before closing the frame.
+    if (event.CanVeto() && m_aiAssistant.get() && m_aiAssistant->IsBusy())
+    {
+        event.Veto();
+        if (!m_aiClosePending)
+        {
+            m_aiClosePending = true;
+            wxWeakRef<MainFrame> frame(this);
+            m_aiAssistant->BeginOwnerShutdown([frame] {
+                if (auto* window = frame.get()) window->Close();
+            });
+        }
+        return;
+    }
+    const bool wasAiClosePending = std::exchange(m_aiClosePending, false);
     if (event.CanVeto() && !ConfirmDiscardChanges())
     {
+        if (wasAiClosePending && m_aiAssistant.get()) m_aiAssistant->ResumeAfterOwnerShutdown();
         event.Veto();
         return;
     }
+    if (m_aiAssistant.get()) m_aiAssistant->BeginOwnerShutdown({});
     event.Skip();
 }
 
