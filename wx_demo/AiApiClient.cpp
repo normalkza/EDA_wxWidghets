@@ -1,4 +1,5 @@
 #include "AiApiClient.h"
+#include "AiSession.h"
 #include "CircuitValidation.h"
 #include <wx/app.h>
 #include <wx/mstream.h>
@@ -18,12 +19,11 @@
 namespace
 {
 constexpr std::size_t MaxQuestion = 4000;
-constexpr std::size_t MaxRequestBytes = 16 * 1024;
-constexpr std::size_t MaxResponseBytes = 64 * 1024;
+constexpr std::size_t MaxRequestBytes = 2 * 1024 * 1024;
+constexpr std::size_t MaxResponseBytes = 256 * 1024;
 constexpr std::size_t MaxComponents = 32;
 constexpr std::size_t MaxWires = 64;
-constexpr int DeadlineMs = 30000;
-constexpr char Endpoint[] = "http://127.0.0.1:8765/assistant/turn";
+constexpr int DeadlineMs = 65000;
 
 AiAssistantReply Failure(const wxString& message)
 {
@@ -127,7 +127,7 @@ bool IsSafeXml(std::string_view xml)
         }
         else
         {
-            if (++nodes > MaxComponents + MaxWires + 3 || depth >= 3) return false;
+            if (++nodes > 10000 || depth >= 5) return false;
             if (xml[end - 1] != '/') ++depth;
         }
         start = xml.find('<', end + 1);
@@ -202,6 +202,53 @@ bool ReadAction(const wxXmlNode& root, AiCircuitAction& action)
     return true;
 }
 
+bool ReadText(const wxXmlNode& node, wxString& text)
+{
+    for (auto* child = node.GetChildren(); child; child = child->GetNext())
+    {
+        if (child->GetType() != wxXML_TEXT_NODE) return false;
+        text += child->GetContent();
+    }
+    return text.length() <= 6000 && CircuitValidation::IsValidXmlText(text);
+}
+
+bool ReadPatch(const wxXmlNode& root, AiCircuitPatch& patch)
+{
+    auto* summary = root.GetChildren(); auto* operations = summary ? summary->GetNext() : nullptr;
+    if (!IsElement(summary, "summary") || !IsElement(operations, "operations") || operations->GetNext() ||
+        !HasOnlyAttributes(*summary, {}) || !HasOnlyAttributes(*operations, {}) || !ReadText(*summary, patch.summary)) return false;
+    for (auto* node = operations->GetChildren(); node; node = node->GetNext())
+    {
+        if (patch.operations.size() >= 128 || !IsElement(node, "op") || !HasOnlyAttributes(*node, {"kind", "ref"})) return false;
+        AiEditOperation operation;
+        if (!ReadIdentifier(*node, "kind", 32, operation.kind) || !ReadIdentifier(*node, "ref", 32, operation.ref)) return false;
+        for (auto* child = node->GetChildren(); child; child = child->GetNext())
+        {
+            if (IsElement(child, "field") && HasOnlyAttributes(*child, {"name"}))
+            {
+                std::string name; wxString text;
+                if (operation.fields.size() >= 14 || !ReadIdentifier(*child, "name", 32, name) ||
+                    !ReadText(*child, text) || !operation.fields.emplace(name, text).second) return false;
+            }
+            else if (IsElement(child, "point") && HasOnlyAttributes(*child, {"x", "y"}) && !child->GetChildren())
+            {
+                wxPoint point;
+                if (operation.points.size() >= 64) return false;
+                for (const auto& field : {std::pair("x", &point.x), std::pair("y", &point.y)})
+                {
+                    const auto value = child->GetAttribute(field.first).ToStdString(wxConvUTF8);
+                    const auto parsed = std::from_chars(value.data(), value.data() + value.size(), *field.second);
+                    if (parsed.ec != std::errc() || parsed.ptr != value.data() + value.size()) return false;
+                }
+                operation.points.push_back(point);
+            }
+            else return false;
+        }
+        patch.operations.push_back(std::move(operation));
+    }
+    return !patch.operations.empty();
+}
+
 AiAssistantReply DecodeReply(const std::string& bytes, AiAssistantMode mode)
 {
     if (bytes.empty()) return Failure(wxT("本地助手未返回内容。"));
@@ -215,6 +262,13 @@ AiAssistantReply DecodeReply(const std::string& bytes, AiAssistantMode mode)
     if (!IsElement(root, "assistant_reply") || !HasOnlyAttributes(*root, {"kind"}))
         return Failure(wxT("本地助手的回复格式不正确。"));
     const wxString kind = root->GetAttribute("kind");
+    if (kind == "patch")
+    {
+        if (mode != AiAssistantMode::Apply) return Failure(wxS("指导模式不能执行画布修改。"));
+        AiAssistantReply reply; reply.kind = AiAssistantReply::Kind::Patch;
+        if (!ReadPatch(*root, reply.patch)) return Failure(wxS("画布修改操作的格式无效。"));
+        return reply;
+    }
     if (kind == "action")
     {
         if (mode != AiAssistantMode::Apply) return Failure(wxT("给步骤模式收到了非预期的电路操作。"));
@@ -237,7 +291,13 @@ AiAssistantReply DecodeReply(const std::string& bytes, AiAssistantMode mode)
     return {kind == "text" ? AiAssistantReply::Kind::Text : AiAssistantReply::Kind::Error, std::move(text), {}};
 }
 
-bool BuildRequest(AiAssistantMode mode, wxString question, wxString& body, wxString& error)
+wxXmlNode* Element(wxXmlNode* parent, const wxString& name)
+{
+    auto* node = new wxXmlNode(wxXML_ELEMENT_NODE, name); parent->AddChild(node); return node;
+}
+
+bool BuildRequest(AiAssistantMode mode, wxString question, wxString& body, wxString& error,
+    const AiWorkspaceContext* context)
 {
     question.Trim().Trim(false);
     if (question.empty()) { error = wxT("请输入问题或电路需求。"); return false; }
@@ -252,12 +312,34 @@ bool BuildRequest(AiAssistantMode mode, wxString question, wxString& body, wxStr
     auto* root = new wxXmlNode(wxXML_ELEMENT_NODE, "assistant_request");
     document.SetRoot(root);
     root->AddAttribute("mode", mode == AiAssistantMode::Guide ? "guide" : "apply");
-    auto* child = new wxXmlNode(root, wxXML_ELEMENT_NODE, "question");
+    auto* child = Element(root, "question");
     child->AddChild(new wxXmlNode(wxXML_TEXT_NODE, "text", question));
+    if (context)
+    {
+        wxXmlDocument scene;
+        const auto bytes = context->sceneXml.ToUTF8();
+        wxMemoryInputStream input(bytes.data(), bytes.length());
+        wxXmlParseError parseError;
+        if (!scene.Load(input, wxXMLDOC_NONE, &parseError) || !IsElement(scene.GetRoot(), "workspace"))
+        { error = wxS("无法读取当前画布快照。"); return false; }
+        auto* state = Element(root, "context");
+        state->AddAttribute("phase", context->review ? "review" : "edit");
+        state->AddChild(new wxXmlNode(*scene.GetRoot()));
+        auto* image = Element(state, "image");
+        image->AddChild(new wxXmlNode(wxXML_TEXT_NODE, "text", context->imageBase64));
+        auto* history = Element(state, "history");
+        for (const auto& message : context->history)
+        {
+            auto* item = Element(history, "message"); item->AddAttribute("role", message.role);
+            item->AddChild(new wxXmlNode(wxXML_TEXT_NODE, "text", message.text));
+        }
+        auto* feedback = Element(state, "feedback");
+        feedback->AddChild(new wxXmlNode(wxXML_TEXT_NODE, "text", context->feedback));
+    }
     wxMemoryOutputStream output;
     if (!document.Save(output, -1) || output.GetSize() > MaxRequestBytes)
     {
-        error = wxT("问题编码后超过 16 KB，请缩短后再试。");
+        error = wxT("问题和画布上下文超过 2 MB，请缩短文本或关闭画布图像后重试。");
         return false;
     }
     std::string bytes(output.GetSize(), '\0');
@@ -290,16 +372,17 @@ AiApiClient::~AiApiClient()
     DetachEvents();
 }
 
-bool AiApiClient::Start(AiAssistantMode mode, const wxString& question, Completion completion, wxString& error)
+bool AiApiClient::Start(AiAssistantMode mode, const wxString& question, Completion completion, wxString& error,
+    const AiWorkspaceContext* context)
 {
     error.clear();
     if (IsBusy()) { error = wxT("已有请求正在处理。"); return false; }
     if (!m_sessionReady || !wxTheApp) { error = wxT("无法启动本地助手连接。"); return false; }
     wxString body;
-    if (!BuildRequest(mode, question, body, error)) return false;
+    if (!BuildRequest(mode, question, body, error, context)) return false;
 
     const int id = NextRequestId();
-    auto request = m_session.CreateRequest(wxTheApp, wxString::FromAscii(Endpoint), id);
+    auto request = m_session.CreateRequest(wxTheApp, AiSession::Get().Endpoint(), id);
     if (!request.IsOk()) { error = wxT("无法创建本地助手请求。"); return false; }
 #ifdef __WXMSW__
     // Do not follow even a loopback service's redirects or use its proxy.
@@ -312,6 +395,8 @@ bool AiApiClient::Start(AiAssistantMode mode, const wxString& question, Completi
     }
 #endif
     request.SetMethod("POST");
+    if (!AiSession::Get().Token().empty())
+        request.SetHeader("Authorization", "Bearer " + AiSession::Get().Token());
     request.SetHeader("Accept", "application/xml");
     request.SetData(body, "application/xml; charset=utf-8");
     request.SetStorage(wxWebRequest::Storage_None);
@@ -371,7 +456,7 @@ void AiApiClient::OnState(wxWebRequestEvent& event)
     if (event.GetId() != m_eventId || event.GetState() == wxWebRequest::State_Active ||
         event.GetState() == wxWebRequest::State_Idle) return;
     if (m_stopReason == StopReason::Deadline) { Complete(Failure(wxT("本地助手响应超时，请重试。"))); return; }
-    if (m_stopReason == StopReason::BodyLimit) { Complete(Failure(wxT("本地助手回复超过 64 KB。"))); return; }
+    if (m_stopReason == StopReason::BodyLimit) { Complete(Failure(wxT("本地助手回复超过 256 KB。"))); return; }
     if (m_stopReason == StopReason::User || event.GetState() == wxWebRequest::State_Cancelled)
     {
         Complete({AiAssistantReply::Kind::Cancelled, wxT("已取消。"), {}});
@@ -380,7 +465,7 @@ void AiApiClient::OnState(wxWebRequestEvent& event)
     const auto& response = event.GetResponse();
     if (!response.IsOk())
     {
-        Complete(Failure(wxT("无法连接本地助手，请确认本地服务已启动（127.0.0.1:8765）。")));
+        Complete(Failure(wxT("无法连接本地助手，请重新启动应用并登录后重试。")));
         return;
     }
     const int status = response.GetStatus();

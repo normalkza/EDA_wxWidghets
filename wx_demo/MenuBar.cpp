@@ -36,6 +36,8 @@ wxMenuBar* CreateMainMenuBar()
     viewMenu->AppendSeparator();
     viewMenu->AppendCheckItem(ID_VIEW_TOOLBOX, wxT("元件库"));
     viewMenu->AppendCheckItem(ID_VIEW_PROPERTIES, wxT("属性栏"));
+    viewMenu->AppendSeparator();
+    viewMenu->AppendCheckItem(ID_HELP_COMPANION, wxT("AI 悬浮插件"));
     menuBar->Append(viewMenu, wxT("视图"));
 
     auto* componentMenu = new wxMenu();

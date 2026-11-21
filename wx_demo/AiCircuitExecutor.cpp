@@ -202,6 +202,69 @@ bool PlaceComponents(const CircuitDocument& original, std::vector<CircuitCompone
 }
 }
 
+wxRect AiCircuitExecutor::ComponentBounds(const CircuitComponentData& component)
+{
+    return ::ComponentBounds(component);
+}
+
+bool AiCircuitExecutor::ArrangeDocument(const CircuitDocument& original, CircuitDocument& candidate,
+    wxString& error, const wxSize& available)
+{
+    if (!CircuitValidation::Validate(original, error)) return false;
+    if (original.components.empty()) return Fail(error, wxS("画布上还没有可整理的元件。"));
+    if (original.components.size() > 128)
+        return Fail(error, wxS("离线布局一次支持最多 128 个元件，请先缩小电路规模。"));
+    CircuitDocument staged = original;
+    std::unordered_map<int, std::size_t> indices;
+    for (std::size_t i = 0; i < staged.components.size(); ++i) indices.emplace(staged.components[i].id, i);
+    std::vector<int> depths(staged.components.size()), incoming(staged.components.size());
+    std::vector<std::vector<std::size_t>> outgoing(staged.components.size());
+    for (const auto& wire : staged.wires)
+    {
+        const auto from = indices.at(wire.sourceId), to = indices.at(wire.targetId);
+        if (staged.components[to].type == "DFF") continue;
+        outgoing[from].push_back(to); ++incoming[to];
+    }
+    std::queue<std::size_t> ready;
+    for (std::size_t i = 0; i < incoming.size(); ++i) if (!incoming[i]) ready.push(i);
+    std::size_t visited = 0;
+    while (!ready.empty())
+    {
+        const auto from = ready.front(); ready.pop(); ++visited;
+        for (const auto to : outgoing[from])
+        { depths[to] = std::max(depths[to], depths[from] + 1); if (!--incoming[to]) ready.push(to); }
+    }
+    if (visited != staged.components.size()) return Fail(error, wxS("当前电路的依赖关系无法进行离线分层布局。"));
+    for (auto& component : staged.components) component.x = component.y = 0;
+    if (!PlaceComponents(CircuitDocument(), staged.components, depths, available, error)) return false;
+    for (auto& wire : staged.wires) wire.route.clear();
+    for (std::size_t i = 0; i < staged.texts.size(); ++i)
+    {
+        auto& text = staged.texts[i];
+        std::int64_t closest = 160 * 160; std::size_t nearest = original.components.size();
+        const wxPoint centre(text.rect.x + text.rect.width / 2, text.rect.y + text.rect.height / 2);
+        for (std::size_t j = 0; j < original.components.size(); ++j)
+        {
+            const auto box = ::ComponentBounds(original.components[j]);
+            const auto delta = centre - wxPoint(box.x + box.width / 2, box.y + box.height / 2);
+            const auto distance = std::int64_t(delta.x) * delta.x + std::int64_t(delta.y) * delta.y;
+            if (distance < closest) { closest = distance; nearest = j; }
+        }
+        if (nearest < original.components.size())
+            text.rect.Offset(staged.components[nearest].x - original.components[nearest].x,
+                staged.components[nearest].y - original.components[nearest].y);
+        if (available.x > 0 && available.y > 0)
+        {
+            if (text.rect.width > available.x || text.rect.height > available.y)
+                return Fail(error, wxS("当前绘图区放不下已有标注，请放大窗口后再整理。"));
+            text.rect.x = std::clamp(text.rect.x, 0, available.x - text.rect.width);
+            text.rect.y = std::clamp(text.rect.y, 0, available.y - text.rect.height);
+        }
+    }
+    if (!CircuitValidation::Validate(staged, error)) return false;
+    candidate = std::move(staged); return true;
+}
+
 bool AiCircuitExecutor::BuildCandidate(const CircuitDocument& original, const AiCircuitAction& action,
     CircuitDocument& candidate, wxString& error, const wxSize& available)
 {

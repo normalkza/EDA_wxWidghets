@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AiCircuitExecutor.h"
+#include "AiWorkspace.h"
 #include <wx/timer.h>
 #include <wx/webrequest.h>
 #include <functional>
@@ -10,10 +11,11 @@ enum class AiAssistantMode { Guide, Apply };
 
 struct AiAssistantReply
 {
-    enum class Kind { Text, Action, Error, Cancelled };
+    enum class Kind { Text, Action, Patch, Error, Cancelled };
     Kind kind = Kind::Error;
     wxString text;
     AiCircuitAction action;
+    AiCircuitPatch patch;
 };
 
 // GUI-thread client for the local assistant broker. A successful Start invokes
@@ -25,7 +27,8 @@ public:
 
     AiApiClient();
     ~AiApiClient() override;
-    bool Start(AiAssistantMode mode, const wxString& question, Completion completion, wxString& error);
+    bool Start(AiAssistantMode mode, const wxString& question, Completion completion, wxString& error,
+        const AiWorkspaceContext* context = nullptr);
     void Cancel();
     bool IsBusy() const { return m_request.IsOk(); }
 

@@ -1,0 +1,2933 @@
+{
+  "ok": true,
+  "coreUrl": "/api/live2d-pet/runtime/live2dcubismcore.min.js",
+  "vendorUrl": "/api/live2d-pet/runtime/live2d-vendor.js",
+  "pets": [
+    {
+      "id": "ds-whale-girl",
+      "displayName": "DS鲸鱼娘",
+      "description": "氵六青的 DS 鲸鱼娘 Live2D 桌宠：8 组动作 + 44 个表情/道具，点她会有反应。随包自带中文配音。",
+      "locales": {
+        "en": {
+          "displayName": "DS Whale Girl",
+          "description": "氵六青's DS Whale Girl Live2D desktop pet: 8 motion groups plus 44 expressions and props; she reacts when you click her.",
+          "lines": {
+            "greet": [
+              "Hi there! I'm the whale girl~",
+              "Let's do our best again today!",
+              "Finally, I get to meet you.",
+              "Slacking-off time already?"
+            ],
+            "click": [
+              "Ah!",
+              "That tickles~",
+              "Hey, what are you doing?",
+              "Head pats?",
+              "Hehe."
+            ],
+            "pat": [
+              "Hehe, that feels nice~",
+              "One more pat?",
+              "Mm... you're messing up my hair."
+            ],
+            "tail": [
+              "Ah! You can't just touch my tail!",
+              "My tail... it tickles.",
+              "Stop pulling my tail!"
+            ],
+            "spin": [
+              "Uu... I'm dizzy...",
+              "No more spinning, no more!"
+            ],
+            "reset": [
+              "Back to normal~",
+              "All neat and tidy."
+            ],
+            "loadFailed": [
+              "Waa... the model failed to load."
+            ],
+            "phase": {
+              "thinking": "Let me think...",
+              "tool": "Busy working...",
+              "waiting": "I need your approval.",
+              "asking": "I'm waiting for your answer.",
+              "helper": "I called in some help.",
+              "queued": "Got it, noted.",
+              "done": "Done!",
+              "failed": "Uwa... something went wrong."
+            }
+          },
+          "bubbles": {
+            "greet": [
+              {
+                "text": "Hi there! I'm the whale girl~",
+                "sound": "greet-1"
+              },
+              {
+                "text": "Let's do our best again today!",
+                "sound": "greet-2"
+              },
+              {
+                "text": "Finally, I get to meet you.",
+                "sound": "greet-3"
+              },
+              {
+                "text": "Slacking-off time already?",
+                "sound": "greet-4"
+              }
+            ],
+            "click": [
+              {
+                "text": "Ah!",
+                "sound": "click-1"
+              },
+              {
+                "text": "That tickles~",
+                "sound": "click-2"
+              },
+              {
+                "text": "Hey, what are you doing?",
+                "sound": "click-3"
+              },
+              {
+                "text": "Head pats?",
+                "sound": "click-4"
+              },
+              {
+                "text": "Hehe.",
+                "sound": "click-5"
+              }
+            ],
+            "play": [],
+            "pat": [
+              {
+                "text": "Hehe, that feels nice~",
+                "sound": "pat-1"
+              },
+              {
+                "text": "One more pat?",
+                "sound": "pat-2"
+              },
+              {
+                "text": "Mm... you're messing up my hair.",
+                "sound": "pat-3"
+              }
+            ],
+            "tail": [
+              {
+                "text": "Ah! You can't just touch my tail!",
+                "sound": "tail-1"
+              },
+              {
+                "text": "My tail... it tickles.",
+                "sound": "tail-2"
+              },
+              {
+                "text": "Stop pulling my tail!",
+                "sound": "tail-3"
+              }
+            ],
+            "spin": [
+              {
+                "text": "Uu... I'm dizzy...",
+                "sound": "spin-1"
+              },
+              {
+                "text": "No more spinning, no more!",
+                "sound": "spin-2"
+              }
+            ],
+            "reset": [
+              {
+                "text": "Back to normal~",
+                "sound": "reset-1"
+              },
+              {
+                "text": "All neat and tidy.",
+                "sound": "reset-2"
+              }
+            ],
+            "loadFailed": [
+              {
+                "text": "Waa... the model failed to load.",
+                "sound": "loadFailed-1"
+              }
+            ],
+            "phase": {
+              "thinking": {
+                "text": "Let me think...",
+                "sound": "phase-thinking"
+              },
+              "tool": {
+                "text": "Busy working...",
+                "sound": "phase-tool"
+              },
+              "waiting": {
+                "text": "I need your approval.",
+                "sound": "phase-waiting"
+              },
+              "asking": {
+                "text": "I'm waiting for your answer.",
+                "sound": "phase-asking"
+              },
+              "helper": {
+                "text": "I called in some help.",
+                "sound": "phase-helper"
+              },
+              "queued": {
+                "text": "Got it, noted.",
+                "sound": "phase-queued"
+              },
+              "done": {
+                "text": "Done!",
+                "sound": "phase-done"
+              },
+              "failed": {
+                "text": "Uwa... something went wrong.",
+                "sound": "phase-failed"
+              }
+            }
+          },
+          "voiceNames": {
+            "greet-1": "Greeting 1",
+            "greet-2": "Greeting 2",
+            "greet-3": "Greeting 3",
+            "greet-4": "Greeting 4",
+            "click-1": "Click 1",
+            "click-2": "Click 2",
+            "click-3": "Click 3",
+            "click-4": "Click 4",
+            "click-5": "Click 5",
+            "pat-1": "Head pat 1",
+            "pat-2": "Head pat 2",
+            "pat-3": "Head pat 3",
+            "tail-1": "Tail 1",
+            "tail-2": "Tail 2",
+            "tail-3": "Tail 3",
+            "spin-1": "Spin 1",
+            "spin-2": "Spin 2",
+            "reset-1": "Reset 1",
+            "reset-2": "Reset 2",
+            "loadFailed-1": "Load failed 1",
+            "phase-thinking": "Thinking",
+            "phase-tool": "Running tools",
+            "phase-waiting": "Waiting for approval",
+            "phase-asking": "Waiting for reply",
+            "phase-helper": "Sub-agent",
+            "phase-queued": "Queued",
+            "phase-done": "Done",
+            "phase-failed": "Error"
+          },
+          "slots": {
+            "glasses": {
+              "label": "Glasses",
+              "none": "None",
+              "options": {
+                "圆眼镜": "Round glasses",
+                "方眼镜": "Square glasses",
+                "椭圆眼镜": "Oval glasses",
+                "墨镜": "Sunglasses"
+              }
+            },
+            "sticker": {
+              "label": "Stickers",
+              "none": "None",
+              "options": {
+                "猫猫": "Cat",
+                "兔兔": "Bunny",
+                "蝴蝶结": "Bow"
+              }
+            },
+            "hair": {
+              "label": "Hair accessory",
+              "none": "Worn",
+              "options": {
+                "摘掉发箍": "Remove headband",
+                "单边马尾": "Side ponytail"
+              }
+            },
+            "cloth": {
+              "label": "Tablecloth",
+              "none": "White",
+              "options": {
+                "黑色": "Black"
+              }
+            },
+            "claw": {
+              "label": "Claws",
+              "none": "None",
+              "options": {
+                "粉魔爪": "Pink claws",
+                "白魔爪": "White claws"
+              }
+            },
+            "whale": {
+              "label": "Whale",
+              "none": "None",
+              "options": {
+                "头顶鲸": "Whale on head",
+                "放桌上": "Whale on desk"
+              }
+            },
+            "desk": {
+              "label": "Desk prop",
+              "none": "None",
+              "options": {
+                "巴菲": "Parfait"
+              }
+            },
+            "rhand": {
+              "label": "Right hand",
+              "none": "None",
+              "options": {
+                "掏出手机": "Take out phone",
+                "喵喵手": "Cat paws",
+                "双手比耶": "Double peace sign",
+                "挤番茄酱": "Squeeze ketchup",
+                "写本本": "Write in notebook"
+              }
+            },
+            "selfie": {
+              "label": "Selfie",
+              "none": "None",
+              "options": {
+                "自拍": "Selfie",
+                "快速自拍": "Quick selfie"
+              }
+            },
+            "lhand": {
+              "label": "Left hand",
+              "none": "None",
+              "options": {
+                "撤回": "Undo",
+                "画笔": "Brush",
+                "橡皮": "Eraser",
+                "蛋包饭": "Omurice"
+              }
+            },
+            "eyes": {
+              "label": "Eyes",
+              "none": "Default",
+              "options": {
+                "星星眼": "Star eyes",
+                "爱心眼": "Heart eyes",
+                "呆呆眼": "Blank eyes",
+                "晕晕": "Dizzy",
+                "阴暗": "Gloomy"
+              }
+            },
+            "mood": {
+              "label": "Mood",
+              "none": "Calm",
+              "options": {
+                "开心兴奋": "Excited",
+                "悲伤": "Sad",
+                "大哭": "Crying",
+                "生气": "Angry",
+                "调皮": "Playful",
+                "闭眼口水": "Sleepy drool",
+                "吐魂": "Soul out"
+              }
+            },
+            "mouth": {
+              "label": "Mouth",
+              "none": "Closed",
+              "options": {
+                "吐舌": "Tongue out",
+                "吹泡泡糖": "Bubble gum"
+              }
+            },
+            "symbol": {
+              "label": "Symbol",
+              "none": "None",
+              "options": {
+                "问号": "Question mark",
+                "感叹号": "Exclamation mark",
+                "流汗": "Sweat drop"
+              }
+            },
+            "flower": {
+              "label": "Ambience: flowers",
+              "none": "None",
+              "options": {
+                "情绪花花": "Mood flowers"
+              }
+            },
+            "heartbeat": {
+              "label": "Ambience: heartbeat",
+              "none": "None",
+              "options": {
+                "心跳": "Heartbeat"
+              }
+            },
+            "heart": {
+              "label": "Ambience: hearts",
+              "none": "None",
+              "options": {
+                "冒爱心": "Floating hearts"
+              }
+            },
+            "cheek": {
+              "label": "Blush",
+              "none": "Off",
+              "options": {
+                "脸红": "Blush"
+              }
+            },
+            "other": {
+              "label": "Other",
+              "none": "None",
+              "options": {
+                "手机换色": "Phone colour"
+              }
+            },
+            "menu": {
+              "label": "Menu",
+              "none": "None",
+              "options": {
+                "点菜按下": "Menu press"
+              }
+            }
+          },
+          "catalog": {
+            "motions": {
+              "Idle": "Idle",
+              "Hammer": "Hammer swing",
+              "BubbleGum": "Bubble gum",
+              "SprayWater": "Whale spout",
+              "OpenCase": "Take out phone",
+              "Selfie": "Selfie",
+              "SelfieQuick": "Quick selfie",
+              "Ketchup": "Squeeze ketchup"
+            },
+            "expressions": {
+              "脸红": "Blush",
+              "爱心眼": "Heart eyes",
+              "星星眼": "Star eyes",
+              "情绪花花": "Mood flowers",
+              "心跳": "Heartbeat",
+              "开心兴奋": "Excited",
+              "悲伤": "Sad",
+              "大哭": "Crying",
+              "生气": "Angry",
+              "晕晕": "Dizzy",
+              "流汗": "Sweat drop",
+              "问号": "Question mark",
+              "感叹号": "Exclamation mark",
+              "阴暗": "Gloomy",
+              "调皮": "Playful",
+              "闭眼口水": "Sleepy drool",
+              "吐魂": "Soul out",
+              "吐舌": "Tongue out",
+              "呆呆眼": "Blank eyes",
+              "冒爱心": "Floating hearts",
+              "圆眼镜": "Round glasses",
+              "方眼镜": "Square glasses",
+              "椭圆眼镜": "Oval glasses",
+              "墨镜": "Sunglasses",
+              "头箍": "Headband",
+              "单边马尾": "Side ponytail",
+              "蝴蝶结贴纸": "Bow sticker",
+              "猫猫贴纸": "Cat sticker",
+              "兔兔贴纸": "Bunny sticker",
+              "头顶鲸": "Whale on head",
+              "鲸鱼放桌上": "Whale on desk",
+              "桌面巴菲": "Desk parfait",
+              "蛋包饭": "Omurice",
+              "桌面粉魔爪": "Pink claws on desk",
+              "魔爪换色": "Claw recolour",
+              "双手比耶": "Double peace sign",
+              "喵喵手": "Cat paws",
+              "手机换色": "Phone colour",
+              "深色桌布": "Dark tablecloth",
+              "画笔": "Brush",
+              "橡皮": "Eraser",
+              "撤回": "Undo",
+              "点菜按下": "Menu press",
+              "挤番茄酱": "Squeeze ketchup"
+            }
+          }
+        }
+      },
+      "scale": 1,
+      "motionsByPhase": {
+        "idle": "Idle",
+        "waiting": "Idle",
+        "thinking": "Idle",
+        "tool": "Idle",
+        "done": "BubbleGum",
+        "failed": "SprayWater"
+      },
+      "motionOptions": {
+        "Hammer": {
+          "fidget": false
+        },
+        "SprayWater": {
+          "preset": {
+            "jingyu": 1
+          },
+          "fidget": false,
+          "hold": true,
+          "persist": true
+        },
+        "BubbleGum": {
+          "hold": true,
+          "persist": true
+        },
+        "OpenCase": {
+          "hold": true
+        },
+        "Selfie": {
+          "holdParams": {
+            "phone5": 10
+          }
+        }
+      },
+      "expressionsByPhase": {},
+      "expressionSlots": [
+        {
+          "id": "glasses",
+          "label": "眼镜",
+          "none": "无",
+          "options": [
+            {
+              "label": "圆眼镜",
+              "expressions": [
+                "圆眼镜"
+              ]
+            },
+            {
+              "label": "方眼镜",
+              "expressions": [
+                "方眼镜"
+              ]
+            },
+            {
+              "label": "椭圆眼镜",
+              "expressions": [
+                "椭圆眼镜"
+              ]
+            },
+            {
+              "label": "墨镜",
+              "expressions": [
+                "墨镜"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sticker",
+          "label": "贴纸",
+          "none": "无",
+          "options": [
+            {
+              "label": "猫猫",
+              "expressions": [
+                "猫猫贴纸"
+              ],
+              "fidget": false
+            },
+            {
+              "label": "兔兔",
+              "expressions": [
+                "兔兔贴纸"
+              ]
+            },
+            {
+              "label": "蝴蝶结",
+              "expressions": [
+                "蝴蝶结贴纸"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hair",
+          "label": "发饰",
+          "none": "戴着",
+          "options": [
+            {
+              "label": "摘掉发箍",
+              "expressions": [
+                "头箍"
+              ]
+            },
+            {
+              "label": "单边马尾",
+              "expressions": [
+                "单边马尾"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "cloth",
+          "label": "桌布",
+          "none": "白色",
+          "options": [
+            {
+              "label": "黑色",
+              "expressions": [
+                "深色桌布"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "claw",
+          "label": "魔爪",
+          "none": "无",
+          "options": [
+            {
+              "label": "粉魔爪",
+              "expressions": [
+                "桌面粉魔爪"
+              ]
+            },
+            {
+              "label": "白魔爪",
+              "expressions": [
+                "桌面粉魔爪",
+                "魔爪换色"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "whale",
+          "label": "鲸鱼",
+          "none": "无",
+          "options": [
+            {
+              "label": "头顶鲸",
+              "expressions": [
+                "头顶鲸"
+              ]
+            },
+            {
+              "label": "放桌上",
+              "expressions": [
+                "鲸鱼放桌上"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "desk",
+          "label": "桌面摆设",
+          "none": "无",
+          "options": [
+            {
+              "label": "巴菲",
+              "expressions": [
+                "桌面巴菲"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "rhand",
+          "label": "右手",
+          "none": "无",
+          "fidgetNone": 1,
+          "options": [
+            {
+              "label": "掏出手机",
+              "expressions": [],
+              "motion": "OpenCase",
+              "fidgetWeight": 4
+            },
+            {
+              "label": "喵喵手",
+              "expressions": [
+                "喵喵手"
+              ],
+              "pairs": {
+                "sticker": "猫猫"
+              }
+            },
+            {
+              "label": "双手比耶",
+              "expressions": [
+                "双手比耶"
+              ],
+              "breaks": [
+                "猫猫"
+              ],
+              "fidgetWeight": 4
+            },
+            {
+              "label": "挤番茄酱",
+              "expressions": [
+                "挤番茄酱"
+              ],
+              "motion": "Ketchup",
+              "requires": [
+                "蛋包饭"
+              ],
+              "breaks": [
+                "猫猫"
+              ]
+            },
+            {
+              "label": "写本本",
+              "expressions": [
+                "点菜按下"
+              ],
+              "clears": [
+                "lhand"
+              ],
+              "sweep": {
+                "x": "pointX",
+                "y": "pointY",
+                "z": "pointZ",
+                "rz": "pointY2",
+                "ampX": 16,
+                "ampY": 9,
+                "ampZ": 7,
+                "loopMs": 2800,
+                "driftMs": 21000,
+                "driftY": 3
+              },
+              "breaks": [
+                "猫猫"
+              ],
+              "fidget": false
+            }
+          ]
+        },
+        {
+          "id": "selfie",
+          "label": "自拍",
+          "none": "无",
+          "fidgetNone": 1,
+          "options": [
+            {
+              "label": "自拍",
+              "expressions": [],
+              "motion": "Selfie",
+              "requires": [
+                "掏出手机"
+              ]
+            },
+            {
+              "label": "快速自拍",
+              "expressions": [],
+              "motion": "SelfieQuick",
+              "fidget": false
+            }
+          ]
+        },
+        {
+          "id": "lhand",
+          "label": "左手",
+          "none": "无",
+          "fidgetNone": 1,
+          "options": [
+            {
+              "label": "撤回",
+              "expressions": [
+                "撤回"
+              ],
+              "fidget": false
+            },
+            {
+              "label": "画笔",
+              "expressions": [
+                "画笔"
+              ],
+              "fidget": false
+            },
+            {
+              "label": "橡皮",
+              "expressions": [
+                "橡皮"
+              ],
+              "fidget": false
+            },
+            {
+              "label": "蛋包饭",
+              "expressions": [
+                "蛋包饭"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "eyes",
+          "label": "眼部",
+          "none": "默认",
+          "fidgetNone": 10,
+          "options": [
+            {
+              "label": "星星眼",
+              "expressions": [
+                "星星眼"
+              ],
+              "fidget": false
+            },
+            {
+              "label": "爱心眼",
+              "expressions": [
+                "爱心眼"
+              ],
+              "pairs": {
+                "heart": "冒爱心"
+              }
+            },
+            {
+              "label": "呆呆眼",
+              "expressions": [
+                "呆呆眼"
+              ],
+              "conflicts": [
+                "开心兴奋",
+                "闭眼口水"
+              ],
+              "fidget": false
+            },
+            {
+              "label": "晕晕",
+              "expressions": [
+                "晕晕"
+              ],
+              "conflicts": [
+                "开心兴奋",
+                "闭眼口水",
+                "大哭"
+              ],
+              "fidget": false
+            },
+            {
+              "label": "阴暗",
+              "expressions": [
+                "阴暗"
+              ],
+              "fidget": false
+            }
+          ]
+        },
+        {
+          "id": "mood",
+          "label": "情绪",
+          "none": "平静",
+          "fidgetNone": 20,
+          "options": [
+            {
+              "label": "开心兴奋",
+              "expressions": [
+                "开心兴奋"
+              ],
+              "conflicts": [
+                "呆呆眼",
+                "晕晕"
+              ],
+              "fidgetWeight": 5
+            },
+            {
+              "label": "悲伤",
+              "expressions": [
+                "悲伤"
+              ],
+              "fidget": false
+            },
+            {
+              "label": "大哭",
+              "expressions": [
+                "大哭"
+              ],
+              "conflicts": [
+                "晕晕"
+              ],
+              "fidget": false
+            },
+            {
+              "label": "生气",
+              "expressions": [
+                "生气"
+              ],
+              "fidget": false
+            },
+            {
+              "label": "调皮",
+              "expressions": [
+                "调皮"
+              ],
+              "fidgetWeight": 5
+            },
+            {
+              "label": "闭眼口水",
+              "expressions": [
+                "闭眼口水"
+              ],
+              "conflicts": [
+                "呆呆眼",
+                "晕晕"
+              ]
+            },
+            {
+              "label": "吐魂",
+              "expressions": [
+                "吐魂"
+              ],
+              "conflicts": [
+                "吹泡泡糖"
+              ],
+              "fidget": false
+            }
+          ]
+        },
+        {
+          "id": "mouth",
+          "label": "嘴部",
+          "none": "闭嘴",
+          "fidgetNone": 8,
+          "options": [
+            {
+              "label": "吐舌",
+              "expressions": [
+                "吐舌"
+              ],
+              "fidget": false
+            },
+            {
+              "label": "吹泡泡糖",
+              "expressions": [],
+              "motion": "BubbleGum",
+              "conflicts": [
+                "吐魂"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "symbol",
+          "label": "符号",
+          "none": "无",
+          "options": [
+            {
+              "label": "问号",
+              "expressions": [
+                "问号"
+              ]
+            },
+            {
+              "label": "感叹号",
+              "expressions": [
+                "感叹号"
+              ]
+            },
+            {
+              "label": "流汗",
+              "expressions": [
+                "流汗"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "flower",
+          "label": "氛围：花花",
+          "none": "无",
+          "fidgetNone": 20,
+          "options": [
+            {
+              "label": "情绪花花",
+              "expressions": [
+                "情绪花花"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "heartbeat",
+          "label": "氛围：心跳",
+          "none": "无",
+          "fidgetNone": 20,
+          "options": [
+            {
+              "label": "心跳",
+              "expressions": [
+                "心跳"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "heart",
+          "label": "氛围：冒爱心",
+          "none": "无",
+          "fidgetNone": 20,
+          "options": [
+            {
+              "label": "冒爱心",
+              "expressions": [
+                "冒爱心"
+              ],
+              "fidget": false
+            }
+          ]
+        },
+        {
+          "id": "cheek",
+          "label": "脸红",
+          "none": "否",
+          "fidgetNone": 10,
+          "options": [
+            {
+              "label": "脸红",
+              "expressions": [
+                "脸红"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "other",
+          "label": "其他",
+          "none": "无",
+          "options": [
+            {
+              "label": "手机换色",
+              "expressions": [
+                "手机换色"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "menu",
+          "label": "点菜",
+          "none": "无",
+          "options": [
+            {
+              "label": "点菜按下",
+              "expressions": [
+                "点菜按下"
+              ]
+            }
+          ]
+        }
+      ],
+      "looksByPhase": {
+        "thinking": {
+          "whale": "头顶鲸",
+          "lhand": "画笔"
+        },
+        "tool": {
+          "whale": "放桌上",
+          "rhand": "写本本",
+          "lhand": "画笔",
+          "symbol": "流汗"
+        },
+        "waiting": {
+          "whale": "头顶鲸",
+          "lhand": "橡皮",
+          "symbol": "问号"
+        },
+        "asking": {
+          "whale": "头顶鲸",
+          "rhand": "双手比耶",
+          "mood": "开心兴奋",
+          "symbol": "问号"
+        },
+        "helper": {
+          "whale": "头顶鲸",
+          "rhand": "喵喵手",
+          "mood": "调皮"
+        },
+        "queued": {
+          "whale": "头顶鲸",
+          "mood": "开心兴奋",
+          "symbol": "感叹号"
+        },
+        "done": {
+          "whale": "头顶鲸",
+          "lhand": "橡皮",
+          "mood": "开心兴奋",
+          "flower": "情绪花花"
+        },
+        "failed": {
+          "whale": "放桌上",
+          "lhand": "画笔",
+          "mood": "大哭",
+          "symbol": "流汗"
+        }
+      },
+      "motionGuards": {
+        "SprayWater": {
+          "whale": [
+            "头顶鲸",
+            "放桌上"
+          ]
+        },
+        "Ketchup": {
+          "lhand": [
+            "蛋包饭"
+          ]
+        }
+      },
+      "headParts": [
+        "Part92",
+        "Part102",
+        "Part",
+        "Part101",
+        "Part57",
+        "Part58",
+        "Part19",
+        "Part44",
+        "Part14",
+        "Part47",
+        "Part69",
+        "Part68",
+        "Part46",
+        "Part45",
+        "Part28",
+        "Part160",
+        "Part161",
+        "Part98",
+        "Part95",
+        "hair_d",
+        "Part96"
+      ],
+      "tailParts": [
+        "Part20",
+        "ArtMesh37_Skinning",
+        "Part25",
+        "Part27",
+        "Part23",
+        "Part16",
+        "Part40",
+        "Part49",
+        "ArtMesh98_Skinning",
+        "Part41",
+        "Part50",
+        "Part12",
+        "Part51",
+        "ArtMesh97_Skinning",
+        "ArtMesh87_Skinning"
+      ],
+      "partNames": {
+        "Part162": "捶出包",
+        "Part109": "桌子上物体",
+        "Part92": "发型1",
+        "Part48": "恶魔角",
+        "Part11": "包和毛",
+        "Part124": "手柄",
+        "Part110": "猫咪手",
+        "Part67": "特效贴图",
+        "Part119": "蛋包饭",
+        "Part4": "蛋包饭手贴图变化",
+        "Part120": "蛋包饭手",
+        "Part122": "点菜板",
+        "Part5": "点菜板手贴图变化",
+        "Part123": "点菜板",
+        "Part106": "看手机",
+        "Part6": "手机色替换",
+        "Part107": "手机水色",
+        "Part102": "发箍切换调整",
+        "Part": "眼镜",
+        "Part101": "眉型",
+        "Part57": "眼睛L",
+        "Part58": "眼睛R",
+        "Part19": "发型F2",
+        "Part44": "动物耳朵L",
+        "Part14": "头发",
+        "Part47": "动物耳朵R",
+        "Part164": "吹泡泡糖",
+        "Part69": "嘴巴",
+        "Part68": "耳朵L",
+        "Part46": "脸蛋",
+        "Part45": "耳朵R",
+        "Part3": "脖子",
+        "Part8": "通用手臂贴图右手F变化",
+        "Part9": "通用手臂贴图左手F变化",
+        "Part133": "鼠标 副本",
+        "Part10": "鼠标垫组1",
+        "Part15": "鼠标垫组2",
+        "Part37": "键盘桌",
+        "Part35": "桌布",
+        "Part112": "按键",
+        "neck_m": "身体",
+        "Part28": "后发发型切换预设",
+        "Part160": "发型D2",
+        "Part161": "发型蛋筒D2",
+        "Part20": "尾巴翅膀",
+        "Part125": "手L",
+        "Part126": "手R",
+        "Part127": "手柄按键",
+        "Part129": "侧键L",
+        "Part130": "侧键R",
+        "Part7": "花",
+        "Part97": "爱心",
+        "Part98": "猫猫耳",
+        "Part95": "兔兔耳",
+        "Part94": "蝴蝶结",
+        "Part121": "蛋包饭",
+        "Part30": "蝴蝶结L",
+        "Part17": "蝴蝶结R",
+        "Part134": "白色 副本",
+        "Part135": "黑色 副本 2",
+        "Part18": "桌布组1",
+        "Part21": "桌布组2",
+        "Part22": "按键组1",
+        "Part114": "按键组2",
+        "Part24": "蝴蝶结组",
+        "Part26": "衣服爱心",
+        "Part29": "衣服背带",
+        "Part31": "衣服右飞肩",
+        "Part32": "衣服左飞肩",
+        "Part33": "衣服左飞肩复制",
+        "Part34": "通用手臂贴图右手D变化",
+        "Part36": "通用手臂贴图右手D变化复制",
+        "Part38": "通用表情手贴图变化",
+        "Part42": "通用表情手贴图变化复制",
+        "Part43": "猫手贴图替换",
+        "Part140": "衣服",
+        "Part141": "neck_m 副本",
+        "Part2": "部件99",
+        "Part163": "蓝紫",
+        "Part166": "黑色",
+        "hair_d": "后发短",
+        "ArtMesh37_Skinning": "尾巴(蒙皮)",
+        "Part25": "尾巴翅膀",
+        "Part27": "大翅膀",
+        "Part23": "翅膀",
+        "Part16": "狐狸尾巴",
+        "ABXY": "ABXY",
+        "Part128": "上下左右",
+        "M": "M",
+        "Part13": "萝卜",
+        "Part96": "R耳",
+        "Part40": "天使翅膀",
+        "Part49": "恶魔翅膀",
+        "ArtMesh98_Skinning": "长毛猫尾",
+        "Part41": "猫尾",
+        "Part50": "小狐尾",
+        "Part12": "大狐尾",
+        "Part51": "大狼尾",
+        "ArtMesh97_Skinning": "恶魔尾线(蒙皮)",
+        "ArtMesh87_Skinning": "狼尾狗尾(蒙皮)"
+      },
+      "lines": {
+        "greet": [
+          "你好呀，我是鲸鱼娘～",
+          "今天也一起加油吧！",
+          "终于见到你了",
+          "摸鱼时间到？"
+        ],
+        "click": [
+          "呀！",
+          "痒痒的～",
+          "干嘛呀",
+          "摸摸头？",
+          "嘿嘿"
+        ],
+        "pat": [
+          "嘿嘿，好舒服～",
+          "再摸一下嘛",
+          "唔…头发要乱了"
+        ],
+        "tail": [
+          "呀！尾巴不能乱摸！",
+          "尾巴…痒痒的",
+          "别拽尾巴啦"
+        ],
+        "spin": [
+          "呜…转晕了…",
+          "别转了别转了"
+        ],
+        "reset": [
+          "表情归位～",
+          "清清爽爽"
+        ],
+        "loadFailed": [
+          "呜呜，模型加载失败了"
+        ],
+        "phase": {
+          "thinking": "让我想想…",
+          "tool": "正在忙…",
+          "waiting": "需要你确认一下",
+          "asking": "在等你回答哦",
+          "helper": "叫了帮手一起弄",
+          "queued": "收到，记下了",
+          "done": "搞定！",
+          "failed": "呜…出错了"
+        }
+      },
+      "bubbles": {
+        "greet": [
+          {
+            "text": "你好呀，我是鲸鱼娘～",
+            "sound": "greet-1"
+          },
+          {
+            "text": "今天也一起加油吧！",
+            "sound": "greet-2"
+          },
+          {
+            "text": "终于见到你了",
+            "sound": "greet-3"
+          },
+          {
+            "text": "摸鱼时间到？",
+            "sound": "greet-4"
+          }
+        ],
+        "click": [
+          {
+            "text": "呀！",
+            "sound": "click-1"
+          },
+          {
+            "text": "痒痒的～",
+            "sound": "click-2"
+          },
+          {
+            "text": "干嘛呀",
+            "sound": "click-3"
+          },
+          {
+            "text": "摸摸头？",
+            "sound": "click-4"
+          },
+          {
+            "text": "嘿嘿",
+            "sound": "click-5"
+          }
+        ],
+        "play": [],
+        "pat": [
+          {
+            "text": "嘿嘿，好舒服～",
+            "sound": "pat-1"
+          },
+          {
+            "text": "再摸一下嘛",
+            "sound": "pat-2"
+          },
+          {
+            "text": "唔…头发要乱了",
+            "sound": "pat-3"
+          }
+        ],
+        "tail": [
+          {
+            "text": "呀！尾巴不能乱摸！",
+            "sound": "tail-1"
+          },
+          {
+            "text": "尾巴…痒痒的",
+            "sound": "tail-2"
+          },
+          {
+            "text": "别拽尾巴啦",
+            "sound": "tail-3"
+          }
+        ],
+        "spin": [
+          {
+            "text": "呜…转晕了…",
+            "sound": "spin-1"
+          },
+          {
+            "text": "别转了别转了",
+            "sound": "spin-2"
+          }
+        ],
+        "reset": [
+          {
+            "text": "表情归位～",
+            "sound": "reset-1"
+          },
+          {
+            "text": "清清爽爽",
+            "sound": "reset-2"
+          }
+        ],
+        "loadFailed": [
+          {
+            "text": "呜呜，模型加载失败了",
+            "sound": "loadFailed-1"
+          }
+        ],
+        "phase": {
+          "thinking": {
+            "text": "让我想想…",
+            "sound": "phase-thinking"
+          },
+          "tool": {
+            "text": "正在忙…",
+            "sound": "phase-tool"
+          },
+          "waiting": {
+            "text": "需要你确认一下",
+            "sound": "phase-waiting"
+          },
+          "asking": {
+            "text": "在等你回答哦",
+            "sound": "phase-asking"
+          },
+          "helper": {
+            "text": "叫了帮手一起弄",
+            "sound": "phase-helper"
+          },
+          "queued": {
+            "text": "收到，记下了",
+            "sound": "phase-queued"
+          },
+          "done": {
+            "text": "搞定！",
+            "sound": "phase-done"
+          },
+          "failed": {
+            "text": "呜…出错了",
+            "sound": "phase-failed"
+          }
+        }
+      },
+      "voices": [
+        {
+          "id": "greet-1",
+          "name": "问候 1",
+          "file": "voice/greet-1.mp3"
+        },
+        {
+          "id": "greet-2",
+          "name": "问候 2",
+          "file": "voice/greet-2.mp3"
+        },
+        {
+          "id": "greet-3",
+          "name": "问候 3",
+          "file": "voice/greet-3.mp3"
+        },
+        {
+          "id": "greet-4",
+          "name": "问候 4",
+          "file": "voice/greet-4.mp3"
+        },
+        {
+          "id": "click-1",
+          "name": "点击 1",
+          "file": "voice/click-1.mp3"
+        },
+        {
+          "id": "click-2",
+          "name": "点击 2",
+          "file": "voice/click-2.mp3"
+        },
+        {
+          "id": "click-3",
+          "name": "点击 3",
+          "file": "voice/click-3.mp3"
+        },
+        {
+          "id": "click-4",
+          "name": "点击 4",
+          "file": "voice/click-4.mp3"
+        },
+        {
+          "id": "click-5",
+          "name": "点击 5",
+          "file": "voice/click-5.mp3"
+        },
+        {
+          "id": "pat-1",
+          "name": "摸头 1",
+          "file": "voice/pat-1.mp3"
+        },
+        {
+          "id": "pat-2",
+          "name": "摸头 2",
+          "file": "voice/pat-2.mp3"
+        },
+        {
+          "id": "pat-3",
+          "name": "摸头 3",
+          "file": "voice/pat-3.mp3"
+        },
+        {
+          "id": "tail-1",
+          "name": "尾巴 1",
+          "file": "voice/tail-1.mp3"
+        },
+        {
+          "id": "tail-2",
+          "name": "尾巴 2",
+          "file": "voice/tail-2.mp3"
+        },
+        {
+          "id": "tail-3",
+          "name": "尾巴 3",
+          "file": "voice/tail-3.mp3"
+        },
+        {
+          "id": "spin-1",
+          "name": "绕晕 1",
+          "file": "voice/spin-1.mp3"
+        },
+        {
+          "id": "spin-2",
+          "name": "绕晕 2",
+          "file": "voice/spin-2.mp3"
+        },
+        {
+          "id": "reset-1",
+          "name": "归位 1",
+          "file": "voice/reset-1.mp3"
+        },
+        {
+          "id": "reset-2",
+          "name": "归位 2",
+          "file": "voice/reset-2.mp3"
+        },
+        {
+          "id": "loadFailed-1",
+          "name": "加载失败 1",
+          "file": "voice/loadFailed-1.mp3"
+        },
+        {
+          "id": "phase-thinking",
+          "name": "思考",
+          "file": "voice/phase-thinking.mp3"
+        },
+        {
+          "id": "phase-tool",
+          "name": "跑工具",
+          "file": "voice/phase-tool.mp3"
+        },
+        {
+          "id": "phase-waiting",
+          "name": "等你确认",
+          "file": "voice/phase-waiting.mp3"
+        },
+        {
+          "id": "phase-asking",
+          "name": "等你回答",
+          "file": "voice/phase-asking.mp3"
+        },
+        {
+          "id": "phase-helper",
+          "name": "子代理",
+          "file": "voice/phase-helper.mp3"
+        },
+        {
+          "id": "phase-queued",
+          "name": "排队",
+          "file": "voice/phase-queued.mp3"
+        },
+        {
+          "id": "phase-done",
+          "name": "完成",
+          "file": "voice/phase-done.mp3"
+        },
+        {
+          "id": "phase-failed",
+          "name": "出错",
+          "file": "voice/phase-failed.mp3"
+        }
+      ],
+      "soundLibrary": [
+        {
+          "id": "greet-1",
+          "name": "问候 1",
+          "builtin": true
+        },
+        {
+          "id": "greet-2",
+          "name": "问候 2",
+          "builtin": true
+        },
+        {
+          "id": "greet-3",
+          "name": "问候 3",
+          "builtin": true
+        },
+        {
+          "id": "greet-4",
+          "name": "问候 4",
+          "builtin": true
+        },
+        {
+          "id": "click-1",
+          "name": "点击 1",
+          "builtin": true
+        },
+        {
+          "id": "click-2",
+          "name": "点击 2",
+          "builtin": true
+        },
+        {
+          "id": "click-3",
+          "name": "点击 3",
+          "builtin": true
+        },
+        {
+          "id": "click-4",
+          "name": "点击 4",
+          "builtin": true
+        },
+        {
+          "id": "click-5",
+          "name": "点击 5",
+          "builtin": true
+        },
+        {
+          "id": "pat-1",
+          "name": "摸头 1",
+          "builtin": true
+        },
+        {
+          "id": "pat-2",
+          "name": "摸头 2",
+          "builtin": true
+        },
+        {
+          "id": "pat-3",
+          "name": "摸头 3",
+          "builtin": true
+        },
+        {
+          "id": "tail-1",
+          "name": "尾巴 1",
+          "builtin": true
+        },
+        {
+          "id": "tail-2",
+          "name": "尾巴 2",
+          "builtin": true
+        },
+        {
+          "id": "tail-3",
+          "name": "尾巴 3",
+          "builtin": true
+        },
+        {
+          "id": "spin-1",
+          "name": "绕晕 1",
+          "builtin": true
+        },
+        {
+          "id": "spin-2",
+          "name": "绕晕 2",
+          "builtin": true
+        },
+        {
+          "id": "reset-1",
+          "name": "归位 1",
+          "builtin": true
+        },
+        {
+          "id": "reset-2",
+          "name": "归位 2",
+          "builtin": true
+        },
+        {
+          "id": "loadFailed-1",
+          "name": "加载失败 1",
+          "builtin": true
+        },
+        {
+          "id": "phase-thinking",
+          "name": "思考",
+          "builtin": true
+        },
+        {
+          "id": "phase-tool",
+          "name": "跑工具",
+          "builtin": true
+        },
+        {
+          "id": "phase-waiting",
+          "name": "等你确认",
+          "builtin": true
+        },
+        {
+          "id": "phase-asking",
+          "name": "等你回答",
+          "builtin": true
+        },
+        {
+          "id": "phase-helper",
+          "name": "子代理",
+          "builtin": true
+        },
+        {
+          "id": "phase-queued",
+          "name": "排队",
+          "builtin": true
+        },
+        {
+          "id": "phase-done",
+          "name": "完成",
+          "builtin": true
+        },
+        {
+          "id": "phase-failed",
+          "name": "出错",
+          "builtin": true
+        }
+      ],
+      "sounds": {
+        "done": [
+          [
+            660,
+            0
+          ],
+          [
+            880,
+            0.13
+          ]
+        ],
+        "failed": [
+          [
+            370,
+            0
+          ],
+          [
+            277,
+            0.16
+          ]
+        ],
+        "waiting": [
+          [
+            520,
+            0
+          ],
+          [
+            660,
+            0.16
+          ]
+        ],
+        "asking": [
+          [
+            520,
+            0
+          ],
+          [
+            780,
+            0.16
+          ]
+        ]
+      },
+      "patReactions": [
+        "重锤出击",
+        "问号",
+        "星星眼"
+      ],
+      "tailReactions": [
+        "吐魂",
+        "问号"
+      ],
+      "spinReactions": [
+        "晕晕"
+      ],
+      "fidgetSlots": [
+        "rhand",
+        "lhand",
+        "mood",
+        "cheek",
+        "mouth",
+        "eyes",
+        "selfie"
+      ],
+      "hiddenMotions": [
+        "OpenCase",
+        "BubbleGum"
+      ],
+      "translate": {
+        "x": 0,
+        "y": 0
+      },
+      "modelUrl": "/model/c_0120.model3.json",
+      "motions": [
+        {
+          "group": "Idle",
+          "count": 1,
+          "label": "待机",
+          "category": "action",
+          "items": [
+            {
+              "index": 0,
+              "duration": 4000,
+              "loop": true,
+              "params": [
+                "Param73",
+                "Param74",
+                "Param75",
+                "Param76",
+                "maoshou2",
+                "maoshou3",
+                "maoshou4",
+                "maoshou5",
+                "maoshou6",
+                "maoshou7",
+                "j2",
+                "j3",
+                "j4",
+                "j5",
+                "j6",
+                "j7",
+                "j8",
+                "j8_1",
+                "j9",
+                "j10",
+                "j11",
+                "j12",
+                "j13",
+                "j14",
+                "j15",
+                "j16",
+                "j17",
+                "j18",
+                "j19",
+                "j20",
+                "j21",
+                "j22",
+                "j23",
+                "j24",
+                "j25",
+                "j26",
+                "j27",
+                "j28",
+                "j29",
+                "j30",
+                "j31",
+                "j32",
+                "j34",
+                "j35",
+                "j36",
+                "j37",
+                "j38",
+                "j39",
+                "j41",
+                "j40",
+                "j42",
+                "j43",
+                "j44",
+                "j45",
+                "j46",
+                "j47",
+                "j48",
+                "j49",
+                "j50",
+                "j51",
+                "j52",
+                "j53",
+                "j54",
+                "j55",
+                "j56",
+                "j57",
+                "ParamBreath4",
+                "ParamBreath3",
+                "Param_Angle_Rotation_1_xk4",
+                "Param_Angle_Rotation_2_xk4",
+                "Param_Angle_Rotation_3_xk4",
+                "Param_Angle_Rotation_4_xk4",
+                "Param_Angle_Rotation_5_xk4",
+                "Param_Angle_Rotation_6_xk4",
+                "Param_Angle_Rotation_7_xk4",
+                "paopao",
+                "paopao2",
+                "paopao3",
+                "paopao4",
+                "paopao5",
+                "Param77",
+                "c1",
+                "c2",
+                "c3",
+                "c4",
+                "c5",
+                "c6",
+                "ParamCheek28",
+                "ParamCheek36"
+              ]
+            }
+          ]
+        },
+        {
+          "group": "Hammer",
+          "count": 1,
+          "label": "重锤出击",
+          "category": "action",
+          "items": [
+            {
+              "index": 0,
+              "duration": 4767,
+              "loop": true,
+              "params": [
+                "ParamCheek20",
+                "ParamCheek27",
+                "ParamCheek76",
+                "ParamCheek77",
+                "ParamCheek75",
+                "ParamAngleX",
+                "ParamAngleY",
+                "ParamAngleZ",
+                "Param",
+                "ParamBodyAngleX",
+                "ParamBodyAngleY",
+                "ParamBodyAngleZ",
+                "Param14",
+                "Param13",
+                "ParamEyeLOpen",
+                "ParamEyeROpen",
+                "ParamEyeBallX",
+                "ParamEyeBallY",
+                "ParamBrowLX",
+                "ParamBrowLY",
+                "ParamBrowLAngle",
+                "ParamBrowLForm",
+                "ParamBrowRX",
+                "ParamBrowRY",
+                "ParamBrowRAngle",
+                "ParamBrowRForm",
+                "ParamMouthForm",
+                "ParamMouthOpenY",
+                "Param71",
+                "Param72",
+                "Param73",
+                "Param74",
+                "Param75",
+                "Param76",
+                "Param77",
+                "Param70"
+              ]
+            }
+          ]
+        },
+        {
+          "group": "BubbleGum",
+          "count": 1,
+          "label": "吹泡泡糖",
+          "category": "action",
+          "items": [
+            {
+              "index": 0,
+              "duration": 5000,
+              "loop": true,
+              "params": [
+                "chuipaopao",
+                "chuipaopao1",
+                "chuipaopao5",
+                "chuipaopao6",
+                "chuipaopao2",
+                "chuipaopao7",
+                "chuipaopao3",
+                "chuipaopao4"
+              ]
+            }
+          ]
+        },
+        {
+          "group": "SprayWater",
+          "count": 1,
+          "label": "鲸鱼喷水",
+          "category": "action",
+          "items": [
+            {
+              "index": 0,
+              "duration": 467,
+              "loop": true,
+              "params": [
+                "pengshui"
+              ]
+            }
+          ]
+        },
+        {
+          "group": "OpenCase",
+          "count": 1,
+          "label": "掏出手机",
+          "category": "action",
+          "items": [
+            {
+              "index": 0,
+              "duration": 1000,
+              "loop": true,
+              "params": [
+                "pointZ2",
+                "phone",
+                "phone4",
+                "phone6",
+                "phone2"
+              ]
+            }
+          ]
+        },
+        {
+          "group": "Selfie",
+          "count": 1,
+          "label": "自拍动画",
+          "category": "action",
+          "items": [
+            {
+              "index": 0,
+              "duration": 3300,
+              "loop": true,
+              "params": [
+                "ParamAngleX",
+                "ParamAngleY",
+                "ParamAngleZ",
+                "ParamBodyAngleX",
+                "ParamBodyAngleY",
+                "ParamBodyAngleZ",
+                "ParamEyeLOpen",
+                "ParamEyeROpen",
+                "ParamEyeBallX",
+                "ParamEyeBallY",
+                "ParamBrowLX",
+                "ParamBrowLY",
+                "ParamBrowLAngle",
+                "ParamBrowLForm",
+                "ParamBrowRX",
+                "ParamBrowRY",
+                "ParamBrowRAngle",
+                "ParamBrowRForm",
+                "ParamMouthForm",
+                "ParamMouthOpenY",
+                "phone",
+                "phone4",
+                "phone6",
+                "phone3",
+                "phone5"
+              ]
+            }
+          ]
+        },
+        {
+          "group": "SelfieQuick",
+          "count": 1,
+          "label": "快速自拍",
+          "category": "action",
+          "items": [
+            {
+              "index": 0,
+              "duration": 1267,
+              "loop": true,
+              "params": [
+                "phone",
+                "phone3"
+              ]
+            }
+          ]
+        },
+        {
+          "group": "Ketchup",
+          "count": 1,
+          "label": "挤番茄酱",
+          "category": "action",
+          "items": [
+            {
+              "index": 0,
+              "duration": 5000,
+              "loop": true,
+              "params": [
+                "ParamCheek21",
+                "ParamAngleX",
+                "ParamAngleY",
+                "ParamAngleZ",
+                "ParamEyeLOpen",
+                "ParamEyeROpen",
+                "ParamMouthForm",
+                "ParamMouthOpenY",
+                "keyboard",
+                "point",
+                "xbox",
+                "danbaofan",
+                "danbaoX",
+                "danbaoY",
+                "danbaoz",
+                "ji",
+                "aixing",
+                "Param9"
+              ]
+            }
+          ]
+        }
+      ],
+      "expressions": [
+        {
+          "name": "脸红",
+          "label": "脸红",
+          "category": "emotion",
+          "file": "expressions/facial-red.exp3.json",
+          "params": [
+            {
+              "id": "Paramhh2",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "爱心眼",
+          "label": "爱心眼",
+          "category": "emotion",
+          "file": "expressions/love-eyes.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek15",
+              "value": 0,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamCheek17",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "Paramhh2",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLX",
+              "value": 0,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLY",
+              "value": -0.30000001192092896,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLAngle",
+              "value": 0.20000004768371582,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLForm",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRX",
+              "value": 0,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRY",
+              "value": -0.30000001192092896,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRAngle",
+              "value": 0.20000004768371582,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRForm",
+              "value": -1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "星星眼",
+          "label": "星星眼",
+          "category": "emotion",
+          "file": "expressions/star-eyes.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek16",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "情绪花花",
+          "label": "情绪花花",
+          "category": "emotion",
+          "file": "expressions/sparkle.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek26",
+              "value": 360,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "心跳",
+          "label": "心跳",
+          "category": "emotion",
+          "file": "expressions/heartbeat.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek73",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "开心兴奋",
+          "label": "开心兴奋",
+          "category": "emotion",
+          "file": "expressions/excited.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek76",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamEyeLOpen",
+              "value": 0,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamEyeROpen",
+              "value": 0,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLX",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLY",
+              "value": -0.800000011920929,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLAngle",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLForm",
+              "value": -0.6000000238418579,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRX",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRY",
+              "value": -0.800000011920929,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRAngle",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRForm",
+              "value": -0.6000000238418579,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamMouthForm",
+              "value": 1.5,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "悲伤",
+          "label": "悲伤",
+          "category": "emotion",
+          "file": "expressions/sad.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek15",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLAngle",
+              "value": 0.2999999523162842,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLForm",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRAngle",
+              "value": 0.2999999523162842,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRForm",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamMouthForm",
+              "value": -1.5,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "大哭",
+          "label": "大哭",
+          "category": "emotion",
+          "file": "expressions/cry.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek20",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamCheek27",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamCheek23",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLX",
+              "value": 0,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLY",
+              "value": -0.30000001192092896,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLAngle",
+              "value": 0.25,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLForm",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRX",
+              "value": 0,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRY",
+              "value": -0.30000001192092896,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRAngle",
+              "value": 0.25,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRForm",
+              "value": -1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "生气",
+          "label": "生气",
+          "category": "emotion",
+          "file": "expressions/angry.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek80",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamCheek23",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLX",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLY",
+              "value": -0.5,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLAngle",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLForm",
+              "value": -0.5876975059509277,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRX",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRY",
+              "value": -0.45431703329086304,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRAngle",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRForm",
+              "value": -0.699999988079071,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "晕晕",
+          "label": "晕晕",
+          "category": "emotion",
+          "file": "expressions/dizzy.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek77",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamEyeLOpen",
+              "value": -0.5,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamEyeROpen",
+              "value": -0.5,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLY",
+              "value": 0,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowLForm",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRY",
+              "value": 0,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamBrowRForm",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "流汗",
+          "label": "流汗",
+          "category": "emotion",
+          "file": "expressions/sweat.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek19",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "问号",
+          "label": "问号",
+          "category": "emotion",
+          "file": "expressions/question.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek74",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "感叹号",
+          "label": "感叹号",
+          "category": "emotion",
+          "file": "expressions/exclaim.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek75",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "阴暗",
+          "label": "阴暗",
+          "category": "emotion",
+          "file": "expressions/gloomy.exp3.json",
+          "params": [
+            {
+              "id": "Paramhh3",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "调皮",
+          "label": "调皮",
+          "category": "emotion",
+          "file": "expressions/naughty.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek21",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamEyeROpen",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamMouthForm",
+              "value": 1.5,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "闭眼口水",
+          "label": "闭眼口水",
+          "category": "emotion",
+          "file": "expressions/drool.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek22",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "吐魂",
+          "label": "吐魂",
+          "category": "emotion",
+          "file": "expressions/soul-out.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek18",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "吐舌",
+          "label": "吐舌",
+          "category": "emotion",
+          "file": "expressions/tongue-out.exp3.json",
+          "params": [
+            {
+              "id": "ParamBrowRForm2",
+              "value": 0,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamCheek79",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamMouthForm",
+              "value": 0.9735565781593323,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamMouthOpenY",
+              "value": 0.7558661103248596,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "呆呆眼",
+          "label": "呆呆眼",
+          "category": "emotion",
+          "file": "expressions/blank-eyes.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek20",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "冒爱心",
+          "label": "冒爱心",
+          "category": "emotion",
+          "file": "expressions/heart-pop.exp3.json",
+          "params": [
+            {
+              "id": "love",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "圆眼镜",
+          "label": "圆眼镜",
+          "category": "accessory",
+          "file": "expressions/glasses-round.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek70",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "方眼镜",
+          "label": "方眼镜",
+          "category": "accessory",
+          "file": "expressions/glasses-square.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek72",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "椭圆眼镜",
+          "label": "椭圆眼镜",
+          "category": "accessory",
+          "file": "expressions/glasses-oval.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek10",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "墨镜",
+          "label": "墨镜",
+          "category": "accessory",
+          "file": "expressions/sunglasses.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek71",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamEyeLOpen",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamEyeROpen",
+              "value": -1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "头箍",
+          "label": "头箍",
+          "category": "accessory",
+          "file": "expressions/headband.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek38",
+              "value": 3,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "单边马尾",
+          "label": "单边马尾",
+          "category": "accessory",
+          "file": "expressions/ponytail.exp3.json",
+          "params": [
+            {
+              "id": "fx1",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "蝴蝶结贴纸",
+          "label": "蝴蝶结贴纸",
+          "category": "accessory",
+          "file": "expressions/sticker-bow.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek81",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "猫猫贴纸",
+          "label": "猫猫贴纸",
+          "category": "accessory",
+          "file": "expressions/sticker-cat.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek83",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "兔兔贴纸",
+          "label": "兔兔贴纸",
+          "category": "accessory",
+          "file": "expressions/sticker-rabbit.exp3.json",
+          "params": [
+            {
+              "id": "ParamCheek82",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "头顶鲸",
+          "label": "头顶鲸",
+          "category": "prop",
+          "file": "expressions/whale.exp3.json",
+          "params": [
+            {
+              "id": "jingyu",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "鲸鱼放桌上",
+          "label": "鲸鱼放桌上",
+          "category": "prop",
+          "file": "expressions/whale-on-desk.exp3.json",
+          "params": [
+            {
+              "id": "fangzhuoshang",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "桌面巴菲",
+          "label": "桌面巴菲",
+          "category": "prop",
+          "file": "expressions/parfait.exp3.json",
+          "params": [
+            {
+              "id": "baleite",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "蛋包饭",
+          "label": "蛋包饭",
+          "category": "prop",
+          "file": "expressions/omurice.exp3.json",
+          "params": [
+            {
+              "id": "point",
+              "value": -1,
+              "blend": "Add"
+            },
+            {
+              "id": "danbaofan",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "桌面粉魔爪",
+          "label": "桌面粉魔爪",
+          "category": "prop",
+          "file": "expressions/claw.exp3.json",
+          "params": [
+            {
+              "id": "mozhua",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "魔爪换色",
+          "label": "魔爪换色",
+          "category": "prop",
+          "file": "expressions/claw-recolor.exp3.json",
+          "params": [
+            {
+              "id": "mozhua2",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "双手比耶",
+          "label": "双手比耶",
+          "category": "prop",
+          "file": "expressions/hands-peace.exp3.json",
+          "params": [
+            {
+              "id": "phone7",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "喵喵手",
+          "label": "喵喵手",
+          "category": "prop",
+          "file": "expressions/cat-paws.exp3.json",
+          "params": [
+            {
+              "id": "maoshou",
+              "value": 1,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamCheek51",
+              "value": 0,
+              "blend": "Add"
+            },
+            {
+              "id": "ParamCheek61",
+              "value": 0,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "手机换色",
+          "label": "手机换色",
+          "category": "prop",
+          "file": "expressions/phone-recolor.exp3.json",
+          "params": [
+            {
+              "id": "shouji",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "深色桌布",
+          "label": "深色桌布",
+          "category": "prop",
+          "file": "expressions/dark-tablecloth.exp3.json",
+          "params": [
+            {
+              "id": "cc2",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "画笔",
+          "label": "画笔",
+          "category": "prop",
+          "file": "expressions/draw-brush.exp3.json",
+          "params": [
+            {
+              "id": "bi",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "橡皮",
+          "label": "橡皮",
+          "category": "prop",
+          "file": "expressions/draw-eraser.exp3.json",
+          "params": [
+            {
+              "id": "pi",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "撤回",
+          "label": "撤回",
+          "category": "prop",
+          "file": "expressions/draw-undo.exp3.json",
+          "params": [
+            {
+              "id": "chehui",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "点菜按下",
+          "label": "点菜按下",
+          "category": "prop",
+          "file": "expressions/menu-press.exp3.json",
+          "params": [
+            {
+              "id": "pointZ",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        },
+        {
+          "name": "挤番茄酱",
+          "label": "挤番茄酱",
+          "category": "prop",
+          "file": "expressions/ketchup-squeeze.exp3.json",
+          "params": [
+            {
+              "id": "ji",
+              "value": 1,
+              "blend": "Add"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

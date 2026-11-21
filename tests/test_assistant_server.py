@@ -60,7 +60,10 @@ class AssistantServerTests(unittest.TestCase):
         cls.addClassCleanup(cls.server.shutdown)
 
     def setUp(self):
-        environment = mock.patch.object(broker.os, "environ", {"DEEPSEEK_API_KEY": FAKE_KEY})
+        transport = mock.patch.object(broker, "USE_WINHTTP", False)
+        transport.start()
+        self.addCleanup(transport.stop)
+        environment = mock.patch.object(broker.os, "environ", {"DEEPSEEK_API_KEY": FAKE_KEY, "DEEPSEEK_PROXY": "direct"})
         self.addCleanup(environment.stop)
         environment.start()
         # Every test intercepts the actual urllib boundary. No public endpoint is contacted.
@@ -265,6 +268,11 @@ class AssistantServerTests(unittest.TestCase):
 
 
 class AssistantNetworkTests(unittest.TestCase):
+    def setUp(self):
+        transport = mock.patch.object(broker, "USE_WINHTTP", False)
+        transport.start()
+        self.addCleanup(transport.stop)
+
     def test_proxy_configuration_and_invalid_values(self):
         with mock.patch.object(broker.os, "environ", {}):
             self.assertEqual(broker.configured_proxy_mode(), "auto")
@@ -340,6 +348,56 @@ class AssistantNetworkTests(unittest.TestCase):
                 message = broker.describe_network_error(urllib.error.URLError(reason))
                 self.assertTrue(any(fragment in message for fragment in expected), message)
                 self.assertNotIn(FAKE_KEY, message)
+
+
+class PrivateSessionTests(unittest.TestCase):
+    def setUp(self):
+        transport = mock.patch.object(broker, "USE_WINHTTP", False)
+        transport.start()
+        self.addCleanup(transport.stop)
+        self.key = "sk-session-test-placeholder"
+        self.token = "session-test-token-for-native-app"
+        self.server = broker.make_server(0, api_key=self.key, session_token=self.token)
+        self.addCleanup(self.server.server_close)
+        self.worker = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.worker.start()
+        self.addCleanup(self.worker.join, 5)
+        self.addCleanup(self.server.shutdown)
+
+    def post(self, authorization=None, origin=None):
+        connection = http.client.HTTPConnection(broker.HOST, self.server.server_port, timeout=4)
+        self.addCleanup(connection.close)
+        headers = {"Content-Type": "application/xml; charset=UTF-8"}
+        if authorization is not None:
+            headers["Authorization"] = authorization
+        if origin is not None:
+            headers["Origin"] = origin
+        connection.request("POST", broker.TURN_PATH, body=GUIDE_XML.encode("utf-8"), headers=headers)
+        response = connection.getresponse()
+        return response.status, response.read()
+
+    def test_session_uses_login_key_instead_of_environment(self):
+        with mock.patch.dict(broker.os.environ, {"DEEPSEEK_API_KEY": FAKE_KEY, "DEEPSEEK_PROXY": "direct"}), \
+                mock.patch.object(broker.urllib.request, "build_opener") as opener:
+            opener.return_value.open.return_value = io.BytesIO(json.dumps(
+                completed(text_output("会话连接成功"))).encode("utf-8"))
+            status, data = self.post("Bearer " + self.token)
+            self.assertEqual(status, 200)
+            self.assertEqual(ET.fromstring(data).findtext("text"), "会话连接成功")
+            request = opener.return_value.open.call_args.args[0]
+            self.assertEqual(request.get_header("Authorization"), "Bearer " + self.key)
+            self.assertNotIn(self.key.encode(), data)
+            self.assertNotIn(self.token.encode(), data)
+
+    def test_session_rejects_missing_wrong_or_browser_credentials(self):
+        with mock.patch.object(broker, "run_turn") as run:
+            for authorization, origin in [(None, None), ("Bearer wrong", None),
+                                           ("Bearer " + self.key, None),
+                                           ("Bearer " + self.token, "http://localhost")]:
+                with self.subTest(authorization=authorization, origin=origin):
+                    status, _ = self.post(authorization, origin)
+                    self.assertEqual(status, 403)
+            run.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -1,18 +1,23 @@
 """Loopback XML adapter for the wx_demo circuit assistant."""
 
 import argparse
+import hmac
 import http.client
 import http.server
 import json
 import os
 import re
+import secrets
 import socket
 import ssl
 import sys
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+import assistant_skills
+import assistant_winhttp
 
 
 HOST = "127.0.0.1"
@@ -23,7 +28,7 @@ DEEPSEEK_PROBE_URL = "https://api.deepseek.com/models"
 DEFAULT_MODEL = "deepseek-flash"
 UPSTREAM_TIMEOUT = 25
 NETWORK_PROBE_TIMEOUT = 4
-MAX_REQUEST_BYTES = 16 * 1024
+MAX_REQUEST_BYTES = 2 * 1024 * 1024
 MAX_QUESTION_CHARS = 4000
 MAX_UPSTREAM_BYTES = 256 * 1024
 MAX_REPLY_CHARS = 6000
@@ -36,6 +41,7 @@ INVALID_XML_CHARS = re.compile(r"[^\x09\x0a\x0d\x20-\ud7ff\ue000-\ufffd\U0001000
 INVALID_RESPONSE = "DeepSeek 返回的响应无效，请重试。"
 INVALID_ACTION = "助手返回的电路无效，没有应用。请简化要求后重试。"
 _auto_proxy_mode = "system"
+USE_WINHTTP = os.name == "nt"
 
 PIN_RULES = (
     "仅支持这些元件：INPUT（inputCount=0，输出 OUT），OUTPUT（inputCount=1，输入 IN），"
@@ -125,6 +131,8 @@ def configured_proxy_mode():
 
 
 def network_opener(mode):
+    if USE_WINHTTP:
+        return assistant_winhttp.WindowsOpener(mode)
     if mode == "system":
         return urllib.request.build_opener(NoRedirect())
     proxies = {} if mode == "direct" else {"https": mode}
@@ -133,6 +141,17 @@ def network_opener(mode):
 
 def describe_network_error(error):
     reason = error.reason if isinstance(error, urllib.error.URLError) else error
+    if isinstance(reason, assistant_winhttp.WinHttpError):
+        code = reason.winerror
+        if code == 12002:
+            return "连接 DeepSeek 超时，请重试。（Windows HTTPS 12002）"
+        if code == 12007:
+            return "Windows 无法解析 DeepSeek 或代理地址。（12007）"
+        if code in (12037, 12038, 12044, 12045, 12175):
+            return f"Windows HTTPS 安全连接失败，请检查证书、系统时间或代理。（{code}）"
+        if code in (12029, 12030, 12152, 12157):
+            return f"Windows HTTPS 连接被中断，请检查当前网络或代理。（{code}）"
+        return f"Windows HTTPS 请求失败（{code}，阶段 {reason.stage}）。"
     if isinstance(reason, TimeoutError) or getattr(reason, "winerror", None) == 10060:
         return "连接 DeepSeek 超时，请重试。"
     if isinstance(reason, socket.gaierror):
@@ -183,6 +202,26 @@ def network_label(mode):
     return {"system": "系统/环境设置", "direct": "直连"}.get(mode, "指定 HTTP 代理")
 
 
+def request_proxy_mode():
+    global _auto_proxy_mode
+    mode = configured_proxy_mode()
+    if mode != "auto":
+        return mode
+    # Probe without credentials before sending the one billable POST. Do not
+    # replay a model request after a timeout or a partially received response.
+    preferred = _auto_proxy_mode if _auto_proxy_mode in ("system", "direct") else "system"
+    alternate = "direct" if preferred == "system" else "system"
+    ok, first = probe_network(preferred)
+    if ok:
+        return preferred
+    ok, second = probe_network(alternate)
+    if ok:
+        _auto_proxy_mode = alternate
+        return alternate
+    raise BrokerError("DeepSeek 连接检查失败。" + network_label(preferred) + "：" + first +
+                      "；" + network_label(alternate) + "：" + second)
+
+
 def parse_turn(data):
     if not 0 < len(data) <= MAX_REQUEST_BYTES:
         raise ValueError("invalid request size")
@@ -199,7 +238,7 @@ def parse_turn(data):
     root = ET.fromstring(xml)
     mode = root.get("mode")
     if (root.tag != "assistant_request" or set(root.attrib) != {"mode"}
-            or mode not in ("guide", "apply") or len(root) != 1 or (root.text or "").strip()):
+            or mode not in ("guide", "apply") or len(root) not in (1, 2) or (root.text or "").strip()):
         raise ValueError("invalid request root")
     node = root[0]
     if node.tag != "question" or node.attrib or len(node) or (node.tail or "").strip():
@@ -207,7 +246,8 @@ def parse_turn(data):
     question = node.text or ""
     if not question.strip() or len(question) > MAX_QUESTION_CHARS:
         raise ValueError("invalid question length")
-    return mode, question.strip()
+    context = assistant_skills.parse_context(root[1]) if len(root) == 2 else None
+    return mode, question.strip(), context
 
 
 def make_payload(mode, question, model):
@@ -241,9 +281,8 @@ def decode_json(text):
 
 
 def fetch_deepseek(payload, api_key):
-    mode = configured_proxy_mode()
-    if mode == "auto":
-        mode = _auto_proxy_mode
+    global _auto_proxy_mode
+    mode = request_proxy_mode()
     request = urllib.request.Request(
         DEEPSEEK_URL,
         data=json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"),
@@ -273,7 +312,13 @@ def fetch_deepseek(payload, api_key):
             message = "DeepSeek 服务暂时不可用，请稍后再试。"
         raise BrokerError(message) from None
     except (OSError, ValueError, http.client.HTTPException) as error:
-        raise BrokerError(describe_network_error(error)) from None
+        message = describe_network_error(error)
+        reason = error.reason if isinstance(error, urllib.error.URLError) else error
+        if (configured_proxy_mode() == "auto" and mode in ("system", "direct")
+                and isinstance(reason, (ssl.SSLError, ConnectionResetError, ConnectionRefusedError))):
+            _auto_proxy_mode = "direct" if mode == "system" else "system"
+            message += " 已切换下一次请求的连接路径，请重试。"
+        raise BrokerError(message) from None
     if len(data) > MAX_UPSTREAM_BYTES:
         raise BrokerError("DeepSeek 返回的响应过大，请缩小问题范围。")
     try:
@@ -399,8 +444,8 @@ def interpret_response(document, mode, api_key):
     return text_reply("text", message.replace(api_key, "[已隐藏]"))
 
 
-def run_turn(mode, question):
-    api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+def run_turn(mode, question, api_key=None, context=None):
+    api_key = (os.environ.get("DEEPSEEK_API_KEY", "") if api_key is None else api_key).strip()
     if not api_key:
         return text_reply("error", "本地服务没有设置 DEEPSEEK_API_KEY。")
     if not re.fullmatch(r"[!-~]{1,1024}", api_key):
@@ -410,8 +455,11 @@ def run_turn(mode, question):
         return text_reply("error", "DEEPSEEK_MODEL 的格式无效。")
     question = question.replace(api_key, "[已隐藏]")
     try:
+        if context is not None:
+            payload = assistant_skills.make_payload(mode, question, model, context)
+            return assistant_skills.interpret_response(fetch_deepseek(payload, api_key), mode, api_key, decode_json)
         return interpret_response(fetch_deepseek(make_payload(mode, question, model), api_key), mode, api_key)
-    except BrokerError as error:
+    except (BrokerError, ValueError) as error:
         return text_reply("error", str(error))
 
 
@@ -451,9 +499,13 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
         port = self.server.server_address[1]
         hosts = {f"{HOST}:{port}", f"localhost:{port}"}
         host_values = self.headers.get_all("Host", [])
+        authorization = self.headers.get_all("Authorization", [])
+        token = self.server.session_token
+        authorized = (len(authorization) == 1 and hmac.compare_digest(
+            authorization[0].encode("utf-8"), ("Bearer " + token).encode("ascii"))) if token else not authorization
         if (self.client_address[0] != HOST or len(host_values) != 1
                 or host_values[0].lower() not in hosts or "Origin" in self.headers
-                or "Authorization" in self.headers or "X-Api-Key" in self.headers):
+                or not authorized or "X-Api-Key" in self.headers):
             self.send_error(403)
             return
         if self.path != TURN_PATH:
@@ -479,28 +531,38 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
             data = self.rfile.read(count)
             if len(data) != count:
                 raise ValueError("truncated request")
-            mode, question = parse_turn(data)
+            mode, question, context = parse_turn(data)
         except (ValueError, ET.ParseError, OSError):
             self.send_error(400)
             return
-        self.send_reply(200, run_turn(mode, question))
+        self.send_reply(200, run_turn(mode, question, self.server.api_key, context))
 
 
-class AssistantServer(http.server.HTTPServer):
+class AssistantServer(http.server.ThreadingHTTPServer):
+    daemon_threads = True
+    def __init__(self, address, handler, *, api_key=None, session_token=""):
+        self.api_key = api_key
+        self.session_token = session_token
+        super().__init__(address, handler)
+
     def handle_error(self, request, client_address):
         # Do not print a traceback that might include an upstream exception message.
         print("A local assistant request failed.", file=sys.stderr)
 
 
-def make_server(port=PORT):
-    return AssistantServer((HOST, port), AssistantHandler)
+def make_server(port=PORT, *, api_key=None, session_token=""):
+    return AssistantServer((HOST, port), AssistantHandler, api_key=api_key, session_token=session_token)
 
 
 def main(argv=None):
     global _auto_proxy_mode
     parser = argparse.ArgumentParser(description="启动 wx_demo 的 DeepSeek 本地服务。")
     parser.add_argument("--check-network", action="store_true", help="不使用密钥检查 DeepSeek 连接")
+    parser.add_argument("--port", type=int, default=None, help="本地监听端口，0 为自动分配")
+    parser.add_argument("--session-stdin", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.port is not None and not 0 <= args.port <= 65535:
+        parser.error("端口必须在 0 至 65535 之间。")
     try:
         mode = configured_proxy_mode()
     except BrokerError as error:
@@ -515,12 +577,38 @@ def main(argv=None):
             reachable = reachable or ok
         return 0 if reachable else 1
     try:
-        with make_server() as server:
+        api_key = None
+        token = ""
+        if args.session_stdin:
+            # 由原生应用通过匿名管道传入，不放在命令行、环境或文件中。
+            raw_key = sys.stdin.buffer.readline(1026)
+            try:
+                api_key = raw_key.decode("ascii").strip()
+            except UnicodeDecodeError:
+                return 2
+            if not raw_key.endswith(b"\n") or not re.fullmatch(r"[!-~]{1,1024}", api_key):
+                return 2
+            token = secrets.token_urlsafe(32)
+        port = args.port if args.port is not None else (0 if args.session_stdin else PORT)
+        with make_server(port, api_key=api_key, session_token=token) as server:
+            if args.session_stdin:
+                def watch_owner():
+                    try:
+                        sys.stdin.buffer.read(1)
+                    except OSError:
+                        pass
+                    server.shutdown()
+
+                threading.Thread(target=watch_owner, daemon=True).start()
             if mode == "auto":
-                print("正在检查 DeepSeek 连接（不使用密钥）…", flush=True)
+                if not args.session_stdin:
+                    print("正在检查 DeepSeek 连接（不使用密钥）…", flush=True)
                 _auto_proxy_mode = choose_auto_proxy()
                 mode = _auto_proxy_mode
-            print(f"电路助手本地服务：http://{HOST}:{PORT}；DeepSeek：{network_label(mode)}", flush=True)
+            if args.session_stdin:
+                print(f"WX_DEMO_ASSISTANT_READY {server.server_port} {token}", flush=True)
+            else:
+                print(f"电路助手本地服务：http://{HOST}:{server.server_port}；DeepSeek：{network_label(mode)}", flush=True)
             server.serve_forever()
     except KeyboardInterrupt:
         return 0

@@ -12,6 +12,7 @@
 #include "Wire.h"
 #include "SimulationSnapshot.h"
 #include "CircuitDocument.h"
+#include "AiWorkspace.h"
 
 #include <optional>
 #include <functional>
@@ -74,7 +75,9 @@ public:
     CircuitDocument ExportDocument() const;
     bool ImportDocument(const CircuitDocument& document, wxString& error);
     // Apply a locally validated assistant proposal as one normal canvas edit.
-    bool ApplyAssistantDocument(const CircuitDocument& document, std::uint64_t expectedRevision, wxString& error);
+    bool ApplyAssistantDocument(const CircuitDocument& document, std::uint64_t expectedRevision, wxString& error,
+        bool coalesceUndo = false);
+    bool CaptureAssistantContext(AiWorkspaceContext& context, wxString& error, bool includeImage = true);
     void ClearDocument();
     bool IsModified() const { return m_modified; }
     void MarkSaved();

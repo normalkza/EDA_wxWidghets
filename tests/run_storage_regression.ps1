@@ -11,7 +11,7 @@ foreach ($item in @($project.SelectNodes('//m:ItemGroup/m:ClCompile | //m:ItemGr
     $item.ParentNode.RemoveChild($item) | Out-Null
 }
 $sources = $project.CreateElement('ItemGroup', $namespace)
-foreach ($sourcePath in @('wx_demo\AiCircuitExecutor.cpp', 'wx_demo\DigitalSimulator.cpp', 'wx_demo\TraceRecorder.cpp', 'wx_demo\CanvasTiming.cpp', 'wx_demo\ComponentRegistry.cpp', 'wx_demo\TopologyRules.cpp', 'wx_demo\Connectivity.cpp', 'wx_demo\SimulationSnapshot.cpp', 'wx_demo\Canvas.cpp', 'wx_demo\CanvasWiring.cpp', 'wx_demo\CanvasDocument.cpp', 'wx_demo\Circuit.cpp', 'wx_demo\CircuitValidation.cpp', 'wx_demo\CircuitFile.cpp', 'wx_demo\Wire.cpp', 'wx_demo\SelectionState.cpp', 'tests\storage_regression.cpp')) {
+foreach ($sourcePath in @('wx_demo\AiCircuitExecutor.cpp', 'wx_demo\AiCircuitPatch.cpp', 'wx_demo\CanvasAssistant.cpp', 'wx_demo\DigitalSimulator.cpp', 'wx_demo\TraceRecorder.cpp', 'wx_demo\CanvasTiming.cpp', 'wx_demo\ComponentRegistry.cpp', 'wx_demo\TopologyRules.cpp', 'wx_demo\Connectivity.cpp', 'wx_demo\SimulationSnapshot.cpp', 'wx_demo\Canvas.cpp', 'wx_demo\CanvasWiring.cpp', 'wx_demo\CanvasDocument.cpp', 'wx_demo\Circuit.cpp', 'wx_demo\CircuitValidation.cpp', 'wx_demo\CircuitFile.cpp', 'wx_demo\Wire.cpp', 'wx_demo\SelectionState.cpp', 'tests\storage_regression.cpp')) {
     $item = $project.CreateElement('ClCompile', $namespace)
     $item.SetAttribute('Include', (Join-Path $repoRoot $sourcePath))
     $sources.AppendChild($item) | Out-Null
@@ -37,6 +37,9 @@ if ($WithoutDebugSymbols) {
     $project.DocumentElement.AppendChild($settings) | Out-Null
 }
 $testProject = Join-Path $buildDir 'storage_regression.vcxproj'
+$testGuard = $project.CreateElement('Import', $namespace)
+$testGuard.SetAttribute('Project', (Join-Path $repoRoot 'build\ExecutableIntegrity.targets'))
+$project.DocumentElement.AppendChild($testGuard) | Out-Null
 $project.Save($testProject)
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 $msbuildPath = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1

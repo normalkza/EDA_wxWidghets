@@ -12,6 +12,7 @@ class wxPanel;
 class SimulationPanel;
 class wxFrame;
 class AiAssistantDialog;
+class PetWebView;
 
 class MainFrame : public wxFrame
 {
@@ -23,6 +24,7 @@ public:
     Canvas* GetCanvas() const { return m_canvas; }
     void StartTutorial();
     void OnExportGedaNetlist(wxCommandEvent& event);
+    void ShowCompanion();
 private:
     friend struct SimulationUiRegressionAccess;
     friend struct CanvasTutorialRegressionAccess;
@@ -39,6 +41,8 @@ private:
     void OpenSimulationWindow();
     void RestoreSimulationPanel();
     void OpenAiAssistant();
+    PetWebView* EnsurePetPlugin();
+    void ShowShortcuts();
 
     Canvas* m_canvas = nullptr;
     wxSplitterWindow* m_workspace = nullptr;
@@ -58,4 +62,6 @@ private:
     wxWeakRef<AiAssistantDialog> m_aiAssistant;
     bool m_aiClosePending = false;
     TutorialManager* m_tutorialManager = nullptr;
+    wxWeakRef<PetWebView> m_petPlugin;
+    wxString m_assistantPetState = "idle";
 };

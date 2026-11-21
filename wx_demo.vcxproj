@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -20,6 +20,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="wx_demo\AiApiClient.cpp" />
+    <ClCompile Include="wx_demo\AiSession.cpp" />
+    <ClCompile Include="wx_demo\OfflineAssistant.cpp" />
+    <ClCompile Include="wx_demo\AiCircuitPatch.cpp" />
+    <ClCompile Include="wx_demo\CanvasAssistant.cpp" />
+    <ClCompile Include="wx_demo\StartupDialog.cpp" />
+
+    <ClCompile Include="wx_demo\PetWebView.cpp" />
     <ClCompile Include="wx_demo\AiAssistantDialog.cpp" />
     <ClCompile Include="wx_demo\AiCircuitExecutor.cpp" />
     <ClCompile Include="wx_demo\Canvas.cpp" />
@@ -64,6 +71,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wx_demo\AiApiClient.h" />
+    <ClInclude Include="wx_demo\AiSession.h" />
+    <ClInclude Include="wx_demo\OfflineAssistant.h" />
+    <ClInclude Include="wx_demo\AiWorkspace.h" />
+    <ClInclude Include="wx_demo\StartupDialog.h" />
+
+    <ClInclude Include="wx_demo\PetWebView.h" />
     <ClInclude Include="wx_demo\AiAssistantDialog.h" />
     <ClInclude Include="wx_demo\AiCircuitExecutor.h" />
     <ClInclude Include="wx_demo\Canvas.h" />
@@ -209,7 +222,11 @@
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy /Y /E /I "$(ProjectDir)wx_demo\res" "$(OutDir)res"</Command>
+      <Command>xcopy /Y /E /I "$(ProjectDir)wx_demo\res" "$(OutDir)res"
+copy /Y "$(ProjectDir)assistant_server.py" "$(OutDir)assistant_server.py"
+copy /Y "$(ProjectDir)assistant_skills.py" "$(OutDir)assistant_skills.py"
+copy /Y "$(ProjectDir)assistant_winhttp.py" "$(OutDir)assistant_winhttp.py"
+xcopy /Y /E /I "$(ProjectDir)skills" "$(OutDir)skills"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -232,7 +249,11 @@
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy /Y /E /I "$(ProjectDir)wx_demo\res" "$(OutDir)res"</Command>
+      <Command>xcopy /Y /E /I "$(ProjectDir)wx_demo\res" "$(OutDir)res"
+copy /Y "$(ProjectDir)assistant_server.py" "$(OutDir)assistant_server.py"
+copy /Y "$(ProjectDir)assistant_skills.py" "$(OutDir)assistant_skills.py"
+copy /Y "$(ProjectDir)assistant_winhttp.py" "$(OutDir)assistant_winhttp.py"
+xcopy /Y /E /I "$(ProjectDir)skills" "$(OutDir)skills"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -253,7 +274,11 @@
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy /Y /E /I "$(ProjectDir)wx_demo\res" "$(OutDir)res"</Command>
+      <Command>xcopy /Y /E /I "$(ProjectDir)wx_demo\res" "$(OutDir)res"
+copy /Y "$(ProjectDir)assistant_server.py" "$(OutDir)assistant_server.py"
+copy /Y "$(ProjectDir)assistant_skills.py" "$(OutDir)assistant_skills.py"
+copy /Y "$(ProjectDir)assistant_winhttp.py" "$(OutDir)assistant_winhttp.py"
+xcopy /Y /E /I "$(ProjectDir)skills" "$(OutDir)skills"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -276,10 +301,15 @@
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy /Y /E /I "$(ProjectDir)wx_demo\res" "$(OutDir)res"</Command>
+      <Command>xcopy /Y /E /I "$(ProjectDir)wx_demo\res" "$(OutDir)res"
+copy /Y "$(ProjectDir)assistant_server.py" "$(OutDir)assistant_server.py"
+copy /Y "$(ProjectDir)assistant_skills.py" "$(OutDir)assistant_skills.py"
+copy /Y "$(ProjectDir)assistant_winhttp.py" "$(OutDir)assistant_winhttp.py"
+xcopy /Y /E /I "$(ProjectDir)skills" "$(OutDir)skills"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)build\ExecutableIntegrity.targets" Condition="Exists('$(MSBuildThisFileDirectory)build\ExecutableIntegrity.targets')" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

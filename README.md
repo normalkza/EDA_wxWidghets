@@ -1,20 +1,72 @@
 # EDA_wxWidghets
 
+## 登录与欢迎页
+
+打开 `x64/Debug/wx_demo.exe`。联网使用时输入用户名和 DeepSeek API Key，点击“登录并继续”；不接入 API 时点击“无需 API，直接使用”，用户名留空则以访客进入。程序显示带用户名的欢迎页，自动准备 AI 助手服务，就绪后进入主工作区；也可点击“进入工作区”。准备失败时可返回登录修改信息。
+
+这是本机工作台的会话入口，不创建远程账户。登录检查必填项与密钥格式；密钥有效性在实际使用 AI 助手时由 DeepSeek 返回。密钥默认隐藏，可切换显示，仅用于本次运行，不写入工程或配置文件。用户名显示在主窗口标题中。
+
+需要安装 Python 3，并能运行 `py` 或 `python` 命令。程序自动在随机本地端口启动自己的 Python 服务，通过匿名管道交付密钥，使用临时令牌连接，退出程序时关闭该服务。日常使用无需单独启动下面的手动服务；编译后会把 `assistant_server.py`、`assistant_skills.py`、`assistant_winhttp.py`、`skills` 与 `res` 一起复制到输出目录。
+
+## 无需 API 直接使用
+
+登录页点击“无需 API，直接使用”，会经过欢迎页进入主工作区。绘图、保存、导入导出、仿真和教程等本地功能直接可用，不需要填写密钥或启动 Python 助手服务。主窗口标题显示“离线模式”。
+
+打开 **帮助 → AI 助手** 或桌宠的助手入口，即可使用“离线工具箱”。它使用程序内置规则和模板，支持新建半加器、全加器及六种基本逻辑门，整理当前电路布局、标注输入输出、检查连接结构、旋转选中元件和恢复自动走线。可从下拉框选择操作后直接执行，也可输入这些指令。“给步骤”只解释，“直接完成”应用修改；先询问某个电路的步骤，再说“直接新建”也能继续该主题。
+
+默认追加新电路；明确输入“清空并新建全加器”等指令才替换原有内容。每次修改都通过本地校验，可用一次 Ctrl+Z 撤销。整理布局保留元件 ID、连接和参数，恢复自动走线，并移动邻近标注。取消或等待期间的手动修改会阻止旧操作应用。未识别的指令只显示支持范围，不会自动切换到 API。
+
+离线工具箱不是本地大语言模型，不提供任意开放式问答。在已连接 DeepSeek 的会话中，可通过“模式”下拉框切换联网助手与离线工具箱；从离线入口进入后，如需联网助手，请重启并在登录页填写密钥。离线功能的实现位于 `wx_demo/OfflineAssistant.cpp`，不调用 API、不上传画布，也不启动 Python。
+
+运行检查：`tests/run_regression.ps1 -WithoutDebugSymbols -OfflineIntegration`，覆盖无 Python PATH、无用户名和密钥的访客启动，半加器/全加器真值表、现有电路整理、标注、追问、撤销、取消及过期操作保护。
+
+## 根据当前画布编辑的 AI skill
+
+在 AI 助手的 DeepSeek 联网模式中输入需求并点击“直接完成”。每次请求会读取最新元件 ID、位置、旋转、真实引脚、电平、连线、文本及当前选择；默认同时发送由绘图区绘制函数生成的 PNG。图像仅包含画布，可关闭“附带画布图像”；元件、连线与文本数据仍会发送给 DeepSeek。默认 `deepseek-flash` 支持图像，配置其它模型时保留结构化上下文。
+
+助手支持移动、旋转、增删现有元件，修改已有标注，删除或重接导线、调整折线路径，也可以新建电路。对话保留最近历史，因此“直接新建”“把刚才的输入移到左边”等追问会带上先前需求。“新对话”清除聊天上下文，不清空电路。
+
+勾选“自动改进”后执行“读取画布 → 生成操作 → 本地校验和执行 → 重新读取画布和图像 → 检查或修正”，每个需求最多三次模型请求。失败的批次不改画布，错误会反馈给助手；等待期间手动编辑会停止应用旧方案。连续自动修改合并为一个 Ctrl+Z 撤销步骤，取消请求保留已经执行的修改，也可整体撤销。
+
+实际加载的规则位于 `skills/circuit-editor/SKILL.md`，编辑工具参数位于 `skills/circuit-editor/tools.json`，加载器为 `assistant_skills.py`。服务每次请求重新读取 skill 文件；编译时将其复制到程序旁。修改源码目录中的 skill 后重新编译，或直接修改正在运行的服务旁的 skill 文件。工具只操作本应用的电路文档，不执行模型生成的程序或系统命令。
+
+Windows 上的 DeepSeek HTTPS 请求使用系统 WinHTTP / Schannel，证书由 Windows 校验，避开当前环境中 Python OpenSSL 握手被中断的问题；非 Windows 环境保留 urllib。仅启用 TLS 1.2 / 1.3，不关闭证书校验、不跟随重定向，密钥仍只发送到固定的 DeepSeek HTTPS 地址。网络自动模式在每次模型请求前用相同通道进行无密钥探测，当前路径失败后尝试另一条代理/直连路径；只发送一次模型 POST，避免网络超时后重复计费。`DEEPSEEK_PROXY=system/direct/指定 HTTP 代理` 仍可显式固定连接方式。诊断命令为 `py assistant_server.py --check-network`。
+
+检查入口：`py -X utf8 -B -m unittest discover -s tests -p "test_assistant*.py"`、`tests/run_storage_regression.ps1 -WithoutDebugSymbols`、`tests/run_regression.ps1 -WithoutDebugSymbols -SkillIntegration`。最后一项运行原生客户端和真实本地服务，只模拟 DeepSeek 响应，检查现有元件修改、PNG 变化、失败修正、对话历史、撤销、取消和过期结果保护，不使用真实密钥或付费调用。
+
+## AI 悬浮插件
+
+启动程序会显示 DS 鲸鱼娘 AI 悬浮插件。透明、无边框的角色直接叠在电路绘图区上，拖动角色可以改变位置，活动范围限制在本窗口的绘图区。透明处仍可操作画布；**视图 → AI 悬浮插件** 控制显示，**F1** 保留原快捷键说明。
+
+渲染、拖动、摸头、尾巴点击、动作、表情、气泡和右键控制面板复用 `dsh-pet-live2d` 的原始客户端。角色旁的 AI 入口打开原有 AI 助手；处理、完成、失败和取消会通知原互动控制器。桌宠本身不调用 DeepSeek；提交 AI 需求仍使用原有本地助手服务。
+
+插件使用 WebView2 Composition 与 DirectComposition 进行透明合成，不依赖 DSH 或独立服务器。资源位于 `wx_demo/res/pet`，编译后随 `res` 目录复制到程序旁。模型、贴图和 React 运行库均使用本地资源；Cubism Core 不随项目分发，优先读取 `%LOCALAPPDATA%/wx_demo/live2d/live2dcubismcore.min.js`，否则尝试 Live2D 官方运行时。启动阶段与错误记录位于 `%LOCALAPPDATA%/wx_demo/pet-plugin.log`，不记录问题或 API Key。
+
+运行库地址由原生宿主在文档创建前注入：本机 Core 缓存和静态 vendor 文件直接通过对应虚拟主机读取。它们不依赖 `WebResourceRequested` 拦截；WebView2 不会为虚拟主机映射的资源触发该事件。
+
+Visual Studio 构建结束后会检查生成的 EXE，自动移除它从输出目录继承的 Low 完整性标签。只处理生成的程序文件，避免程序启动后无法写缓存或创建透明合成层。若旧日志不可写，诊断会静默转到 `%TEMP%/wx-demo-pet-进程号.log`；失败状态也会带上具体阶段和错误码。
+
+保留上善无形、ZipZipPipe、氵六青的模型署名及 CC BY-NC-SA 4.0 许可，原适配代码 A8Chann / MIT；完整声明见 `wx_demo/res/pet/licenses`。原模型美术和 DSH 源码保持不变，通过薄适配层对接 wx_demo。
+
+资源检查入口：`py -m unittest discover -s tests -p test_pet_assets.py`；`tests/run_regression.ps1 -WithoutDebugSymbols -PetIntegration` 为可选运行检查入口。
+
 ## DeepSeek 电路助手
 
-在 **PowerShell 7** 中切到本项目根目录，输入在 [DeepSeek 开放平台](https://platform.deepseek.com/) 创建的 API Key，再启动本地服务。服务仅监听 `127.0.0.1:8765`，使用 Python 标准库，无需安装 Python 包。密钥仅由该服务读取，不写入工程或电路文件。
+正常使用时，在登录页填写 [DeepSeek 开放平台](https://platform.deepseek.com/) 创建的 API Key 即可。在 **帮助 → AI 助手** 中输入需求。服务使用 Python 标准库，无需安装 Python 包。
+
+开发调试仍支持手动启动独立的 `127.0.0.1:8765` 服务；应用的登录会话使用自己的端口，不会占用或停止这项独立服务。在 **PowerShell 7** 中切到本项目根目录：
 
 ```powershell
 $env:DEEPSEEK_API_KEY = Read-Host -MaskInput 'DeepSeek API Key'
 py .\assistant_server.py
 ```
 
-服务运行时打开 wx_demo，在 **帮助 → AI 助手** 中输入需求：
+AI 助手支持：
 
 - **给步骤**：只返回文字。例如“请说明如何用异或门和与门搭半加器”。
-- **直接完成**：例如“帮我搭一个双输入与门电路”。助手可新增输入、输出和六种基本逻辑门并连线；本地检查通过后才整批添加到当前电路，按一次 **Ctrl+Z** 可撤销。现有电路不会被清空；等待期间若改过画布，旧结果不会应用。
+- **直接完成**：例如“帮我搭一个双输入与门电路”。助手可使用当前可用元件创建电路，也能修改现有元件、连线和标注。本地检查通过后才整批应用，按一次 **Ctrl+Z** 可撤销同一需求的自动改进。未要求清空时保留现有内容；等待期间若改过画布，旧结果不会应用。
 
-模型默认 `deepseek-flash`，需要时在启动服务前设置 `DEEPSEEK_MODEL`。服务通过 DeepSeek 的 `/responses` 接口发送你输入的需求；现有画布、XML 和其他本地文件留在本机。退出时可在服务终端按 **Ctrl+C**。
+模型默认 `deepseek-flash`，需要时在启动服务前设置 `DEEPSEEK_MODEL`。服务通过 DeepSeek 的 `/responses` 接口发送需求、最近对话和当前画布上下文；其它本地文件不会发送。退出时可在服务终端按 **Ctrl+C**。
 
 若提示连接失败，在启动服务的同一个 PowerShell 窗口按 **Ctrl+C**，运行 `py .\assistant_server.py --check-network`。它不读取 API Key，也不会调用模型；收到 **HTTP 401** 表示该连接路径可达。默认启动时优先探测 Python 的系统/环境代理设置，连接失败时再探测直连。
 

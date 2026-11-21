@@ -1,5 +1,6 @@
 #include "MainFrame.h"
 #include "AiAssistantDialog.h"
+#include "PetWebView.h"
 #include "MenuBar.h"
 #include "ToolBar.h"
 #include "Toolbox.h"
@@ -24,6 +25,7 @@
 #include <wx/arrstr.h>
 #include <wx/tokenzr.h>
 #include "KiCadNetlistExporter.h"
+#include "AiSession.h"
 
 
 MainFrame::MainFrame()
@@ -307,17 +309,14 @@ MainFrame::MainFrame()
     Bind(wxEVT_UPDATE_UI, [canvas](wxUpdateUIEvent& event) {
         event.Enable(canvas->HasSelectedInput());
         }, ID_SIMULATE_TOGGLE_INPUT);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowShortcuts(); }, wxID_HELP);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-        wxMessageBox(
-            wxT("Ctrl+N  新建\nCtrl+O  打开\nCtrl+S  保存\nCtrl+Shift+S  另存为\n\n")
-            wxT("Ctrl+Z  撤销\nCtrl+X / C / V  剪切 / 复制 / 粘贴\n")
-            wxT("Ctrl+D / Delete  删除\n\n")
-            wxT("R  顺时针旋转 90°\nShift+R  逆时针旋转 90°\n")
-            wxT("Esc  取消当前操作\nCtrl+Enter  完成文字编辑\n\n")
-            wxT("F5  复位仿真\nF6  切换选中输入电平\nF7  下一事件\nF8  运行 / 继续\n")
-            wxT("双击 CLOCK / DFF / PROBE  编辑参数\nF1  快捷键"),
-            wxT("快捷键"), wxOK | wxICON_INFORMATION, this);
-        }, wxID_HELP);
+        if (m_petPlugin.get() && m_petPlugin->IsShown()) m_petPlugin->SetPageVisible(false);
+        else ShowCompanion();
+    }, ID_HELP_COMPANION);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& event) {
+        event.Check(m_petPlugin.get() && m_petPlugin->IsShown());
+    }, ID_HELP_COMPANION);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) {
         wxMessageBox(wxT("数字电路编辑器\n\n逻辑电路绘制与实时模拟\n")
             wxT("支持 XML 保存、元件旋转、正交连线与撤销。"),
@@ -378,6 +377,13 @@ MainFrame::MainFrame()
 
 MainFrame::~MainFrame()
 {
+    if (m_aiAssistant.get()) m_aiAssistant->SetStateCallback({});
+    if (auto* pet = m_petPlugin.get())
+    {
+        pet->SetActionCallback({});
+        pet->SetStatusCallback({});
+        delete pet;
+    }
     if (m_canvas) m_canvas->SetDocumentResetCallback({});
     delete m_tutorialManager;
     m_tutorialManager = nullptr;
@@ -388,8 +394,59 @@ void MainFrame::OpenAiAssistant()
     if (m_aiClosePending) return;
     if (m_tutorialManager) m_tutorialManager->CancelTutorial();
     if (!m_aiAssistant.get())
+    {
         m_aiAssistant = wxWeakRef<AiAssistantDialog>(new AiAssistantDialog(this, *m_canvas));
+        m_aiAssistant->SetStateCallback([this](AiAssistantState state) {
+            switch (state)
+            {
+            case AiAssistantState::Working: m_assistantPetState = "thinking"; break;
+            case AiAssistantState::Answered:
+            case AiAssistantState::Applied: m_assistantPetState = "done"; break;
+            case AiAssistantState::Failed: m_assistantPetState = "error"; break;
+            case AiAssistantState::Cancelled: m_assistantPetState = "cancelled"; break;
+            default: m_assistantPetState = "idle"; break;
+            }
+            if (m_petPlugin.get()) m_petPlugin->SetPetState(m_assistantPetState);
+        });
+    }
     m_aiAssistant->ShowAssistant();
+}
+
+PetWebView* MainFrame::EnsurePetPlugin()
+{
+    if (!m_petPlugin.get())
+    {
+        m_petPlugin = new PetWebView(this, m_canvas);
+        m_petPlugin->SetActionCallback([this](const wxString& action) {
+            if (m_aiClosePending) return;
+            if (action == "open-ai") OpenAiAssistant();
+            else if (action == "hide-pet") m_petPlugin->SetPageVisible(false);
+            else if (action == "reload-pet") m_petPlugin->Reload();
+        });
+        m_petPlugin->SetStatusCallback([this](const wxString& status) {
+            SetStatusText(status);
+        });
+        m_petPlugin->SetPetState(m_assistantPetState);
+    }
+    return m_petPlugin.get();
+}
+
+void MainFrame::ShowCompanion()
+{
+    if (!m_aiClosePending) EnsurePetPlugin()->SetPageVisible(true);
+}
+
+void MainFrame::ShowShortcuts()
+{
+    wxMessageBox(
+        wxT("Ctrl+N  新建\nCtrl+O  打开\nCtrl+S  保存\nCtrl+Shift+S  另存为\n\n")
+        wxT("Ctrl+Z  撤销\nCtrl+X / C / V  剪切 / 复制 / 粘贴\n")
+        wxT("Ctrl+D / Delete  删除\n\n")
+        wxT("R  顺时针旋转 90°\nShift+R  逆时针旋转 90°\n")
+        wxT("Esc  取消当前操作\nCtrl+Enter  完成文字编辑\n\n")
+        wxT("F5  复位仿真\nF6  切换选中输入电平\nF7  下一事件\nF8  运行 / 继续\n")
+        wxT("双击 CLOCK / DFF / PROBE  编辑参数\nCtrl+T  新手教程"),
+        wxT("快捷键"), wxOK | wxICON_INFORMATION, this);
 }
 
 void MainFrame::StartTutorial()
@@ -401,6 +458,7 @@ void MainFrame::StartTutorial()
     wxSingleChoiceDialog dialog(this, wxT("请选择要学习的教程："), wxT("新手教程"), choices);
     if (dialog.ShowModal() != wxID_OK) return;
     if (!ConfirmDiscardChanges()) return;
+    if (m_petPlugin.get()) m_petPlugin->SetPageVisible(false);
     if (!m_showToolbox)
     {
         m_showToolbox = true;
@@ -493,7 +551,9 @@ void MainFrame::UpdateDocumentTitle()
     const wxString name = m_filePath.IsEmpty() ? wxString(wxT("未命名.xml")) :
         wxFileName(m_filePath).GetFullName();
     SetTitle((m_canvas->IsModified() ? wxString("* ") : wxString()) + name +
-        wxT(" - 数字电路编辑器"));
+        wxT(" - 数字电路编辑器") + (AiSession::Get().UserName().empty() ? wxString() :
+            wxS(" · ") + AiSession::Get().UserName()) +
+        (AiSession::Get().IsOffline() ? wxString(wxS(" · 离线模式")) : wxString()));
 }
 
 bool MainFrame::SaveDocument(bool saveAs)

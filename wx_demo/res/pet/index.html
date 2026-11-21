@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' https://wx-demo-runtime.local https://cubism.live2d.com 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self' blob: data:; img-src 'self' blob: data:; media-src 'self' blob: data:; object-src 'none'; base-uri 'none'">
+  <title>wx_demo AI 桌宠</title>
+  <link rel="stylesheet" href="pet.css">
+  <script defer src="pet.js"></script>
+  <script defer src="react.js"></script>
+  <script defer src="react-dom.js"></script>
+  <script defer src="client.js"></script>
+</head>
+<body data-wx-pet="">
+  <div id="pet-dock" data-wx-pet-ui="" hidden>
+    <button id="pet-ai" type="button" title="AI 助手" aria-label="打开 AI 助手">AI</button>
+    <button id="pet-reload" type="button" title="重新加载桌宠" aria-label="重新加载桌宠">↻</button>
+    <button id="pet-hide" type="button" title="隐藏桌宠" aria-label="隐藏桌宠">×</button>
+  </div>
+  <div id="pet-status" data-wx-pet-ui="" role="status" aria-live="polite">
+    <span id="pet-status-text">正在加载 Live2D…</span>
+    <button id="pet-retry" type="button" hidden>重试</button>
+  </div>
+</body>
+</html>

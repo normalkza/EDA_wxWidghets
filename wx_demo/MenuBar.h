@@ -51,7 +51,9 @@ enum MainMenuId
     ID_EXPORT_KICAD_SCHEMATIC,
 
     // 新手教程入口
-    ID_START_TUTORIAL
+    ID_START_TUTORIAL,
+    ID_HELP_COMPANION,
+    ID_HELP_SHORTCUTS
 };
 
 wxMenuBar* CreateMainMenuBar();

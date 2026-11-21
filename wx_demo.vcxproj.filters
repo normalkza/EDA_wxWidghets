@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="源文件">
@@ -94,6 +94,25 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="wx_demo\AiApiClient.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\AiSession.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\OfflineAssistant.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\AiCircuitPatch.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\CanvasAssistant.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\StartupDialog.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+
+    <ClCompile Include="wx_demo\PetWebView.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="wx_demo\AiAssistantDialog.cpp">
@@ -204,6 +223,22 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="wx_demo\AiApiClient.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\AiSession.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\OfflineAssistant.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\AiWorkspace.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\StartupDialog.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+
+    <ClInclude Include="wx_demo\PetWebView.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="wx_demo\AiAssistantDialog.h">

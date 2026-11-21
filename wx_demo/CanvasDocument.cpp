@@ -287,7 +287,8 @@ bool Canvas::ImportDocument(const CircuitDocument& document, wxString& error)
     return ReplaceDocument(document, error, true);
 }
 
-bool Canvas::ApplyAssistantDocument(const CircuitDocument& document, std::uint64_t expectedRevision, wxString& error)
+bool Canvas::ApplyAssistantDocument(const CircuitDocument& document, std::uint64_t expectedRevision, wxString& error,
+    bool coalesceUndo)
 {
     error.clear();
     if (!wxIsMainThread())
@@ -317,7 +318,7 @@ bool Canvas::ApplyAssistantDocument(const CircuitDocument& document, std::uint64
     // prior history or alter the saved baseline, unlike opening a file.
     m_undoHistory.reserve(m_undoLimit);
     if (!ReplaceDocument(document, error, false)) return false;
-    RecordUndo(std::move(before));
+    if (!coalesceUndo || m_undoHistory.empty()) RecordUndo(std::move(before));
     RefreshModifiedState();
     SetFocusIgnoringChildren();
     return true;
