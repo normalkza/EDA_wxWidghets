@@ -11,7 +11,6 @@
 #include "SimulationPanel.h"
 #include "PcbFrame.h"
 #include "KiCadSchematicExporter.h"
-#include "GedaNetlistExporter.h"
 #include <wx/utils.h>
 #include <wx/filename.h>
 #include <wx/filefn.h>
@@ -23,9 +22,9 @@
 #include <vector>
 #include <wx/dir.h>
 #include <wx/arrstr.h>
-#include <wx/tokenzr.h>
 #include "KiCadNetlistExporter.h"
 #include "AiSession.h"
+#include <wx/stdpaths.h>
 
 
 MainFrame::MainFrame()
@@ -81,10 +80,10 @@ MainFrame::MainFrame()
     Bind(wxEVT_MENU, &MainFrame::OnNew, this, wxID_NEW);
     Bind(wxEVT_MENU, &MainFrame::OnOpen, this, wxID_OPEN);
     Bind(wxEVT_MENU, &MainFrame::OnImportKiCadPcb, this, ID_FILE_IMPORT_KICAD_PCB);
-    Bind(wxEVT_MENU, &MainFrame::OnExportGedaNetlist, this, ID_FILE_EXPORT_GEDA_NETLIST);
+    // 单独导出 KiCad 原理图：只生成 .kicad_sch，不自动生成网表。
     Bind(wxEVT_MENU, [this](wxCommandEvent&) {
         if (!m_canvas) return;
-        wxFileDialog dialog(this, wxT("导出 KiCad 原理图与网表"), wxEmptyString,
+        wxFileDialog dialog(this, wxT("导出 KiCad 原理图"), wxEmptyString,
             wxT("circuit.kicad_sch"),
             wxT("KiCad 原理图文件 (*.kicad_sch)|*.kicad_sch"),
             wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
@@ -94,88 +93,91 @@ MainFrame::MainFrame()
         const CircuitDocument document = m_canvas->ExportDocument();
         std::string error;
         if (!KiCadSchematicExporter::ExportSchematic(
-            document,
-            path.ToStdString(wxConvUTF8),
-            std::string(),
-            error,
-            this))
+            document, path.ToStdString(wxConvUTF8), std::string(), error, this))
         {
             const wxString message = wxString::FromUTF8(error);
             SetStatusText(wxT("KiCad 原理图导出失败：") + message);
             wxMessageBox(message, wxT("原理图导出失败"), wxOK | wxICON_ERROR, this);
             return;
         }
-        // 原理图导出成功后，自动确定网表保存路径
-        wxFileName netlistFile(path);
-        netlistFile.SetExt(wxT("net"));
-        const wxString netlistPath = netlistFile.GetFullPath();
 
-        // 先自动查找 KiCad CLI
-        wxString cliPath = KiCadNetlistExporter::FindKiCadCli();
+        SetStatusText(wxT("KiCad 原理图已导出：") + path);
+        wxMessageBox(wxT("KiCad 原理图导出成功！\n\n") + path,
+            wxT("导出完成"), wxOK | wxICON_INFORMATION, this);
+    }, ID_EXPORT_KICAD_SCHEMATIC);
 
-        // 如果自动查找失败，让用户手动选择
-        if (cliPath.IsEmpty())
+
+    // 单独导出 KiCad 网表：允许用户选择保存位置。
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+        if (!m_canvas) return;
+
+        // 默认文件名和目录
+        wxString defaultDir;
+        wxString defaultName = wxT("circuit.net");
+
+        if (!m_filePath.IsEmpty())
         {
-            wxFileDialog cliDialog(
-                this,
-                wxT("请选择 KiCad CLI 程序"),
-                wxEmptyString,
-                wxT("kicad-cli.exe"),
-                wxT("KiCad CLI 程序 (kicad-cli.exe)|kicad-cli.exe|所有文件 (*.*)|*.*"),
-                wxFD_OPEN | wxFD_FILE_MUST_EXIST
-            );
-
-            if (cliDialog.ShowModal() != wxID_OK)
-            {
-                SetStatusText(wxT("原理图已导出，用户取消了 KiCad CLI 选择。"));
-
-                wxMessageBox(
-                    wxT("原理图已经成功导出，但没有选择 KiCad CLI，网表未生成。"),
-                    wxT("网表导出已取消"),
-                    wxOK | wxICON_INFORMATION,
-                    this
-                );
-                return;
-            }
-
-            cliPath = cliDialog.GetPath();
-        }
-
-        // 使用找到或用户选择的 CLI 导出网表
-        std::string netlistError;
-
-        if (KiCadNetlistExporter::ExportFromSchematic(
-            path.ToStdString(wxConvUTF8),
-            netlistPath.ToStdString(wxConvUTF8),
-            cliPath,
-            netlistError))
-        {
-            SetStatusText(wxT("原理图和网表导出成功：") + netlistPath);
-
-            wxMessageBox(
-                wxT("导出成功！\n\n")
-                wxT("原理图：\n") + path + wxT("\n\n")
-                wxT("网表：\n") + netlistPath,
-                wxT("导出完成"),
-                wxOK | wxICON_INFORMATION,
-                this
-            );
+            wxFileName outputPath(m_filePath);
+            defaultDir = outputPath.GetPath();
+            defaultName = outputPath.GetName() + wxT(".net");
         }
         else
         {
-            const wxString message = wxString::FromUTF8(netlistError);
-
-            SetStatusText(wxT("原理图已导出，但网表生成失败。"));
-
-            wxMessageBox(
-                wxT("原理图已经成功导出，但网表生成失败：\n\n") + message,
-                wxT("网表导出失败"),
-                wxOK | wxICON_WARNING,
-                this
+            wxFileName outputPath(
+                wxStandardPaths::Get().GetExecutablePath()
             );
+            defaultDir = outputPath.GetPath();
         }
 
-        }, ID_EXPORT_KICAD_SCHEMATIC);
+        // 弹出网表保存对话框
+        wxFileDialog dialog(
+            this,
+            wxT("导出 KiCad 网表"),
+            defaultDir,
+            defaultName,
+            wxT("KiCad 网表文件 (*.net)|*.net"),
+            wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+        );
+
+        if (dialog.ShowModal() != wxID_OK)
+            return;
+
+        wxString netlistPath = dialog.GetPath();
+
+        // 确保文件扩展名为 .net
+        wxFileName selectedFile(netlistPath);
+        if (selectedFile.GetExt().CmpNoCase(wxT("net")) != 0)
+        {
+            selectedFile.SetExt(wxT("net"));
+            netlistPath = selectedFile.GetFullPath();
+        }
+
+        std::string error;
+        if (!KiCadNetlistExporter::ExportFullAdder(
+            m_canvas->ExportDocument(),
+            netlistPath.ToStdString(wxConvUTF8),
+            error))
+        {
+            const wxString message = wxString::FromUTF8(error);
+            SetStatusText(wxT("KiCad 网表导出失败：") + message);
+            wxMessageBox(
+                message,
+                wxT("网表导出失败"),
+                wxOK | wxICON_ERROR,
+                this
+            );
+            return;
+        }
+
+        SetStatusText(wxT("KiCad 网表已导出：") + netlistPath);
+        wxMessageBox(
+            wxT("KiCad 网表导出成功！\n\n保存位置：\n") + netlistPath,
+            wxT("导出完成"),
+            wxOK | wxICON_INFORMATION,
+            this
+        );
+        }, ID_EXPORT_KICAD_NETLIST);
+
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveDocument(); }, wxID_SAVE);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveDocument(true); }, wxID_SAVEAS);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { Close(); }, wxID_EXIT);
@@ -661,25 +663,6 @@ void MainFrame::OnImportKiCadPcb(wxCommandEvent&)
         wxT("KiCad PCB 板图 (*.kicad_pcb)|*.kicad_pcb"), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dialog.ShowModal() != wxID_OK) return;
     (new PcbFrame(this, dialog.GetPath()))->Show();
-}
-
-void MainFrame::OnExportGedaNetlist(wxCommandEvent&)
-{
-    wxFileDialog dialog(this, wxT("导出 gEDA 网表"), wxEmptyString,
-        wxT("circuit.net"), wxT("gEDA 网表文件 (*.net)|*.net"), wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-    if (dialog.ShowModal() != wxID_OK) return;
-    wxString path = dialog.GetPath();
-    if (!wxFileName(path).HasExt()) path += ".net";
-    std::string error;
-    if (!GedaNetlistExporter::ExportFullAdder(m_canvas->ExportDocument(),
-        path.ToStdString(wxConvUTF8), error))
-    {
-        const wxString message = wxString::FromUTF8(error);
-        SetStatusText(wxT("gEDA 网表导出失败：") + message);
-        wxMessageBox(message, wxT("网表导出失败"), wxOK | wxICON_ERROR, this);
-        return;
-    }
-    SetStatusText(wxT("gEDA 网表已导出：") + path);
 }
 
 void MainFrame::OnClose(wxCloseEvent& event)

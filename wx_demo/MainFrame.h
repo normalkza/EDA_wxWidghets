@@ -23,7 +23,6 @@ public:
     Toolbox* GetToolbox() const { return m_toolbox; }
     Canvas* GetCanvas() const { return m_canvas; }
     void StartTutorial();
-    void OnExportGedaNetlist(wxCommandEvent& event);
     void ShowCompanion();
 private:
     friend struct SimulationUiRegressionAccess;

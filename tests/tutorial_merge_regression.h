@@ -6,6 +6,7 @@
 #include "Toolbox.h"
 #include "KiCadSchematicExporter.h"
 #include "GedaNetlistExporter.h"
+#include "KiCadNetlistExporter.h"
 #include "KiCadSExpr.h"
 #include "SelectionState.h"
 #include <wx/clipbrd.h>
@@ -18,6 +19,7 @@
 #include <algorithm>
 #include <memory>
 #include <sstream>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -114,7 +116,7 @@ inline void TestExport()
         ~TemporaryFiles()
         {
             wxLogNull quiet;
-            for (const auto* name : {wxS("74xx.kicad_sym"), wxS("与门导出.kicad_sch"), wxS("全加器导出.net")})
+            for (const auto* name : {wxS("74xx.kicad_sym"), wxS("与门导出.kicad_sch"), wxS("全加器导出.net"), wxS("全加器KiCad网表.net")})
                 if (wxFileExists(Path(name))) wxRemoveFile(Path(name));
             wxFileName::Rmdir(directory);
             wxFileName::Rmdir(rootDirectory);
@@ -180,6 +182,36 @@ inline void TestExport()
         "gEDA exporter rejects invalid connections");
     Require(ReadFile(files.Path(wxS("全加器导出.net"))) == netlistBytes,
         "rejected gEDA export preserves the original file bytes");
+
+    const auto kicadPath = files.Path(wxS("全加器KiCad网表.net"));
+    Require(KiCadNetlistExporter::ExportFullAdder(FullAdder(), kicadPath.ToStdString(wxConvUTF8), error),
+        "direct KiCad full-adder netlist supports Unicode paths without a CLI");
+    const auto kicadBytes = ReadFile(kicadPath);
+    Require(KiCadSExprParser::Parse(kicadBytes, root, error) && root.Head() == "export" &&
+        root.Find("components") && root.Find("libparts") && root.Find("nets"), "KiCad netlist uses native s-expression structure");
+    Require(root.Find("components")->FindAll("comp").size() == 3 &&
+        root.Find("libparts")->FindAll("libpart").size() == 3, "KiCad netlist retains all three chip packages and libraries");
+    for (const auto* part : root.Find("libparts")->FindAll("libpart"))
+        Require(part->Find("pins") && part->Find("pins")->FindAll("pin").size() == 14, "each chip has its physical DIP-14 pin definition");
+    std::set<std::string> usedPins;
+    const auto kicadNets = root.Find("nets")->FindAll("net");
+    Require(kicadNets.size() == 8, "KiCad full-adder retains all signal networks");
+    for (const auto* net : kicadNets)
+        for (const auto* node : net->FindAll("node"))
+        {
+            const auto* ref = node->Find("ref"); const auto* pin = node->Find("pin");
+            Require(ref && ref->children.size() == 2 && pin && pin->children.size() == 2,
+                "net nodes carry chip reference and physical pin number");
+            Require(usedPins.insert(ref->children[1].value + ":" + pin->children[1].value).second,
+                "a physical pin belongs to exactly one signal network");
+        }
+    Require(usedPins.size() == 15, "all five logical gates retain their physical pins");
+    for (const auto& invalid : {invalidAdder, SimpleAnd()})
+    {
+        Require(!KiCadNetlistExporter::ExportFullAdder(invalid, kicadPath.ToStdString(wxConvUTF8), error) && !error.empty(),
+            "KiCad exporter rejects invalid or unsupported documents");
+        Require(ReadFile(kicadPath) == kicadBytes, "failed KiCad export leaves the existing file intact");
+    }
 }
 }
 
@@ -296,7 +328,7 @@ struct CanvasTutorialRegressionAccess
         auto& canvas = *frame->m_canvas;
         canvas.m_clipboard = &clipboard;
         const int ids[] = {ID_HELP_AI_ASSISTANT, ID_START_TUTORIAL, ID_FILE_IMPORT_KICAD_PCB,
-            ID_FILE_EXPORT_GEDA_NETLIST, ID_EXPORT_KICAD_SCHEMATIC};
+            ID_EXPORT_KICAD_NETLIST, ID_EXPORT_KICAD_SCHEMATIC};
         for (std::size_t i = 0; i < std::size(ids); ++i)
         {
             auto* item = frame->GetMenuBar()->FindItem(ids[i]);
