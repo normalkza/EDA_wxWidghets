@@ -56,7 +56,7 @@ bool Canvas::EditSelectedTimingParameters()
         grid->Add(initial, 1, wxEXPAND);
     }
     wxChoice* edge = nullptr;
-    if (original.type == "DFF")
+    if (original.type == "DFF" && original.inputCount == 3)
     {
         grid->Add(new wxStaticText(&dialog, wxID_ANY, wxT("触发沿")), 0, wxALIGN_CENTER_VERTICAL);
         edge = new wxChoice(&dialog, wxID_ANY);
@@ -75,7 +75,9 @@ bool Canvas::EditSelectedTimingParameters()
     if (original.type == "PROBE") label = addText(wxT("波形名称"), wxString::FromUTF8(original.probeLabel));
     root->Add(grid, 1, wxEXPAND | wxALL, FromDIP(20));
     const wxString hint = original.type == "CLOCK" ? wxT("整数纳秒；高、低电平持续时间均至少 1 ns。\n首次跳变可为 0，初值本身不产生边沿。") :
-        original.type == "DFF" ? wxT("D / CLK / RESET → Q，可选择上升沿或下降沿触发。\nRESET 为高有效异步复位，优先于时钟采样。") :
+        original.type == "DFF" && original.inputCount == 4 ?
+            wxT("上升沿采样 D；Q 与 QN 互反。SET / CLR 为低有效异步控制端，悬空视为高电平；同时拉低时 CLR 优先。") :
+        original.type == "DFF" ? wxT("旧版 DFF：D / CLK / RESET → Q；RESET 为高有效异步复位。") :
         original.type == "PROBE" ? wxT("连接 IN 引脚后，运行仿真查看该信号的波形。") :
         wxT("这里设置保存的初值；仿真中点击 INPUT / BUTTON 可施加运行激励。");
     root->Add(new wxStaticText(&dialog, wxID_ANY, hint), 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(20));

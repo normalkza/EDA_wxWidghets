@@ -29,7 +29,8 @@ inline void TestComponentRegistry()
             auto component = ComponentRegistry::Create(type, count);
             require(component && component->name == type, type + " creates correct runtime type");
             require(component->inputs.size() == static_cast<std::size_t>(count) &&
-                component->outputs.size() == static_cast<std::size_t>(definition.outputCount),
+                component->outputs.size() == static_cast<std::size_t>(
+                    type == "DFF" && count == 3 ? 1 : definition.outputCount),
                 type + " pin counts agree with capability metadata");
             require(component->SupportsVariableInputs() == definition.SupportsVariableInputs(),
                 type + " editing capability agrees with runtime model");
@@ -67,19 +68,36 @@ inline void TestComponentRegistry()
         comparator->outputs.size() == 3 && comparator->outputs[0].name == "A>B" &&
         comparator->outputs[1].name == "A=B" && comparator->outputs[2].name == "A<B",
         "comparator has stable comparison outputs");
-    require(dff && dff->inputs.size() == 3 && dff->inputs[0].name == "D" &&
-        dff->inputs[1].name == "CLK" && dff->inputs[2].name == "RESET" && dff->outputs[0].name == "Q",
-        "DFF has stable named data, clock, asynchronous reset and Q pins");
+    require(dff && dff->inputs.size() == 4 && dff->inputs[0].name == "D" &&
+        dff->inputs[1].name == "CLK" && dff->inputs[2].name == "SET" &&
+        dff->inputs[3].name == "CLR" && dff->outputs[0].name == "Q" &&
+        dff->outputs[1].name == "QN" && dff->outputs[1].value == LogicValue::High,
+        "new DFF exposes data, clock, active-low controls and complementary outputs");
     require(!dff->HasCombinationalPath(0, 0) && !dff->HasCombinationalPath(1, 0) &&
-        dff->HasCombinationalPath(2, 0), "only asynchronous reset has an immediate DFF dependency");
+        dff->HasCombinationalPath(2, 0) && dff->HasCombinationalPath(3, 1),
+        "only asynchronous controls have immediate DFF dependencies");
     dff->inputs[0].value = LogicValue::High;
     dff->inputs[1].value = LogicValue::High;
-    dff->Evaluate();
-    require(dff->outputs[0].value == LogicValue::Low, "legacy Evaluate never samples a DFF clock");
-    dff->outputs[0].value = LogicValue::High;
     dff->inputs[2].value = LogicValue::High;
+    dff->inputs[3].value = LogicValue::High;
     dff->Evaluate();
-    require(dff->outputs[0].value == LogicValue::Low, "DFF asynchronous reset is high active");
+    require(dff->outputs[0].value == LogicValue::Low && dff->outputs[1].value == LogicValue::High,
+        "Evaluate never samples a DFF clock");
+    dff->inputs[2].value = LogicValue::Low;
+    dff->Evaluate();
+    require(dff->outputs[0].value == LogicValue::High && dff->outputs[1].value == LogicValue::Low,
+        "DFF asynchronous SET is low active");
+    dff->inputs[3].value = LogicValue::Low;
+    dff->Evaluate();
+    require(dff->outputs[0].value == LogicValue::Low && dff->outputs[1].value == LogicValue::High,
+        "DFF asynchronous CLR wins when both controls are low");
+    auto legacyDff = ComponentRegistry::Create("DFF", 3, true);
+    require(legacyDff && legacyDff->inputs[2].name == "RESET" && legacyDff->outputs.size() == 1,
+        "saved three-input DFF retains its original pin layout");
+    legacyDff->inputs[2].value = LogicValue::High;
+    legacyDff->Evaluate();
+    require(legacyDff->outputs[0].value == LogicValue::Low,
+        "saved three-input DFF retains its high-active reset");
     require(!ComponentRegistry::Create("INPUT", 1) && !ComponentRegistry::Create("NOT", 2),
         "fixed-count components reject malformed serialized pin counts");
     require(!ComponentRegistry::Find("UNKNOWN") && !ComponentRegistry::Create("UNKNOWN"),

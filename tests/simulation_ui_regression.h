@@ -69,9 +69,10 @@ struct SimulationUiRegressionAccess
             "timer budget executes events to the configured stop time");
         Require(panel.m_csv->IsEnabled() && panel.m_vcd->IsEnabled(), "completed traces are exportable");
         panel.Reset(); panel.Step();
-        Require(panel.ToggleInput(6) && panel.m_simulator.GetValue(2, PinType::Output, 0) == LogicValue::Low,
-            "runtime reset stimulus applies asynchronously through the controller");
-        Require(!canvas.ExportDocument().components.back().high && !canvas.IsModified(),
+        Require(panel.ToggleInput(6) && panel.m_simulator.GetValue(2, PinType::Output, 0) == LogicValue::Low &&
+            panel.m_simulator.GetValue(2, PinType::Output, 1) == LogicValue::High,
+            "runtime active-low CLR applies asynchronously through the controller");
+        Require(canvas.ExportDocument().components.back().high && !canvas.IsModified(),
             "controller stimuli do not alter persistent initial levels");
         panel.Stop();
         Require(!panel.m_active && !panel.m_simulator.GetTraces().empty(), "stop preserves exportable history");

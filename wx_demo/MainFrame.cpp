@@ -457,6 +457,8 @@ void MainFrame::StartTutorial()
     wxArrayString choices;
     choices.Add(wxT("半加器教程"));
     choices.Add(wxT("全加器教程"));
+    choices.Add(wxT("半加器自动演示"));
+    choices.Add(wxT("全加器自动演示"));
     wxSingleChoiceDialog dialog(this, wxT("请选择要学习的教程："), wxT("新手教程"), choices);
     if (dialog.ShowModal() != wxID_OK) return;
     if (!ConfirmDiscardChanges()) return;
@@ -467,8 +469,11 @@ void MainFrame::StartTutorial()
         UpdateSidebarVisibility();
     }
     m_filePath.Clear();
-    m_tutorialManager->StartTutorial(dialog.GetSelection() == 0 ?
-        wxT("半加器 (Half Adder)") : wxT("全加器 (Full Adder)"));
+    const int selection = dialog.GetSelection();
+    const wxString name = selection % 2 == 0 ?
+        wxT("半加器 (Half Adder)") : wxT("全加器 (Full Adder)");
+    if (selection >= 2) m_tutorialManager->StartAutoTutorial(name);
+    else m_tutorialManager->StartTutorial(name);
     m_simulation->InvalidateDocument();
     UpdateDocumentTitle();
 }
@@ -702,16 +707,16 @@ void MainFrame::LoadTimingExample()
     design.formatVersion = 3;
     design.simulation.stopTimeNs = 200;
     design.components = {
-        {1, "CLOCK", 60, 60, 0, false}, {2, "DFF", 340, 100, 3, false},
-        {3, "NOT", 180, 240, 1, false}, {4, "PROBE", 580, 60, 1, false},
-        {5, "PROBE", 580, 200, 1, false}, {6, "INPUT", 60, 360, 0, false} };
+        {1, "CLOCK", 60, 60, 0, false}, {2, "DFF", 340, 100, 4, false},
+        {3, "PROBE", 580, 60, 1, false}, {4, "PROBE", 580, 200, 1, false},
+        {5, "INPUT", 60, 300, 0, true}, {6, "INPUT", 180, 300, 0, true} };
     design.components[0].clockPeriodNs = 20;
     design.components[0].clockHighNs = 10;
-    design.components[3].probeLabel = "CLK";
-    design.components[4].probeLabel = "Q_div2";
-    design.wires = { {1, 0, 2, 1}, {1, 0, 4, 0}, {2, 0, 3, 0},
-        {3, 0, 2, 0}, {2, 0, 5, 0}, {6, 0, 2, 2} };
-    design.texts = { {wxRect(40, 10, 660, 35), 12, wxT("DFF 二分频 · Q 经 NOT 反馈到 D · INPUT 控制高有效异步 RESET")} };
+    design.components[2].probeLabel = "CLK";
+    design.components[3].probeLabel = "Q_div2";
+    design.wires = { {1, 0, 2, 1}, {1, 0, 3, 0}, {2, 1, 2, 0},
+        {2, 0, 4, 0}, {5, 0, 2, 2}, {6, 0, 2, 3} };
+    design.texts = { {wxRect(40, 10, 660, 35), 12, wxT("DFF 二分频 · QN 反馈到 D · SET/CLR 低有效")} };
     wxString error;
     if (m_tutorialManager) m_tutorialManager->CancelTutorial();
     if (!m_canvas->ImportDocument(design, error))

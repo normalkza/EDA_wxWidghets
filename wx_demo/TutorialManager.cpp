@@ -3,11 +3,22 @@
 #include "MainFrame.h"
 #include "Toolbox.h"
 #include "Canvas.h"
+#include "ComponentRegistry.h"
 #include "SelectionState.h"
+#include <algorithm>
+#include <array>
+#include <iterator>
+
+namespace
+{
+    constexpr int AutoStepDelayMs = 2400;
+    constexpr int AutoFinishDelayMs = 3000;
+}
 
 TutorialManager::TutorialManager(MainFrame* mainFrame)
-    : m_mainFrame(mainFrame)
+    : m_mainFrame(mainFrame), m_autoTimer(this)
 {
+    Bind(wxEVT_TIMER, [this](wxTimerEvent&) { AdvanceAutoDemo(); }, m_autoTimer.GetId());
     m_overlay = new TutorialOverlay(mainFrame);
 
     m_overlay->SetPreviousCallback([this]()
@@ -28,6 +39,7 @@ TutorialManager::TutorialManager(MainFrame* mainFrame)
 
 TutorialManager::~TutorialManager()
 {
+    m_autoTimer.Stop();
     m_lifetime.reset();
     CancelTutorial();
     if (auto* overlay = m_overlay.get())
@@ -36,6 +48,136 @@ TutorialManager::~TutorialManager()
         overlay->Destroy();
     }
     m_overlay = nullptr;
+}
+
+void TutorialManager::StartAutoTutorial(const wxString& tutorialName)
+{
+    CancelTutorial();
+    m_currentTutorialName = tutorialName;
+    BuildSteps();
+    Canvas* canvas = m_mainFrame ? m_mainFrame->GetCanvas() : nullptr;
+    if (!canvas || m_steps.empty()) return;
+
+    canvas->ClearDocument();
+    m_autoDocument = canvas->ExportDocument();
+    m_autoPlacements.clear();
+    std::copy_if(m_steps.begin(), m_steps.end(), std::back_inserter(m_autoPlacements),
+        [](const TutorialStep& step) { return step.placement; });
+    if (m_autoPlacements.empty()) return;
+    m_autoLabels.clear();
+    m_expectedWires.clear();
+    m_autoPlacementIndex = m_autoWireIndex = 0;
+    m_autoFrameRevision = canvas->GetDocumentRevision();
+    m_autoDemo = m_active = true;
+    m_autoPaused = false;
+    if (auto* overlay = m_overlay.get())
+    {
+        overlay->SetAutoDemoMode(true);
+        overlay->SetStep(m_currentTutorialName + wxT(" - 自动演示"),
+            wxT("即将自动放置元件并逐条连线。观察画布中每一步的变化；可随时暂停或结束演示。"),
+            wxString::Format(wxT("演示进度：0 / %d"),
+                static_cast<int>(m_autoPlacements.size()) + m_wireTarget),
+            canvas->GetScreenRect());
+    }
+    m_autoTimer.StartOnce(AutoStepDelayMs);
+}
+
+wxPoint TutorialManager::AutoPlacementPosition(std::size_t index) const
+{
+    static const std::array<wxPoint, 6> half{{
+        {60, 140}, {60, 320}, {270, 120}, {270, 340}, {540, 170}, {540, 380}}};
+    static const std::array<wxPoint, 10> full{{
+        {40, 120}, {40, 290}, {40, 460}, {240, 100}, {470, 160},
+        {240, 370}, {470, 430}, {690, 400}, {750, 160}, {900, 450}}};
+    const bool halfAdder = m_currentTutorialName == wxT("半加器 (Half Adder)");
+    const wxPoint base = halfAdder ? half.at(index) : full.at(index);
+    const wxSize size = m_mainFrame->GetCanvas()->GetClientSize();
+    const double xScale = std::min(1.0, std::max(0.5,
+        static_cast<double>(size.x - 100) / (halfAdder ? 650.0 : 1020.0)));
+    const double yScale = std::min(1.0, std::max(0.6,
+        static_cast<double>(size.y - 100) / 590.0));
+    return wxPoint(static_cast<int>(base.x * xScale), static_cast<int>(base.y * yScale));
+}
+
+void TutorialManager::AdvanceAutoDemo()
+{
+    if (!m_active || !m_autoDemo || m_autoPaused || !m_mainFrame) return;
+    Canvas* canvas = m_mainFrame->GetCanvas();
+    if (!canvas || canvas->GetDocumentRevision() != m_autoFrameRevision)
+    {
+        CancelTutorial();
+        return;
+    }
+    if (m_autoPlacementIndex == m_autoPlacements.size() &&
+        m_autoWireIndex == m_expectedWires.size() && !m_expectedWires.empty())
+    {
+        FinishTutorial();
+        return;
+    }
+
+    wxString message;
+    if (m_autoPlacementIndex < m_autoPlacements.size())
+    {
+        const auto& step = m_autoPlacements[m_autoPlacementIndex];
+        const auto type = step.type.ToStdString(wxConvUTF8);
+        const auto* definition = ComponentRegistry::Find(type);
+        if (!definition || !definition->IsAvailable()) { CancelTutorial(); return; }
+        const wxPoint position = AutoPlacementPosition(m_autoPlacementIndex);
+        CircuitComponentData component;
+        component.id = static_cast<int>(m_autoPlacementIndex) + 1;
+        component.type = type;
+        component.x = position.x;
+        component.y = position.y;
+        component.inputCount = definition->defaultInputCount;
+        m_autoDocument.components.push_back(component);
+        message = step.message + wxT("\n\n已自动") + step.name + wxT("。");
+        if (!step.label.IsEmpty()) m_autoLabels.emplace_back(component.id, step.label);
+        ++m_autoPlacementIndex;
+    }
+    else
+    {
+        const auto& expected = m_expectedWires[m_autoWireIndex];
+        auto wire = expected.wire;
+        if (!canvas->RouteTutorialWire(wire))
+        {
+            CancelTutorial();
+            wxMessageBox(wxT("自动连线无法避开元件，请调整画布大小后重试。"),
+                wxT("自动教程无法继续"), wxOK | wxICON_ERROR, m_mainFrame);
+            return;
+        }
+        m_autoDocument.wires.push_back(std::move(wire));
+        message = wxT("请将 ") + expected.sourceName + wxT(" 的 ") + expected.sourcePinName +
+            wxT(" 连接到 ") + expected.targetName + wxT(" 的 ") + expected.targetPinName +
+            wxT("。\n\n已自动完成这条连线。");
+        ++m_autoWireIndex;
+    }
+
+    wxString error;
+    if (!canvas->ShowTutorialFrame(m_autoDocument, error))
+    {
+        CancelTutorial();
+        wxMessageBox(error, wxT("自动教程无法继续"), wxOK | wxICON_ERROR, m_mainFrame);
+        return;
+    }
+    m_autoFrameRevision = canvas->GetDocumentRevision();
+    for (const auto& [id, label] : m_autoLabels) canvas->SetTutorialLabel(id, label);
+    if (m_autoPlacementIndex == m_autoPlacements.size() && m_expectedWires.empty())
+    {
+        BuildExpectedWires();
+        if (m_expectedWires.size() != static_cast<std::size_t>(m_wireTarget))
+        {
+            CancelTutorial();
+            return;
+        }
+    }
+    if (auto* overlay = m_overlay.get())
+        overlay->SetStep(m_currentTutorialName + wxT(" - 自动演示"), message,
+            wxString::Format(wxT("演示进度：%d / %d"),
+                static_cast<int>(m_autoPlacementIndex + m_autoWireIndex),
+                static_cast<int>(m_autoPlacements.size() + m_expectedWires.size())),
+            canvas->GetScreenRect());
+    m_autoTimer.StartOnce(m_autoPlacementIndex == m_autoPlacements.size() &&
+        m_autoWireIndex == m_expectedWires.size() ? AutoFinishDelayMs : AutoStepDelayMs);
 }
 
 void TutorialManager::StartTutorial(const wxString& tutorialName)
@@ -418,7 +560,7 @@ void TutorialManager::ShowCurrentWireStep()
 
 void TutorialManager::NotifyToolSelected(const wxString& componentType)
 {
-    if (!m_active || m_waitingForWires)
+    if (!m_active || m_autoDemo || m_waitingForWires)
         return;
 
     if (m_stepIndex >= static_cast<int>(m_steps.size()))
@@ -437,7 +579,7 @@ void TutorialManager::NotifyToolSelected(const wxString& componentType)
 
 void TutorialManager::NotifyComponentPlaced(const wxString& componentType, int componentId)
 {
-    if (!m_active || m_waitingForWires)
+    if (!m_active || m_autoDemo || m_waitingForWires)
         return;
 
     if (m_stepIndex >= static_cast<int>(m_steps.size()))
@@ -488,7 +630,7 @@ void TutorialManager::CompleteCurrentStep()
 
 void TutorialManager::PreviousStep()
 {
-    if (!m_active || m_waitingForWires)
+    if (!m_active || m_autoDemo || m_waitingForWires)
         return;
 
     if (m_stepIndex > 0)
@@ -500,12 +642,16 @@ void TutorialManager::PreviousStep()
 
 void TutorialManager::NextStep()
 {
-    // 教程步骤自动推进，不需要手动点击下一步。
+    if (!m_active || !m_autoDemo) return;
+    m_autoPaused = !m_autoPaused;
+    if (m_autoPaused) m_autoTimer.Stop();
+    else m_autoTimer.StartOnce(AutoStepDelayMs);
+    if (auto* overlay = m_overlay.get()) overlay->SetAutoDemoMode(true, m_autoPaused);
 }
 
 void TutorialManager::NotifyWireCreated(const CircuitWireData& wire)
 {
-    if (!m_active || !m_waitingForWires || !m_overlay)
+    if (!m_active || m_autoDemo || !m_waitingForWires || !m_overlay)
         return;
 
     if (m_wireStepIndex >= static_cast<int>(m_expectedWires.size()))
@@ -586,15 +732,21 @@ void TutorialManager::NotifyWireCreated(const CircuitWireData& wire)
 
 void TutorialManager::FinishTutorial()
 {
+    const bool wasAutoDemo = m_autoDemo;
+    m_autoTimer.Stop();
+    m_autoDemo = m_autoPaused = false;
     ++m_generation;
     m_active = false;
     m_waitingForWires = false;
 
     if (m_overlay)
+    {
+        m_overlay->SetAutoDemoMode(false);
         m_overlay->HideOverlay();
+    }
 
     wxMessageBox(
-        wxT("恭喜！你已完成 ") +
+        (wasAutoDemo ? wxT("自动演示完成：") : wxT("恭喜！你已完成 ")) +
         m_currentTutorialName +
         wxT(" 教程。"),
         wxT("教程完成"),
@@ -608,6 +760,12 @@ void TutorialManager::FinishTutorial()
 // =====================================================
 void TutorialManager::CancelTutorial()
 {
+    m_autoTimer.Stop();
+    m_autoDemo = m_autoPaused = false;
+    m_autoPlacements.clear();
+    m_autoLabels.clear();
+    m_autoDocument = CircuitDocument{};
+    m_autoPlacementIndex = m_autoWireIndex = 0;
     ++m_generation;
     m_active = false;
     m_waitingForWires = false;
@@ -620,7 +778,10 @@ void TutorialManager::CancelTutorial()
     m_expectedWires.clear();
 
     if (m_overlay)
+    {
+        m_overlay->SetAutoDemoMode(false);
         m_overlay->HideOverlay();
+    }
 }
 
 void TutorialManager::BuildExpectedWires()

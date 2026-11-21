@@ -129,7 +129,7 @@ bool SimulationPanel::Prepare()
     for (const auto& component : design.components)
         for (int pin = 0; pin < component.inputCount; ++pin)
         {
-            if (component.type == "DFF" && pin == 2) continue;
+            if (component.type == "DFF" && (pin == 2 || pin == 3)) continue;
             const bool connected = std::any_of(design.wires.begin(), design.wires.end(), [&](const auto& wire) {
                 return wire.targetId == component.id && wire.targetPin == pin;
             });

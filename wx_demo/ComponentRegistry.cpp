@@ -47,7 +47,7 @@ const std::vector<ComponentDefinition>& ComponentRegistry::All()
         {"ADDER", "加法器", "运算器", "adder", 2, 2, 2, 1},
         {"SUBTRACTOR", "减法器", "运算器", "subtractor", 2, 2, 2, 1},
         {"COMPARATOR", "比较器", "运算器", "comparator", 2, 2, 2, 3, FixedComponent<ComparatorComponent>},
-        {"DFF", "D 触发器", "存储", "dff", 3, 3, 3, 1, FixedComponent<DffComponent>},
+        {"DFF", "D 触发器", "存储", "dff", 4, 3, 4, 2, VariableComponent<DffComponent>},
         {"REGISTER", "寄存器", "存储", "register", 2, 2, 2, 1},
         {"COUNTER", "计数器", "存储", "counter", 1, 1, 1, 1}
     };
@@ -70,6 +70,8 @@ std::unique_ptr<Component> ComponentRegistry::Create(std::string_view type, int 
     auto component = definition->factory(inputCount);
     if (SupportsInitialLevel(type))
         component->outputs[0].value = high ? LogicValue::High : LogicValue::Low;
+    if (type == "DFF" && component->outputs.size() == 2)
+        component->outputs[1].value = high ? LogicValue::Low : LogicValue::High;
     return component;
 }
 
