@@ -87,6 +87,8 @@ bool CircuitValidation::Validate(const CircuitDocument& document, wxString& erro
             return Fail(error, wxS("元件旋转角度只能是 0、90、180 或 270 度。"));
         if (data.inputCount < 0)
             return Fail(error, wxString::Format(wxS("元件 %d 的输入数量不能为负数。"), data.id));
+        if (data.type == "DFF" && data.inputCount != 3 && data.fallingEdge)
+            return Fail(error, wxString::Format(wxS("元件 %d 的 DFF 仅支持上升沿触发。"), data.id));
         if (data.clockPeriodNs < 2 || data.clockHighNs < 1 || data.clockHighNs >= data.clockPeriodNs ||
             data.clockStartNs < 0 || data.clockStartNs > std::numeric_limits<std::int64_t>::max() - data.clockPeriodNs)
             return Fail(error, wxString::Format(wxS("元件 %d 的时钟参数无效：高低时间均至少为 1 ns，启动延迟不能为负或溢出。"), data.id));

@@ -103,7 +103,7 @@ struct CanvasTimingRegressionAccess
         {
             CircuitDocument document;
             document.formatVersion = 3;
-            const int inputs = std::string(type) == "DFF" ? 3 : std::string(type) == "PROBE" ? 1 : 0;
+            const int inputs = std::string(type) == "DFF" ? 2 : std::string(type) == "PROBE" ? 1 : 0;
             document.components = {{71, type, 280, 160, inputs, false}};
             wxString error;
             Require(canvas.ImportDocument(document, error), "timing geometry fixture imports");

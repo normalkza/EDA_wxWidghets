@@ -74,6 +74,10 @@ public:
     int GetGateInputCount() const;
     CircuitDocument ExportDocument() const;
     bool ImportDocument(const CircuitDocument& document, wxString& error);
+    // Replace one frame of an automatic tutorial without ending that tutorial.
+    bool ShowTutorialFrame(const CircuitDocument& document, wxString& error);
+    // Route an automatic tutorial wire around all placed component bodies.
+    bool RouteTutorialWire(CircuitWireData& wire) const;
     // Apply a locally validated assistant proposal as one normal canvas edit.
     bool ApplyAssistantDocument(const CircuitDocument& document, std::uint64_t expectedRevision, wxString& error,
         bool coalesceUndo = false);
@@ -148,6 +152,7 @@ private:
     void DrawTextSelection(wxDC& dc);
     std::function<void()> m_documentChangedCallback;
     std::function<void()> m_documentResetCallback;
+    bool m_showingTutorialFrame = false;
     // 把坐标对齐到网格点
     int SnapToGrid(int value) const { return m_snapEnabled ? (value / m_gridSize) * m_gridSize : value; }
 

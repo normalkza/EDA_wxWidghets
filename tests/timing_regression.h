@@ -45,6 +45,49 @@ inline void Run()
     DigitalSimulator simulator;
     wxString error;
     Require(!simulator.Step(error) && !error.empty(), "uncompiled simulator rejects stepping");
+    CircuitDocument modern;
+    modern.formatVersion = 3;
+    modern.simulation.stopTimeNs = 100;
+    modern.components = {{1, "CLOCK", 0, 0, 0, false}, {2, "DFF", 200, 0, 2, false},
+        {3, "INPUT", 0, 120, 0, false}};
+    modern.components[0].clockStartNs = 5;
+    modern.wires = {{1, 0, 2, 1}, {3, 0, 2, 0}};
+    Require(simulator.Compile(modern, 70, error) &&
+        simulator.GetValue(2, PinType::Output, 0) == LogicValue::Low &&
+        simulator.GetValue(2, PinType::Output, 1) == LogicValue::High,
+        "new DFF initializes Q and complementary QN without a clock edge");
+    Require(simulator.SetInput(3, LogicValue::High, error) &&
+        simulator.GetValue(2, PinType::Output, 0) == LogicValue::Low &&
+        simulator.AdvanceTo(5, error) &&
+        simulator.GetValue(2, PinType::Output, 0) == LogicValue::High &&
+        simulator.GetValue(2, PinType::Output, 1) == LogicValue::Low,
+        "new DFF holds D changes until the rising edge and keeps QN inverted");
+    Require(simulator.SetInput(3, LogicValue::Low, error) && simulator.AdvanceTo(15, error) &&
+        simulator.GetValue(2, PinType::Output, 0) == LogicValue::High &&
+        simulator.AdvanceTo(25, error) && simulator.GetValue(2, PinType::Output, 0) == LogicValue::Low,
+        "new DFF ignores the falling edge and samples the next rising edge");
+    auto historical = modern;
+    historical.components[1].inputCount = 4;
+    historical.components.push_back({4, "INPUT", 0, 200, 0, true});
+    historical.components.push_back({5, "INPUT", 0, 280, 0, true});
+    historical.wires.push_back({4, 0, 2, 2});
+    historical.wires.push_back({5, 0, 2, 3});
+    Require(simulator.Compile(historical, 700, error) &&
+        simulator.SetInput(4, LogicValue::Low, error) &&
+        simulator.GetValue(2, PinType::Output, 0) == LogicValue::High &&
+        simulator.SetInput(5, LogicValue::Low, error) &&
+        simulator.GetValue(2, PinType::Output, 0) == LogicValue::Low,
+        "previous four-input DFF retains asynchronous controls for saved files");
+    auto feedback = modern;
+    feedback.components.resize(2);
+    feedback.components[0].clockStartNs = 0;
+    feedback.wires = {{1, 0, 2, 1}, {2, 1, 2, 0}};
+    Require(simulator.Compile(feedback, 701, error) && simulator.Step(error) &&
+        simulator.GetValue(2, PinType::Output, 0) == LogicValue::High &&
+        simulator.GetValue(2, PinType::Output, 1) == LogicValue::Low &&
+        simulator.StepClockPeriod(1, error) &&
+        simulator.GetValue(2, PinType::Output, 0) == LogicValue::Low,
+        "direct QN-to-D feedback divides the clock by two");
     auto design = Chain();
     Require(simulator.Compile(design, 71, error), "compile DFF chain");
     Require(simulator.GetTime() == 0 && simulator.GetRevision() == 71, "initial time and revision");

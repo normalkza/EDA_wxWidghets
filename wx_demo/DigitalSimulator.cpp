@@ -79,9 +79,8 @@ bool DigitalSimulator::Compile(const CircuitDocument& document, std::uint64_t re
                     wire.targetId, wire.sourceId);
                 return false;
             }
-            // D and CLK are sampled; only the asynchronous RESET -> Q path
-            // participates in the immediate dependency graph.
-            if (targetNode.design.type == "DFF" && wire.targetPin != 2) continue;
+            // D and CLK are sampled; only asynchronous control pins are immediate.
+            if (targetNode.design.type == "DFF" && wire.targetPin < 2) continue;
             outgoing[source].push_back(target);
             ++indegree[target];
         }
@@ -98,7 +97,7 @@ bool DigitalSimulator::Compile(const CircuitDocument& document, std::uint64_t re
         }
         if (candidate.m_order.size() != ordered.size())
         {
-            error = wxS("电路包含组合或异步复位反馈环路。");
+            error = wxS("电路包含组合或异步控制反馈环路。");
             return false;
         }
         candidate.m_compiled = true;
@@ -127,6 +126,8 @@ bool DigitalSimulator::Initialize(wxString& error)
         for (auto& pin : node.component->outputs) pin.value = LogicValue::Low;
         if (ComponentRegistry::SupportsInitialLevel(node.design.type))
             node.component->outputs[0].value = node.design.high ? LogicValue::High : LogicValue::Low;
+        if (node.design.type == "DFF" && node.component->outputs.size() == 2)
+            node.component->outputs[1].value = node.design.high ? LogicValue::Low : LogicValue::High;
         node.nextClock = node.design.type == "CLOCK" ?
             std::optional<std::int64_t>(node.design.clockStartNs) : std::nullopt;
     }
@@ -177,13 +178,15 @@ void DigitalSimulator::RefreshInputs(Node& node)
     {
         const auto& driver = node.inputs[input];
         node.component->inputs[input].value = driver ?
-            m_nodes[driver->node].component->outputs[driver->pin].value : LogicValue::Low;
+            m_nodes[driver->node].component->outputs[driver->pin].value :
+            node.design.type == "DFF" && node.component->inputs.size() == 4 && input >= 2 ?
+                LogicValue::High : LogicValue::Low;
     }
 }
 
 void DigitalSimulator::Settle()
 {
-    // The topological order includes async RESET dependencies, so one sweep
+    // The topological order includes asynchronous control dependencies, so one sweep
     // reaches the unique combinational fixed point without traversal races.
     for (const auto index : m_order)
     {
@@ -333,8 +336,15 @@ bool DigitalSimulator::ProcessTimeUnchecked(std::int64_t timeNs, wxString& error
         const bool rising = node.previousClock == LogicValue::Low && inputs[1].value == LogicValue::High;
         const bool falling = node.previousClock == LogicValue::High && inputs[1].value == LogicValue::Low;
         const bool activeEdge = node.design.fallingEdge ? falling : rising;
-        const auto next = inputs[2].value == LogicValue::High ? LogicValue::Low :
-            activeEdge ? inputs[0].value : node.component->outputs[0].value;
+        LogicValue next = node.component->outputs[0].value;
+        if (inputs.size() == 3 && inputs[2].value == LogicValue::High)
+            next = LogicValue::Low;
+        else if (inputs.size() == 4 && inputs[3].value == LogicValue::Low)
+            next = LogicValue::Low;
+        else if (inputs.size() == 4 && inputs[2].value == LogicValue::Low)
+            next = LogicValue::High;
+        else if (activeEdge)
+            next = inputs[0].value;
         node.previousClock = inputs[1].value;
         if (next != node.component->outputs[0].value) commits.emplace_back(index, next);
     }
@@ -344,7 +354,13 @@ bool DigitalSimulator::ProcessTimeUnchecked(std::int64_t timeNs, wxString& error
             return Fail(wxS("同一时刻的 delta 轮次数量已达上限。"), error);
         // Every DFF reads the same pre-commit snapshot. A chain advances one
         // stage per edge, regardless of its component IDs or placement order.
-        for (const auto& [index, next] : commits) m_nodes[index].component->outputs[0].value = next;
+        for (const auto& [index, next] : commits)
+        {
+            auto& outputs = m_nodes[index].component->outputs;
+            outputs[0].value = next;
+            if (outputs.size() == 2)
+                outputs[1].value = next == LogicValue::High ? LogicValue::Low : LogicValue::High;
+        }
         if (!Record(timeNs, delta, error)) return false;
         if (++delta > m_config.maxDeltaCycles)
             return Fail(wxS("同一时刻的 delta 轮次数量已达上限。"), error);

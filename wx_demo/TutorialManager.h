@@ -2,6 +2,7 @@
 
 #include <wx/wx.h>
 #include <wx/weakref.h>
+#include <wx/timer.h>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -11,7 +12,7 @@
 
 class MainFrame;
 
-class TutorialManager
+class TutorialManager : public wxEvtHandler
 {
 public:
     explicit TutorialManager(MainFrame* mainFrame);
@@ -20,6 +21,7 @@ public:
     TutorialManager& operator=(const TutorialManager&) = delete;
 
     void StartTutorial(const wxString& tutorialName);
+    void StartAutoTutorial(const wxString& tutorialName);
     void CancelTutorial();
 
     void NotifyToolSelected(const wxString& componentType);
@@ -51,6 +53,8 @@ private:
     };
 
     void BuildSteps();
+    void AdvanceAutoDemo();
+    wxPoint AutoPlacementPosition(std::size_t index) const;
     void ShowCurrentStep();
 
     void PreviousStep();
@@ -77,6 +81,15 @@ private:
     wxString m_currentTutorialName;
 
     std::vector<TutorialStep> m_steps;
+    std::vector<TutorialStep> m_autoPlacements;
+    std::vector<std::pair<int, wxString>> m_autoLabels;
+    CircuitDocument m_autoDocument;
+    wxTimer m_autoTimer;
+    std::uint64_t m_autoFrameRevision = 0;
+    std::size_t m_autoPlacementIndex = 0;
+    std::size_t m_autoWireIndex = 0;
+    bool m_autoDemo = false;
+    bool m_autoPaused = false;
 
     int m_stepIndex = 0;
     int m_wireCount = 0;

@@ -234,7 +234,7 @@ CircuitDocument Canvas::ExportDocument() const
 
 void Canvas::ResetDocument()
 {
-    if (m_documentResetCallback) m_documentResetCallback();
+    if (!m_showingTutorialFrame && m_documentResetCallback) m_documentResetCallback();
     ++m_documentRevision;
     if (m_documentChangedCallback) m_documentChangedCallback();
     m_dragTimer.Stop();
@@ -285,6 +285,20 @@ void Canvas::ClearDocument()
 bool Canvas::ImportDocument(const CircuitDocument& document, wxString& error)
 {
     return ReplaceDocument(document, error, true);
+}
+
+bool Canvas::ShowTutorialFrame(const CircuitDocument& document, wxString& error)
+{
+    if (!wxIsMainThread())
+    {
+        error = wxS("请在主界面播放教程。");
+        return false;
+    }
+    m_showingTutorialFrame = true;
+    const bool ok = ReplaceDocument(document, error, false);
+    m_showingTutorialFrame = false;
+    if (ok) RefreshModifiedState();
+    return ok;
 }
 
 bool Canvas::ApplyAssistantDocument(const CircuitDocument& document, std::uint64_t expectedRevision, wxString& error,
