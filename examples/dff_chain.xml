@@ -3,9 +3,8 @@
   <components>
     <component id="1" type="INPUT" x="60" y="60" inputCount="0" high="1"/>
     <component id="2" type="CLOCK" x="60" y="190" inputCount="0" high="0" clockPeriodNs="20" clockHighNs="10" clockStartNs="5"/>
-    <component id="3" type="INPUT" x="60" y="310" inputCount="0" high="1"/>
-    <component id="4" type="DFF" x="300" y="160" inputCount="4" high="0"/>
-    <component id="5" type="DFF" x="540" y="160" inputCount="4" high="0"/>
+    <component id="4" type="DFF" x="300" y="160" inputCount="2" high="0"/>
+    <component id="5" type="DFF" x="540" y="160" inputCount="2" high="0"/>
     <component id="6" type="PROBE" x="420" y="50" inputCount="1" high="0" probeLabel="Q1 · 第一级"/>
     <component id="7" type="PROBE" x="680" y="160" inputCount="1" high="0" probeLabel="Q2 · 第二级"/>
     <component id="8" type="PROBE" x="180" y="50" inputCount="1" high="0" probeLabel="CLK · 共用时钟"/>
@@ -18,15 +17,12 @@
     <wire sourceId="4" sourcePinId="Q" targetId="5" targetPinId="D"/>
     <wire sourceId="4" sourcePinId="Q" targetId="6" targetPinId="IN"/>
     <wire sourceId="5" sourcePinId="Q" targetId="7" targetPinId="IN"/>
-    <wire sourceId="3" sourcePinId="OUT" targetId="4" targetPinId="CLR"/>
-    <wire sourceId="3" sourcePinId="OUT" targetId="5" targetPinId="CLR"/>
   </wires>
   <texts>
     <text x="30" y="8" width="770" height="28" pointSize="17">两级 DFF：同一上升沿只前进一级</text>
     <text x="40" y="112" width="100" height="24" pointSize="12">D = 1</text>
-    <text x="35" y="281" width="230" height="24" pointSize="12">CLR：低有效异步清零</text>
-    <text x="30" y="370" width="780" height="52" pointSize="13">首次上升沿 5 ns：Q1 = 1、Q2 = 0；第二次 25 ns：Q1 = Q2 = 1。
-点击 D 可改变运行激励；CLR 拉低立即清零，释放后等待上升沿。</text>
+    <text x="30" y="310" width="780" height="52" pointSize="13">首次上升沿 5 ns：Q1 = 1、Q2 = 0；第二次 25 ns：Q1 = Q2 = 1。
+点击 D 可改变运行激励；各级只在上升沿更新。</text>
   </texts>
   <simulation stopTimeNs="205" maxEvents="100000" maxDeltaCycles="128" maxTraceSamples="200000"/>
 </circuit>

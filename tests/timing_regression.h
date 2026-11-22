@@ -48,11 +48,10 @@ inline void Run()
     CircuitDocument modern;
     modern.formatVersion = 3;
     modern.simulation.stopTimeNs = 100;
-    modern.components = {{1, "CLOCK", 0, 0, 0, false}, {2, "DFF", 200, 0, 4, false},
-        {3, "INPUT", 0, 120, 0, false}, {4, "INPUT", 0, 200, 0, true},
-        {5, "INPUT", 0, 280, 0, true}};
+    modern.components = {{1, "CLOCK", 0, 0, 0, false}, {2, "DFF", 200, 0, 2, false},
+        {3, "INPUT", 0, 120, 0, false}};
     modern.components[0].clockStartNs = 5;
-    modern.wires = {{1, 0, 2, 1}, {3, 0, 2, 0}, {4, 0, 2, 2}, {5, 0, 2, 3}};
+    modern.wires = {{1, 0, 2, 1}, {3, 0, 2, 0}};
     Require(simulator.Compile(modern, 70, error) &&
         simulator.GetValue(2, PinType::Output, 0) == LogicValue::Low &&
         simulator.GetValue(2, PinType::Output, 1) == LogicValue::High,
@@ -67,15 +66,18 @@ inline void Run()
         simulator.GetValue(2, PinType::Output, 0) == LogicValue::High &&
         simulator.AdvanceTo(25, error) && simulator.GetValue(2, PinType::Output, 0) == LogicValue::Low,
         "new DFF ignores the falling edge and samples the next rising edge");
-    Require(simulator.SetInput(4, LogicValue::Low, error) &&
-        simulator.GetValue(2, PinType::Output, 0) == LogicValue::High &&
-        simulator.SetInput(4, LogicValue::High, error) &&
+    auto historical = modern;
+    historical.components[1].inputCount = 4;
+    historical.components.push_back({4, "INPUT", 0, 200, 0, true});
+    historical.components.push_back({5, "INPUT", 0, 280, 0, true});
+    historical.wires.push_back({4, 0, 2, 2});
+    historical.wires.push_back({5, 0, 2, 3});
+    Require(simulator.Compile(historical, 700, error) &&
+        simulator.SetInput(4, LogicValue::Low, error) &&
         simulator.GetValue(2, PinType::Output, 0) == LogicValue::High &&
         simulator.SetInput(5, LogicValue::Low, error) &&
-        simulator.GetValue(2, PinType::Output, 0) == LogicValue::Low &&
-        simulator.SetInput(4, LogicValue::Low, error) &&
-        simulator.GetValue(2, PinType::Output, 1) == LogicValue::High,
-        "active-low asynchronous SET and CLR act without an edge; CLR wins a conflict");
+        simulator.GetValue(2, PinType::Output, 0) == LogicValue::Low,
+        "previous four-input DFF retains asynchronous controls for saved files");
     auto feedback = modern;
     feedback.components.resize(2);
     feedback.components[0].clockStartNs = 0;

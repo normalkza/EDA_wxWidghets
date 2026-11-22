@@ -707,16 +707,15 @@ void MainFrame::LoadTimingExample()
     design.formatVersion = 3;
     design.simulation.stopTimeNs = 200;
     design.components = {
-        {1, "CLOCK", 60, 60, 0, false}, {2, "DFF", 340, 100, 4, false},
+        {1, "CLOCK", 60, 60, 0, false}, {2, "DFF", 340, 100, 2, false},
         {3, "PROBE", 580, 60, 1, false}, {4, "PROBE", 580, 200, 1, false},
-        {5, "INPUT", 60, 300, 0, true}, {6, "INPUT", 180, 300, 0, true} };
+        };
     design.components[0].clockPeriodNs = 20;
     design.components[0].clockHighNs = 10;
     design.components[2].probeLabel = "CLK";
     design.components[3].probeLabel = "Q_div2";
-    design.wires = { {1, 0, 2, 1}, {1, 0, 3, 0}, {2, 1, 2, 0},
-        {2, 0, 4, 0}, {5, 0, 2, 2}, {6, 0, 2, 3} };
-    design.texts = { {wxRect(40, 10, 660, 35), 12, wxT("DFF 二分频 · QN 反馈到 D · SET/CLR 低有效")} };
+    design.wires = { {1, 0, 2, 1}, {1, 0, 3, 0}, {2, 1, 2, 0}, {2, 0, 4, 0} };
+    design.texts = { {wxRect(40, 10, 660, 35), 12, wxT("理想 DFF 二分频 · QN 反馈到 D")} };
     wxString error;
     if (m_tutorialManager) m_tutorialManager->CancelTutorial();
     if (!m_canvas->ImportDocument(design, error))

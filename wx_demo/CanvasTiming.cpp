@@ -75,6 +75,8 @@ bool Canvas::EditSelectedTimingParameters()
     if (original.type == "PROBE") label = addText(wxT("波形名称"), wxString::FromUTF8(original.probeLabel));
     root->Add(grid, 1, wxEXPAND | wxALL, FromDIP(20));
     const wxString hint = original.type == "CLOCK" ? wxT("整数纳秒；高、低电平持续时间均至少 1 ns。\n首次跳变可为 0，初值本身不产生边沿。") :
+        original.type == "DFF" && original.inputCount == 2 ?
+            wxT("理想 D 触发器：上升沿采样 D；Q 保持到下一次上升沿，QN 始终与 Q 互反。") :
         original.type == "DFF" && original.inputCount == 4 ?
             wxT("上升沿采样 D；Q 与 QN 互反。SET / CLR 为低有效异步控制端，悬空视为高电平；同时拉低时 CLR 优先。") :
         original.type == "DFF" ? wxT("旧版 DFF：D / CLK / RESET → Q；RESET 为高有效异步复位。") :

@@ -850,6 +850,9 @@ Canvas::GateGeometry Canvas::GetGateGeometry(const Component& component) const
     if (type == "COMPARATOR") return { 100, 80, 0, 100,
         { wxPoint(0, 20), wxPoint(0, 60) },
         { wxPoint(100, 20), wxPoint(100, 40), wxPoint(100, 60) } };
+    if (type == "DFF" && component.inputs.size() == 2) return { 100, 80, 0, 110,
+        { wxPoint(0, 20), wxPoint(0, 60) },
+        { wxPoint(110, 20), wxPoint(110, 60) } };
     if (type == "DFF" && component.inputs.size() == 4) return { 100, 120, 0, 110,
         { wxPoint(0, 40), wxPoint(0, 80), wxPoint(50, 0), wxPoint(50, 120) },
         { wxPoint(110, 40), wxPoint(110, 80) } };
@@ -1523,19 +1526,24 @@ void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
     if (timing)
     {
         dc.SetBrush(wxBrush(wxColour(244, 248, 255)));
-        const bool dualOutputDff = type == "DFF" && pc.comp->inputs.size() == 4;
-        dc.DrawRoundedRectangle(x, y + (dualOutputDff ? 10 : 0), w,
-            h - (dualOutputDff ? 20 : 0), 5);
+        const bool dualOutputDff = type == "DFF" && pc.comp->outputs.size() == 2;
+        const bool legacyControls = dualOutputDff && pc.comp->inputs.size() == 4;
+        dc.DrawRoundedRectangle(x, y + (legacyControls ? 10 : 0), w,
+            h - (legacyControls ? 20 : 0), 5);
         dc.SetFont(wxFontInfo(9).Bold());
         dc.SetTextForeground(wxColour(36, 50, 71));
-        dc.DrawLabel(wxString::FromUTF8(type), wxRect(x + 14, y + (dualOutputDff ? 52 : 4), w - 20, 20), wxALIGN_CENTER);
+        dc.DrawLabel(wxString::FromUTF8(type),
+            wxRect(x + 14, y + (legacyControls ? 52 : dualOutputDff ? 32 : 4), w - 20, 20), wxALIGN_CENTER);
         dc.SetFont(wxFontInfo(8));
         if (dualOutputDff)
         {
-            dc.DrawText("D", x + 8, y + 33);
-            dc.DrawText("CLK", x + 8, y + 73);
-            dc.DrawText("SET", x + 52, y + 20);
-            dc.DrawText("CLR", x + 52, y + 92);
+            dc.DrawText("D", x + 8, y + (legacyControls ? 33 : 13));
+            dc.DrawText("CLK", x + 8, y + (legacyControls ? 73 : 53));
+            if (legacyControls)
+            {
+                dc.DrawText("SET", x + 52, y + 20);
+                dc.DrawText("CLR", x + 52, y + 92);
+            }
             for (std::size_t i = 0; i < pc.comp->outputs.size(); ++i)
             {
                 const auto& output = pc.comp->outputs[i];
@@ -1545,14 +1553,19 @@ void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
             }
             dc.SetPen(wxPen(wxColour(36, 50, 71), 2));
             dc.SetBrush(wxBrush(wxColour(244, 248, 255)));
-            dc.DrawCircle(x + 50, y + 10, 4);
-            dc.DrawCircle(x + 50, y + 110, 4);
-            dc.DrawLine(x + 50, y, x + 50, y + 6);
-            dc.DrawLine(x + 50, y + 114, x + 50, y + 120);
-            dc.DrawCircle(x + 103, y + 80, 4);
-            dc.DrawLine(x + 107, y + 80, x + 110, y + 80);
-            dc.DrawLine(x + 100, y + 40, x + 110, y + 40);
-            wxPoint triangle[]{ wxPoint(x, y + 75), wxPoint(x + 5, y + 80), wxPoint(x, y + 85) };
+            if (legacyControls)
+            {
+                dc.DrawCircle(x + 50, y + 10, 4);
+                dc.DrawCircle(x + 50, y + 110, 4);
+                dc.DrawLine(x + 50, y, x + 50, y + 6);
+                dc.DrawLine(x + 50, y + 114, x + 50, y + 120);
+            }
+            const int qnY = geometry.outputs[1].y;
+            dc.DrawCircle(x + 103, y + qnY, 4);
+            dc.DrawLine(x + 107, y + qnY, x + 110, y + qnY);
+            dc.DrawLine(x + 100, y + geometry.outputs[0].y, x + 110, y + geometry.outputs[0].y);
+            const int clockY = geometry.inputs[1].y;
+            wxPoint triangle[]{ wxPoint(x, y + clockY - 5), wxPoint(x + 5, y + clockY), wxPoint(x, y + clockY + 5) };
             dc.DrawLines(3, triangle);
         }
         else

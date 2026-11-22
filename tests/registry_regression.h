@@ -68,29 +68,22 @@ inline void TestComponentRegistry()
         comparator->outputs.size() == 3 && comparator->outputs[0].name == "A>B" &&
         comparator->outputs[1].name == "A=B" && comparator->outputs[2].name == "A<B",
         "comparator has stable comparison outputs");
-    require(dff && dff->inputs.size() == 4 && dff->inputs[0].name == "D" &&
-        dff->inputs[1].name == "CLK" && dff->inputs[2].name == "SET" &&
-        dff->inputs[3].name == "CLR" && dff->outputs[0].name == "Q" &&
+    require(dff && dff->inputs.size() == 2 && dff->inputs[0].name == "D" &&
+        dff->inputs[1].name == "CLK" && dff->outputs[0].name == "Q" &&
         dff->outputs[1].name == "QN" && dff->outputs[1].value == LogicValue::High,
-        "new DFF exposes data, clock, active-low controls and complementary outputs");
+        "ideal DFF exposes only data, clock and complementary outputs");
     require(!dff->HasCombinationalPath(0, 0) && !dff->HasCombinationalPath(1, 0) &&
-        dff->HasCombinationalPath(2, 0) && dff->HasCombinationalPath(3, 1),
-        "only asynchronous controls have immediate DFF dependencies");
+        !dff->HasCombinationalPath(0, 1) && !dff->HasCombinationalPath(1, 1),
+        "ideal DFF has no immediate data or clock path");
     dff->inputs[0].value = LogicValue::High;
     dff->inputs[1].value = LogicValue::High;
-    dff->inputs[2].value = LogicValue::High;
-    dff->inputs[3].value = LogicValue::High;
     dff->Evaluate();
     require(dff->outputs[0].value == LogicValue::Low && dff->outputs[1].value == LogicValue::High,
         "Evaluate never samples a DFF clock");
-    dff->inputs[2].value = LogicValue::Low;
-    dff->Evaluate();
-    require(dff->outputs[0].value == LogicValue::High && dff->outputs[1].value == LogicValue::Low,
-        "DFF asynchronous SET is low active");
-    dff->inputs[3].value = LogicValue::Low;
-    dff->Evaluate();
-    require(dff->outputs[0].value == LogicValue::Low && dff->outputs[1].value == LogicValue::High,
-        "DFF asynchronous CLR wins when both controls are low");
+    auto historicalDff = ComponentRegistry::Create("DFF", 4);
+    require(historicalDff && historicalDff->inputs[2].name == "SET" &&
+        historicalDff->inputs[3].name == "CLR" && historicalDff->outputs.size() == 2,
+        "previous four-input DFF files retain their pin layout");
     auto legacyDff = ComponentRegistry::Create("DFF", 3, true);
     require(legacyDff && legacyDff->inputs[2].name == "RESET" && legacyDff->outputs.size() == 1,
         "saved three-input DFF retains its original pin layout");
