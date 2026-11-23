@@ -41,7 +41,7 @@ const std::vector<ComponentDefinition>& ComponentRegistry::All()
         {"SPLITTER", "分线器", "线路", "splitter", 1, 1, 1, 1},
         {"PROBE", "探针", "线路", "probe", 1, 1, 1, 0, FixedComponent<ProbeComponent>},
         {"CLOCK", "时钟", "线路", "clock", 0, 0, 0, 1, FixedComponent<ClockComponent>},
-        {"CONSTANT", "常量", "线路", "constant", 0, 0, 0, 1, FixedComponent<ConstantComponent>},
+        {"CONSTANT", "常量", "存储", "constant", 0, 0, 0, 1, FixedComponent<ConstantComponent>},
         {"MUX", "数据选择器", "复用器", "mux", 3, 3, 3, 1, FixedComponent<MuxComponent>},
         {"DEMUX", "解复用器", "复用器", "demux", 2, 2, 2, 2},
         {"ADDER", "加法器", "运算器", "adder", 2, 2, 2, 1},

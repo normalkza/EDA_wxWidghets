@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <stdexcept>
+#include <vector>
 
 inline void TestRegistryToolbox()
 {
@@ -34,45 +35,55 @@ inline void TestRegistryToolbox()
     const auto activeItem = tree->GetSelection();
     require(activeItem.IsOk() && toolbox->GetSelectedType() == "AND", "implemented component selectable");
 
-    wxTreeItemId unavailable, available;
-    std::size_t placeholderCount = 0;
-    std::function<void(wxTreeItemId)> inspect = [&](wxTreeItemId parent) {
+    bool hasPlaceholder = false;
+    bool hasRemovedCategory = false;
+    wxTreeItemId wireCategory, storageCategory, orItem, constantItem;
+    std::function<void(wxTreeItemId, int)> inspect = [&](wxTreeItemId parent, int depth) {
         wxTreeItemIdValue cookie;
         for (auto item = tree->GetFirstChild(parent, cookie); item.IsOk(); item = tree->GetNextChild(parent, cookie))
         {
-            const auto label = tree->GetItemText(item);
-            if (label.EndsWith(wxT("（待实现）")))
+            const wxString label = tree->GetItemText(item);
+            if (label.EndsWith(wxT("（待实现）"))) hasPlaceholder = true;
+            if (depth == 0)
             {
-                ++placeholderCount;
-                if (!unavailable.IsOk()) unavailable = item;
+                if (label == wxT("复用器") || label == wxT("运算器")) hasRemovedCategory = true;
+                if (label == wxT("线路")) wireCategory = item;
+                if (label == wxT("存储")) storageCategory = item;
             }
-            if (label == wxT("或门")) available = item;
-            inspect(item);
+            if (label == wxT("或门")) orItem = item;
+            if (label == wxT("常量")) constantItem = item;
+            inspect(item, depth + 1);
         }
     };
-    inspect(tree->GetRootItem());
-    std::size_t expectedPlaceholders = 0;
+    inspect(tree->GetRootItem(), 0);
+    require(!hasPlaceholder, "no placeholder entries are shown in the toolbox tree");
+    require(!hasRemovedCategory, "mux and arithmetic categories are removed");
+    require(wireCategory.IsOk() && storageCategory.IsOk(), "wire and storage categories exist");
+    wxTreeItemIdValue wireCookie;
+    const auto firstWireChild = tree->GetFirstChild(wireCategory, wireCookie);
+    require(firstWireChild.IsOk() && tree->GetItemText(firstWireChild) == wxT("导线"),
+        "wire category contains the wire tool");
+    require(!tree->GetNextChild(wireCategory, wireCookie).IsOk(), "wire category has no other tools");
+    require(constantItem.IsOk(), "constant is listed in the storage category");
+
     for (const auto& definition : ComponentRegistry::All())
     {
         const auto type = wxString::FromUTF8(definition.type.data(), definition.type.size());
         require(toolbox->IsToolAvailable(type) == definition.IsAvailable(), "UI availability agrees with factory");
         if (!definition.IsAvailable())
         {
-            ++expectedPlaceholders;
             toolbox->SelectTool(type);
             require(toolbox->GetSelectedType() == "AND" && tree->GetSelection() == activeItem,
-                "programmatic placeholder selection preserves active tool");
+                "programmatic selection of unavailable component preserves active tool");
         }
     }
-    require(placeholderCount == expectedPlaceholders && unavailable.IsOk(), "all placeholders visibly marked");
-    require(tree->GetItemTextColour(unavailable) == wxColour(148, 156, 169), "placeholder is visibly disabled");
-    tree->SelectItem(unavailable);
-    require(tree->GetSelection() == activeItem && toolbox->GetSelectedType() == "AND" &&
-        g_selectedType == "AND" && callbacks == 0, "disabled tree selection is vetoed without tool callback");
     toolbox->SelectTool("UNKNOWN");
     require(toolbox->GetSelectedType() == "AND", "unknown tool cannot become active");
-    require(available.IsOk(), "registered OR entry exists");
-    tree->SelectItem(available);
+    require(orItem.IsOk(), "registered OR entry exists");
+    tree->SelectItem(orItem);
     require(toolbox->GetSelectedType() == "OR" && g_selectedType == "OR" && callbacks == 1 && selected == "OR",
         "available tree selection updates active tool exactly once");
+    tree->SelectItem(constantItem);
+    require(toolbox->GetSelectedType() == "CONSTANT" && g_selectedType == "CONSTANT" && callbacks == 2,
+        "constant selection in storage category activates the constant tool");
 }

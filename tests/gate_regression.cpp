@@ -761,7 +761,7 @@ int main(int argc, char** argv)
         RunTutorialMergeRegression(*canvas);
         std::cout << "PASS: native KiCad PCB parsing/view/workspace, async import, saved-file refresh, exact snapshot copy; "
             "digital timing engine, DFF chains/divider/reset, simultaneous sampling, resource rollback, CSV/VCD; "
-            "timing canvas/controller integration and shipped examples; registry, disabled toolbox placeholders, undirected nets, shared topology and atomic bulk import, "
+            "timing canvas/controller integration and shipped examples; registry, curated toolbox tree, undirected nets, shared topology and atomic bulk import, "
             "independent snapshots, runtime/design separation and revision rejection; "
             "truth tables, pin resizing, hit bounds, drag/resize pixels, rotated pins and pixels, rotation clipboard/undo, "
             "editable wire segments and undo, view options, properties, fanout, propagation, disconnection and cycle rejection\n";

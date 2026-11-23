@@ -229,26 +229,38 @@ void Toolbox::BuildTree()
     AppendTool(baseId, wxT("文本工具"), m_imgText, "TEXT");
     AppendTool(baseId, wxT("删除工具"), m_imgDelete, "DELETE");
 
+    // 元件库只展示已实现的元件；分类顺序固定，避免展示复用器、运算器等不需要的分组。
+    struct CategorySpec { const char* name; bool expanded; };
+    static const std::vector<CategorySpec> visibleCategories{
+        {"输入 / 输出", true},
+        {"逻辑门", true},
+        {"线路", true},
+        {"存储", true}
+    };
     std::unordered_map<std::string, wxTreeItemId> categories;
+    for (const auto& spec : visibleCategories)
+    {
+        const wxTreeItemId item = appendCategory(wxString::FromUTF8(spec.name));
+        if (spec.expanded) m_treeCtrl->Expand(item);
+        categories.emplace(spec.name, item);
+    }
+    // 线路分类仅保留导线工具，其余线路元件不进入元件库树。
+    AppendTool(categories.at("线路"), wxT("导线"), m_imgWire, "WIRE");
+
     for (const auto& definition : ComponentRegistry::All())
     {
+        // 标为（待实现）的元件不再显示。
+        if (!definition.IsAvailable()) continue;
         const std::string category(definition.category);
-        auto [position, inserted] = categories.try_emplace(category);
-        if (inserted)
-        {
-            position->second = appendCategory(wxString::FromUTF8(category));
-            if (category == "线路") AppendTool(position->second, wxT("导线"), m_imgWire, "WIRE");
-        }
+        if (category == "线路") continue;
+        auto position = categories.find(category);
+        if (position == categories.end()) continue;
         AppendTool(position->second,
             wxString::FromUTF8(definition.displayName.data(), definition.displayName.size()),
             m_componentIcons.at(std::string(definition.type)),
-            wxString::FromUTF8(definition.type.data(), definition.type.size()), definition.IsAvailable());
+            wxString::FromUTF8(definition.type.data(), definition.type.size()));
     }
     m_treeCtrl->Expand(baseId);
-    m_treeCtrl->Expand(categories.at("输入 / 输出"));
-    m_treeCtrl->Expand(categories.at("逻辑门"));
-
-
 }
 wxRect Toolbox::GetToolRect(const wxString& type)
 {
