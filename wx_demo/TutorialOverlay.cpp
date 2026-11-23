@@ -246,6 +246,15 @@ void TutorialOverlay::SetNextEnabled(bool enabled)
     }
 }
 
+void TutorialOverlay::SetAutoDemoMode(bool enabled, bool paused)
+{
+    m_autoDemoMode = enabled;
+    if (m_previousButton) m_previousButton->Enable(!enabled);
+    if (m_nextButton) m_nextButton->SetLabel(enabled ?
+        (paused ? wxT("继续演示") : wxT("暂停演示")) : wxT("下一步"));
+    SetNextEnabled(enabled);
+}
+
 
 void TutorialOverlay::SetStep(
     const wxString& title,
@@ -287,7 +296,7 @@ void TutorialOverlay::SetStep(
     const wxSize panelSize = m_panelFrame->GetSize();
 
     int panelX = parentSize.x - panelSize.x - 20;
-    int panelY = 80;
+    int panelY = m_autoDemoMode ? parentSize.y - panelSize.y - 20 : 80;
 
     if (panelX < 0)
         panelX = 10;

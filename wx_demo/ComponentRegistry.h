@@ -22,7 +22,7 @@ struct ComponentDefinition
     Factory factory = nullptr;
 
     bool IsAvailable() const { return factory != nullptr; }
-    bool SupportsVariableInputs() const { return minInputCount != maxInputCount; }
+    bool SupportsVariableInputs() const { return minInputCount != maxInputCount && type != "DFF"; }
     bool AcceptsInputCount(int count) const
     {
         return count >= minInputCount && count <= maxInputCount;

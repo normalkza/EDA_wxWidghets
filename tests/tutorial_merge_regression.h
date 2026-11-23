@@ -22,6 +22,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace TutorialMergeRegressionDetail
@@ -387,6 +388,80 @@ struct CanvasTutorialRegressionAccess
         Require(!tutorial.m_active && tutorial.m_stepIndex == 0 && canvas.ExportDocument().components.size() == 4 &&
             canvas.ExportDocument().wires.size() == 3,
             "a queued tutorial step cannot revive or modify the AI replacement");
+
+        for (const auto& [name, componentCount, wireCount] : {
+            std::tuple{wxString(wxS("半加器 (Half Adder)")), 6, 6},
+            std::tuple{wxString(wxS("全加器 (Full Adder)")), 10, 12}})
+        {
+            tutorial.StartAutoTutorial(name);
+            Require(tutorial.m_active && tutorial.m_autoDemo && tutorial.m_autoPlacements.size() ==
+                static_cast<std::size_t>(componentCount) && canvas.ExportDocument().components.empty(),
+                "automatic tutorial starts from an empty visible canvas");
+            tutorial.NextStep();
+            tutorial.AdvanceAutoDemo();
+            Require(tutorial.m_autoPaused && canvas.ExportDocument().components.empty(),
+                "pause prevents automatic placement");
+            tutorial.NextStep();
+            for (int index = 0; index < componentCount; ++index)
+            {
+                tutorial.AdvanceAutoDemo();
+                Require(canvas.ExportDocument().components.size() == static_cast<std::size_t>(index + 1) &&
+                    canvas.ExportDocument().wires.empty() && canvas.IsModified(),
+                    "automatic tutorial places one component per frame");
+            }
+            Require(tutorial.m_expectedWires.size() == static_cast<std::size_t>(wireCount),
+                "automatic tutorial reuses the expected wire plan");
+            for (int index = 0; index < wireCount; ++index)
+            {
+                tutorial.AdvanceAutoDemo();
+                const auto document = canvas.ExportDocument();
+                Require(document.wires.size() == static_cast<std::size_t>(index + 1),
+                    "automatic tutorial adds one validated wire per frame");
+                const auto& wire = document.wires.back();
+                Require(wire.route.size() >= 2, "automatic wire has an explicit obstacle-aware route");
+                for (std::size_t point = 1; point < wire.route.size(); ++point)
+                {
+                    const auto& a = wire.route[point - 1];
+                    const auto& b = wire.route[point];
+                    Require(a != b && (a.x == b.x || a.y == b.y),
+                        "automatic wire remains an orthogonal polyline");
+                    for (auto component : canvas.m_components)
+                    {
+                        if ((point == 1 && component.id == wire.sourceId) ||
+                            (point + 1 == wire.route.size() && component.id == wire.targetId)) continue;
+                        component.tutorialLabel.clear();
+                        wxRect body = canvas.GetComponentRect(component);
+                        body.Inflate(7);
+                        const bool intersects = a.x == b.x ?
+                            a.x >= body.GetLeft() && a.x <= body.GetRight() &&
+                            std::max(a.y, b.y) >= body.GetTop() &&
+                            std::min(a.y, b.y) <= body.GetBottom() :
+                            a.y >= body.GetTop() && a.y <= body.GetBottom() &&
+                            std::max(a.x, b.x) >= body.GetLeft() &&
+                            std::min(a.x, b.x) <= body.GetRight();
+                        Require(!intersects, "automatic wire avoids all non-terminal component bodies");
+                    }
+                }
+            }
+            Require(tutorial.m_active && canvas.ExportDocument().components.size() ==
+                static_cast<std::size_t>(componentCount) &&
+                canvas.ExportDocument().wires.size() == static_cast<std::size_t>(wireCount),
+                "automatic tutorial leaves a complete editable circuit on the canvas");
+            tutorial.CancelTutorial();
+            wxTheApp->ProcessPendingEvents();
+            Require(!tutorial.m_autoDemo && !tutorial.m_autoTimer.IsRunning() &&
+                canvas.ExportDocument().wires.size() == static_cast<std::size_t>(wireCount) &&
+                canvas.IsModified(),
+                "ending the demonstration stops playback and retains the finished circuit");
+        }
+        tutorial.StartAutoTutorial(wxS("半加器 (Half Adder)"));
+        tutorial.AdvanceAutoDemo();
+        Require(canvas.ImportDocument(SimpleAnd(), error), "external document can replace an automatic tutorial frame");
+        wxTheApp->ProcessPendingEvents();
+        tutorial.AdvanceAutoDemo();
+        Require(!tutorial.m_active && !tutorial.m_autoTimer.IsRunning() &&
+            canvas.ExportDocument().components.size() == 4 && canvas.ExportDocument().wires.size() == 3,
+            "cancelled automatic playback cannot overwrite a replacement document");
 
         tutorial.StartTutorial(wxS("半加器 (Half Adder)"));
         tutorial.NotifyToolSelected("INPUT");

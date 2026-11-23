@@ -1,6 +1,8 @@
 #include "Canvas.h"
 #include "DigitalSimulator.h"
 #include <algorithm>
+#include <limits>
+#include <queue>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -33,7 +35,13 @@ wxPoint Canvas::GetPinPosition(const PinReference& pin) const
 
 wxPoint Canvas::GetPinDirection(const PinReference& pin) const
 {
-    const wxPoint direction = pin.type == PinType::Output ? wxPoint(1, 0) : wxPoint(-1, 0);
+    wxPoint direction = pin.type == PinType::Output ? wxPoint(1, 0) : wxPoint(-1, 0);
+    if (pin.IsValid() && pin.component->name == "DFF" && pin.component->inputs.size() == 4 &&
+        pin.type == PinType::Input)
+    {
+        if (pin.index == 2) direction = wxPoint(0, -1);
+        else if (pin.index == 3) direction = wxPoint(0, 1);
+    }
     for (const auto& pc : m_components)
         if (pc.comp == pin.component && pin.IsValid())
             return ComponentToWorld(pc, direction) - ComponentToWorld(pc, wxPoint());
@@ -71,6 +79,148 @@ Wire::Path Canvas::GetWirePath(const WireConnection& connection) const
     const wxPoint outDirection = GetPinDirection(connection.output), inDirection = GetPinDirection(connection.input);
     return connection.route.empty() ? Wire::Route(output, input, m_gridSize, outDirection, inDirection) :
         Wire::Reanchor(connection.route, output, input, m_gridSize, outDirection, inDirection);
+}
+
+bool Canvas::RouteTutorialWire(CircuitWireData& wire) const
+{
+    const PlacedComponent* source = nullptr;
+    const PlacedComponent* target = nullptr;
+    for (const auto& component : m_components)
+    {
+        if (component.id == wire.sourceId) source = &component;
+        if (component.id == wire.targetId) target = &component;
+    }
+    if (!source || !target || wire.sourcePin < 0 || wire.targetPin < 0 ||
+        static_cast<std::size_t>(wire.sourcePin) >= source->comp->outputs.size() ||
+        static_cast<std::size_t>(wire.targetPin) >= target->comp->inputs.size()) return false;
+
+    const PinReference outputPin{source->comp, PinType::Output, static_cast<std::size_t>(wire.sourcePin)};
+    const PinReference inputPin{target->comp, PinType::Input, static_cast<std::size_t>(wire.targetPin)};
+    if (GetPinDirection(outputPin) != wxPoint(1, 0) ||
+        GetPinDirection(inputPin) != wxPoint(-1, 0)) return false;
+    const wxPoint output = GetPinPosition(outputPin), input = GetPinPosition(inputPin);
+    const wxPoint start(output.x + 20, output.y), finish(input.x - 20, input.y);
+
+    std::vector<wxRect> obstacles;
+    std::vector<int> xs{start.x, finish.x}, ys{start.y, finish.y};
+    for (auto component : m_components)
+    {
+        component.tutorialLabel.clear();
+        wxRect rect = GetComponentRect(component);
+        rect.Inflate(7);
+        obstacles.push_back(rect);
+        xs.push_back(rect.GetLeft() - 1);
+        xs.push_back(rect.GetRight() + 1);
+        ys.push_back(rect.GetTop() - 1);
+        ys.push_back(rect.GetBottom() + 1);
+    }
+    const auto outer = [](std::vector<int>& values) {
+        const auto bounds = std::minmax_element(values.begin(), values.end());
+        const int low = *bounds.first, high = *bounds.second;
+        values.push_back(low - 30);
+        values.push_back(high + 30);
+        std::sort(values.begin(), values.end());
+        values.erase(std::unique(values.begin(), values.end()), values.end());
+    };
+    outer(xs);
+    outer(ys);
+
+    const auto clearSegment = [&](const wxPoint& a, const wxPoint& b) {
+        for (const auto& rect : obstacles)
+        {
+            if (a.y == b.y && a.y >= rect.GetTop() && a.y <= rect.GetBottom() &&
+                std::max(a.x, b.x) >= rect.GetLeft() &&
+                std::min(a.x, b.x) <= rect.GetRight()) return false;
+            if (a.x == b.x && a.x >= rect.GetLeft() && a.x <= rect.GetRight() &&
+                std::max(a.y, b.y) >= rect.GetTop() &&
+                std::min(a.y, b.y) <= rect.GetBottom()) return false;
+        }
+        return true;
+    };
+    if (!clearSegment(start, start) || !clearSegment(finish, finish)) return false;
+    // The terminal stubs may touch their own devices, but no other device.
+    for (std::size_t i = 0; i < obstacles.size(); ++i)
+    {
+        const auto& rect = obstacles[i];
+        const auto crosses = [&](const wxPoint& a, const wxPoint& b) {
+            return a.y >= rect.GetTop() && a.y <= rect.GetBottom() &&
+                std::max(a.x, b.x) >= rect.GetLeft() &&
+                std::min(a.x, b.x) <= rect.GetRight();
+        };
+        if ((m_components[i].id != wire.sourceId && crosses(output, start)) ||
+            (m_components[i].id != wire.targetId && crosses(finish, input))) return false;
+    }
+
+    const int width = static_cast<int>(xs.size()), height = static_cast<int>(ys.size());
+    const auto indexOf = [&](const wxPoint& point) {
+        const int x = static_cast<int>(std::lower_bound(xs.begin(), xs.end(), point.x) - xs.begin());
+        const int y = static_cast<int>(std::lower_bound(ys.begin(), ys.end(), point.y) - ys.begin());
+        return y * width + x;
+    };
+    const int begin = indexOf(start), end = indexOf(finish);
+    const int stateCount = width * height * 3;
+    std::vector<int> distance(stateCount, std::numeric_limits<int>::max());
+    std::vector<int> previous(stateCount, -1);
+    using QueueEntry = std::pair<int, int>;
+    std::priority_queue<QueueEntry, std::vector<QueueEntry>, std::greater<QueueEntry>> pending;
+    distance[begin * 3] = 0;
+    pending.push({0, begin * 3});
+    int finalState = -1;
+    while (!pending.empty())
+    {
+        const auto [cost, state] = pending.top();
+        pending.pop();
+        if (cost != distance[state]) continue;
+        const int node = state / 3, x = node % width, y = node / width;
+        if (node == end) { finalState = state; break; }
+        const wxPoint here(xs[x], ys[y]);
+        for (const auto [dx, dy] : {std::pair{-1, 0}, std::pair{1, 0},
+            std::pair{0, -1}, std::pair{0, 1}})
+        {
+            const int nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+            const wxPoint there(xs[nx], ys[ny]);
+            if ((node == begin && dy == 0 && dx < 0) ||
+                (ny * width + nx == end && dy == 0 && dx < 0) ||
+                !clearSegment(here, there)) continue;
+            const int direction = dx ? 1 : 2;
+            const int next = (ny * width + nx) * 3 + direction;
+            const int nextCost = cost + std::abs(there.x - here.x) +
+                std::abs(there.y - here.y) + (state % 3 && state % 3 != direction ? 12 : 0);
+            if (nextCost >= distance[next]) continue;
+            distance[next] = nextCost;
+            previous[next] = state;
+            pending.push({nextCost, next});
+        }
+    }
+    if (finalState < 0) return false;
+    std::vector<wxPoint> route{input};
+    for (int state = finalState; state >= 0; state = previous[state])
+    {
+        const int node = state / 3;
+        route.emplace_back(xs[node % width], ys[node / width]);
+    }
+    route.push_back(output);
+    std::reverse(route.begin(), route.end());
+    std::vector<wxPoint> simplified;
+    for (const auto& point : route)
+    {
+        if (!simplified.empty() && simplified.back() == point) continue;
+        while (simplified.size() >= 2)
+        {
+            const auto& a = simplified[simplified.size() - 2];
+            const auto& b = simplified.back();
+            if ((a.x == b.x && b.x == point.x) || (a.y == b.y && b.y == point.y))
+                simplified.pop_back();
+            else break;
+        }
+        simplified.push_back(point);
+    }
+    if (simplified.size() < 2 || simplified.size() > 256 ||
+        simplified[1].x <= output.x || simplified[simplified.size() - 2].x >= input.x)
+        return false;
+    wire.route = std::move(simplified);
+    return true;
 }
 
 wxRect Canvas::GetComponentUpdateRect(const PlacedComponent& pc) const

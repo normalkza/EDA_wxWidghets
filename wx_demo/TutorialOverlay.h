@@ -38,6 +38,7 @@ public:
     }
 
     void SetNextEnabled(bool enabled);
+    void SetAutoDemoMode(bool enabled, bool paused = false);
 
     void UpdateOverlay();
     void HideOverlay();
@@ -71,6 +72,7 @@ private:
     std::function<void()> m_cancelCallback;
 
     bool m_nextEnabled = false;
+    bool m_autoDemoMode = false;
     bool m_shuttingDown = false;
 
     wxDECLARE_EVENT_TABLE();

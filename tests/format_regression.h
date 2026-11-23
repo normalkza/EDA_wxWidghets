@@ -250,6 +250,40 @@ inline void Run()
     CircuitDocument restoredTiming;
     Require(CircuitFile::Load(file.path, restoredTiming, error), "load complete v3 simulation design");
     Equal(restoredTiming, timing);
+    CircuitDocument idealDff;
+    idealDff.formatVersion = 3;
+    idealDff.components = {{1, "DFF", 200, 100, 2, false},
+        {2, "CLOCK", 0, 0, 0, false}};
+    idealDff.wires = {{2, 0, 1, 1}, {1, 1, 1, 0}};
+    Require(CircuitFile::Save(file.path, idealDff, error), "save ideal four-pin DFF");
+    const auto idealBytes = Read(file.path);
+    Require(idealBytes.find("sourcePinId=\"QN\"") != std::string::npos &&
+        idealBytes.find("targetPinId=\"SET\"") == std::string::npos &&
+        idealBytes.find("targetPinId=\"CLR\"") == std::string::npos,
+        "ideal DFF saves QN feedback without asynchronous pins");
+    CircuitDocument restoredIdeal;
+    Require(CircuitFile::Load(file.path, restoredIdeal, error), "load ideal four-pin DFF");
+    Equal(restoredIdeal, idealDff);
+    auto invalidIdeal = idealDff;
+    invalidIdeal.wires.push_back({2, 0, 1, 2});
+    Require(!CircuitFile::Validate(invalidIdeal, error), "ideal DFF rejects obsolete control pin wiring");
+    CircuitDocument dualOutput;
+    dualOutput.formatVersion = 3;
+    dualOutput.components = {{1, "DFF", 200, 100, 4, true},
+        {2, "CLOCK", 0, 0, 0, false}, {3, "INPUT", 0, 160, 0, true},
+        {4, "INPUT", 80, 160, 0, true}};
+    dualOutput.wires = {{2, 0, 1, 1}, {1, 1, 1, 0}, {3, 0, 1, 2}, {4, 0, 1, 3}};
+    Require(CircuitFile::Save(file.path, dualOutput, error), "save four-input dual-output DFF");
+    const auto dualBytes = Read(file.path);
+    Require(dualBytes.find("sourcePinId=\"QN\"") != std::string::npos &&
+        dualBytes.find("targetPinId=\"SET\"") != std::string::npos &&
+        dualBytes.find("targetPinId=\"CLR\"") != std::string::npos,
+        "historical DFF serializes its named complementary and asynchronous pins");
+    CircuitDocument restoredDual;
+    Require(CircuitFile::Load(file.path, restoredDual, error), "load four-input dual-output DFF");
+    Equal(restoredDual, dualOutput);
+    dualOutput.components[0].fallingEdge = true;
+    Require(!CircuitFile::Validate(dualOutput, error), "new DFF rejects falling-edge configuration");
     auto invalidAsyncFeedback = timing;
     invalidAsyncFeedback.wires.back() = {3, 0, 2, 2};
     invalidAsyncFeedback.wires.erase(invalidAsyncFeedback.wires.begin() + 4);
