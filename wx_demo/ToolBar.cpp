@@ -37,7 +37,7 @@ namespace
 
 wxBitmap CreatePortToolBitmap(const wxSize& size, bool input)
 {
-    // 同一组几何比例同时用于工具栏和树状元件库，节点直接贴在方框边上。
+    // 同一组几何比例同时用于工具栏和树状元件库；输入为方框、输出为圆形，节点贴在轮廓边上。
     constexpr int scale = 3;
     const wxSize renderSize(std::max(1, size.x) * scale, std::max(1, size.y) * scale);
     wxBitmap bitmap(renderSize);
@@ -51,7 +51,10 @@ wxBitmap CreatePortToolBitmap(const wxSize& size, bool input)
         const wxColour terminal = input ? wxColour(225, 92, 99) : wxColour(53, 120, 229);
         dc.SetPen(wxPen(terminal, std::max(2, side / 20)));
         dc.SetBrush(*wxWHITE_BRUSH);
-        dc.DrawRoundedRectangle(left, top, side, side, std::max(3, side * 6 / 40));
+        if (input)
+            dc.DrawRoundedRectangle(left, top, side, side, std::max(3, side * 6 / 40));
+        else
+            dc.DrawCircle(left + side / 2, top + side / 2, side / 2);
         dc.SetTextForeground(wxColour(36, 50, 71));
         dc.SetFont(wxFont(wxFontInfo(wxSize(0, side * 19 / 40))
             .FaceName(wxT("Microsoft YaHei UI")).Bold()));

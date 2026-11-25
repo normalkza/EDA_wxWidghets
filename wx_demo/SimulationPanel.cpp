@@ -1,9 +1,11 @@
 #include "SimulationPanel.h"
 #include "Canvas.h"
 #include "WaveformPanel.h"
+#include "InputWaveformDialog.h"
 #include <wx/choice.h>
 #include <wx/filedlg.h>
 #include <wx/filename.h>
+#include <wx/msgdlg.h>
 #include <wx/stopwatch.h>
 #include <wx/wrapsizer.h>
 #include <filesystem>
@@ -32,6 +34,7 @@ SimulationPanel::SimulationPanel(wxWindow* parent, Canvas* canvas)
     m_csv = button(wxT("导出 CSV"), [this] { Export(false); });
     m_vcd = button(wxT("导出 VCD"), [this] { Export(true); });
     button(wxT("限制设置"), [this] { Configure(); });
+    button(wxT("编辑输入波形"), [this] { EditWaveforms(); });
     button(wxT("分频示例"), [this] { if (m_exampleCallback) m_exampleCallback(); });
     root->Add(buttons, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(8));
     auto* settings = new wxBoxSizer(wxHORIZONTAL);
@@ -248,8 +251,9 @@ void SimulationPanel::UpdateControls()
 {
     const wxString state = m_running ? (m_periodTarget ? wxT("周期步进中") : wxT("运行中")) : !m_active ? wxT("就绪") :
         m_simulator.HasFailed() ? wxT("已中止") : m_simulator.IsFinished() ? wxT("已完成") : wxT("已暂停");
-    m_state->SetLabel(wxString::Format(wxT("%s · t=%lld ns · %llu 事件%s"), state,
-        static_cast<long long>(m_simulator.GetTime()), static_cast<unsigned long long>(m_simulator.GetEventCount()),
+    m_state->SetLabel(wxString::Format(wxS("%s · t=%s · %llu 事件%s"), state,
+        WaveformUi::FormatTime(m_simulator.GetTime(), 0, m_simulator.GetConfig().stopTimeNs),
+        static_cast<unsigned long long>(m_simulator.GetEventCount()),
         m_warnings.empty() ? wxT("") : wxT(" · 输入悬空")));
     m_state->SetToolTip(m_warnings);
     m_pause->Enable(m_running);
@@ -297,6 +301,23 @@ void SimulationPanel::Export(bool vcd)
     wxMessageBox(wxString::Format(wxT("已导出有效记录 0…%lld ns：\n"),
         static_cast<long long>(m_simulator.GetRecordedUntil())) + path,
         wxT("数字时序仿真"), wxOK | wxICON_INFORMATION, this);
+}
+
+void SimulationPanel::EditWaveforms()
+{
+    const auto document = m_canvas->ExportDocument();
+    const bool hasSource = std::any_of(document.components.begin(), document.components.end(),
+        [](const auto& data) { return data.type == "INPUT" || data.type == "BUTTON"; });
+    if (!hasSource)
+    {
+        wxMessageBox(wxS("请先放置 INPUT 或 BUTTON，再为它定义输入波形。"),
+            wxS("输入波形"), wxOK | wxICON_INFORMATION, this);
+        return;
+    }
+    Pause();
+    InputWaveformDialog dialog(this, m_canvas);
+    dialog.ShowModal();
+    InvalidateDocument();
 }
 
 void SimulationPanel::Configure()

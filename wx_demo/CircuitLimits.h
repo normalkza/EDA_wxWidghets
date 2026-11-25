@@ -21,4 +21,5 @@ inline constexpr int MinPointSize = 6;
 inline constexpr int MaxPointSize = 96;
 inline constexpr int MaxXmlDepth = 8;
 inline constexpr std::size_t MaxXmlNodes = 16000;
+inline constexpr std::size_t MaxWaveformEdges = 512;
 }

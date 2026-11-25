@@ -6,6 +6,15 @@
 #include <vector>
 #include "SimulationConfig.h"
 
+// One scheduled transition of an interactive input: at timeNs the source
+// becomes high/low. Times are integer nanoseconds and strictly increasing.
+struct WaveformEdge
+{
+    std::int64_t timeNs = 0;
+    bool high = false;
+    bool operator==(const WaveformEdge&) const = default;
+};
+
 // Design data contains values and persistent IDs only. It owns no runtime
 // components or controls and can be copied for undo, storage and compilation.
 struct CircuitComponentData
@@ -23,6 +32,9 @@ struct CircuitComponentData
     std::string probeLabel;
     // DFF sampling edge; false preserves the original rising-edge behavior.
     bool fallingEdge = false;
+    // Custom stimuli for INPUT / BUTTON sources. Empty means no scheduled
+    // waveform: the source keeps its initial level for the whole simulation.
+    std::vector<WaveformEdge> waveform;
 };
 
 struct CircuitWireData

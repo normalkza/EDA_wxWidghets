@@ -31,6 +31,7 @@
 #include "timing_regression.h"
 #include "canvas_timing_regression.h"
 #include "simulation_ui_regression.h"
+#include "waveform_regression.h"
 #include "pcb_import_regression.h"
 #include "pcb_workspace_regression.h"
 #include "pcb_view_regression.h"
@@ -741,6 +742,7 @@ int main(int argc, char** argv)
         TestLogic();
         TestCircuit();
         SimulationUiRegressionAccess::Run();
+        TestInputWaveform();
         PcbImportRegression::Run();
         PcbWorkspaceRegressionAccess::Run();
         PcbViewRegressionAccess::Run();
@@ -762,6 +764,7 @@ int main(int argc, char** argv)
         std::cout << "PASS: native KiCad PCB parsing/view/workspace, async import, saved-file refresh, exact snapshot copy; "
             "digital timing engine, DFF chains/divider/reset, simultaneous sampling, resource rollback, CSV/VCD; "
             "timing canvas/controller integration and shipped examples; registry, curated toolbox tree, undirected nets, shared topology and atomic bulk import, "
+            "custom input waveforms with unit-aware editing, persistence and scheduled replay; "
             "independent snapshots, runtime/design separation and revision rejection; "
             "truth tables, pin resizing, hit bounds, drag/resize pixels, rotated pins and pixels, rotation clipboard/undo, "
             "editable wire segments and undo, view options, properties, fanout, propagation, disconnection and cycle rejection\n";

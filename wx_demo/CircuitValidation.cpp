@@ -99,6 +99,18 @@ bool CircuitValidation::Validate(const CircuitDocument& document, wxString& erro
             label.Find('\n') != wxNOT_FOUND || label.Find('\r') != wxNOT_FOUND || label.Find('\t') != wxNOT_FOUND ||
             (!data.probeLabel.empty() && data.type != "PROBE"))
             return Fail(error, wxString::Format(wxS("元件 %d 的探针名称无效：仅探针支持名称，长度最多 128 个字符。"), data.id));
+        if (!data.waveform.empty() && data.type != "INPUT" && data.type != "BUTTON")
+            return Fail(error, wxString::Format(wxS("元件 %d 不是输入源，不能设置自定义波形。"), data.id));
+        if (data.waveform.size() > MaxWaveformEdges)
+            return Fail(error, wxString::Format(wxS("元件 %d 的波形边沿过多（最多 %d 个）。"),
+                data.id, static_cast<int>(MaxWaveformEdges)));
+        std::int64_t previousTime = -1;
+        for (const auto& edge : data.waveform)
+        {
+            if (edge.timeNs < 0 || edge.timeNs > config.stopTimeNs || edge.timeNs <= previousTime)
+                return Fail(error, wxString::Format(wxS("元件 %d 的波形时间必须非负、严格递增且不超过停止时间。"), data.id));
+            previousTime = edge.timeNs;
+        }
         auto component = ComponentRegistry::Create(data.type, data.inputCount, data.high);
         if (!component)
             return Fail(error, wxString::Format(wxS("元件 %d 的类型、输入数量或电平无效。"), data.id));

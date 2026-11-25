@@ -1,6 +1,7 @@
 #include "Canvas.h"
 #include "ComponentRegistry.h"
 #include <wx/choice.h>
+#include <algorithm>
 
 std::optional<CircuitComponentData> Canvas::GetSelectedComponentData() const
 {
@@ -13,6 +14,43 @@ bool Canvas::CanEditTimingParameters() const
     if (!HasSelectedComponent()) return false;
     const auto& type = m_components[m_selectedIndex].comp->name;
     return ComponentRegistry::SupportsInitialLevel(type) || type == "PROBE";
+}
+
+bool Canvas::ApplyWaveformDocument(const CircuitDocument& document, wxString& error)
+{
+    error.clear();
+    if (!wxIsMainThread())
+    {
+        error = wxS("请在主界面编辑输入波形。");
+        return false;
+    }
+    if (!CircuitFile::Validate(document, error)) return false;
+    const auto before = ExportDocument();
+    if (before.components.size() != document.components.size())
+    {
+        error = wxS("波形编辑期间电路发生了变化，请重新打开编辑器。");
+        return false;
+    }
+    bool changed = before.simulation != document.simulation;
+    for (std::size_t i = 0; i < before.components.size() && !changed; ++i)
+        if (before.components[i].waveform != document.components[i].waveform) changed = true;
+    if (!changed) return true;
+
+    RecordUndo(before);
+    m_formatVersion = std::max(m_formatVersion, 3);
+    m_simulationConfig = document.simulation;
+    for (auto& placed : m_components)
+    {
+        const auto& type = placed.comp->name;
+        if (type != "INPUT" && type != "BUTTON") continue;
+        auto found = std::find_if(document.components.begin(), document.components.end(),
+            [&](const auto& data) { return data.id == placed.id; });
+        placed.parameters.waveform = found == document.components.end() ?
+            std::vector<WaveformEdge>{} : found->waveform;
+    }
+    MarkModified();
+    Refresh(false);
+    return true;
 }
 
 bool Canvas::SetSimulationConfig(const SimulationConfig& config, wxString& error)

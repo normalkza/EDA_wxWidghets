@@ -1477,7 +1477,7 @@ void Canvas::DrawTextBoxes(wxDC& dc, const wxRect& updateRect)
 }
 
 
-// 输入、输出使用同样的方框；连接点贴在框边，不再伸出短导线。
+// 输入用方框，输出用圆形；连接点贴在轮廓边，不再伸出短导线。
 void Canvas::DrawPort(wxDC& dc, int x, int y, LogicValue value, PinType direction, int rotation)
 {
     const bool high = value == LogicValue::High;
@@ -1485,7 +1485,10 @@ void Canvas::DrawPort(wxDC& dc, int x, int y, LogicValue value, PinType directio
     const wxFont previousFont = dc.GetFont();
     dc.SetPen(wxPen(terminal, 2));
     dc.SetBrush(wxBrush(high ? wxColour(232, 247, 238) : wxColour(255, 255, 255)));
-    dc.DrawRoundedRectangle(x, y, m_portSize, m_portSize, 6);
+    if (direction == PinType::Input)
+        dc.DrawCircle(x + m_portSize / 2, y + m_portSize / 2, m_portSize / 2);
+    else
+        dc.DrawRoundedRectangle(x, y, m_portSize, m_portSize, 6);
     dc.SetFont(wxFontInfo(14).FaceName("Microsoft YaHei UI").Bold());
     dc.SetTextForeground(high ? wxColour(30, 143, 83) : wxColour(36, 50, 71));
     dc.DrawLabel(high ? wxT("1") : wxT("0"), wxRect(x, y, m_portSize, m_portSize), wxALIGN_CENTER);

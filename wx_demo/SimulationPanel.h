@@ -35,6 +35,7 @@ private:
     void ShowError(const wxString& error);
     void Export(bool vcd);
     void Configure();
+    void EditWaveforms();
     void OnTimer(wxTimerEvent& event);
     void Pump();
 

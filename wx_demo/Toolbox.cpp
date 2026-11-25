@@ -244,7 +244,7 @@ void Toolbox::BuildTree()
         if (spec.expanded) m_treeCtrl->Expand(item);
         categories.emplace(spec.name, item);
     }
-    // 线路分类仅保留导线工具，其余线路元件不进入元件库树。
+    // 线路分类只展示导线和时钟；其余线路元件不进入元件库树。
     AppendTool(categories.at("线路"), wxT("导线"), m_imgWire, "WIRE");
 
     for (const auto& definition : ComponentRegistry::All())
@@ -252,7 +252,11 @@ void Toolbox::BuildTree()
         // 标为（待实现）的元件不再显示。
         if (!definition.IsAvailable()) continue;
         const std::string category(definition.category);
-        if (category == "线路") continue;
+        if (category == "线路")
+        {
+            // 线路分类只留导线和时钟，其余线路元件不显示。
+            if (definition.type != "CLOCK") continue;
+        }
         auto position = categories.find(category);
         if (position == categories.end()) continue;
         AppendTool(position->second,

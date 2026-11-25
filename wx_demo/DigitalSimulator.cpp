@@ -135,6 +135,21 @@ bool DigitalSimulator::Initialize(wxString& error)
     for (auto& node : m_nodes)
         if (node.design.type == "DFF") node.previousClock = node.component->inputs[1].value;
 
+    // Custom source waveforms become ordinary scheduled stimuli, so Reset and
+    // Compile replay exactly the same stimuli without special UI state.
+    for (std::size_t index = 0; index < m_nodes.size(); ++index)
+    {
+        const auto& design = m_nodes[index].design;
+        if (design.type != "INPUT" && design.type != "BUTTON") continue;
+        for (const auto& edge : design.waveform)
+        {
+            if (edge.timeNs < 0 || edge.timeNs > m_config.stopTimeNs)
+                return Fail(wxS("自定义输入波形的边沿时间超出仿真范围。"), error);
+            m_stimuli[edge.timeNs].push_back(
+                {index, edge.high ? LogicValue::High : LogicValue::Low});
+        }
+    }
+
     std::vector<DigitalTrace> traces;
     m_tracePins.clear();
     m_traceDirections.clear();

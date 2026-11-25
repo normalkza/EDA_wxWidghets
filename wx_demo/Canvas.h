@@ -51,6 +51,9 @@ public:
     bool CanEditTimingParameters() const;
     std::optional<CircuitComponentData> GetSelectedComponentData() const;
     bool SetSimulationConfig(const SimulationConfig& config, wxString& error);
+    // Apply custom input waveforms and the simulation horizon produced by the
+    // waveform editor as one ordinary, undoable design edit.
+    bool ApplyWaveformDocument(const CircuitDocument& document, wxString& error);
     void SetDocumentChangedCallback(std::function<void()> callback) { m_documentChangedCallback = std::move(callback); }
     void SetDocumentResetCallback(std::function<void()> callback) { m_documentResetCallback = std::move(callback); }
     void SetRuntimeInputCallback(std::function<bool(int)> callback) { m_runtimeInputCallback = std::move(callback); }

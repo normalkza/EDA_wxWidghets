@@ -37,7 +37,7 @@ inline void TestRegistryToolbox()
 
     bool hasPlaceholder = false;
     bool hasRemovedCategory = false;
-    wxTreeItemId wireCategory, storageCategory, orItem, constantItem;
+    wxTreeItemId wireCategory, storageCategory, orItem, constantItem, wireItem, clockItem;
     std::function<void(wxTreeItemId, int)> inspect = [&](wxTreeItemId parent, int depth) {
         wxTreeItemIdValue cookie;
         for (auto item = tree->GetFirstChild(parent, cookie); item.IsOk(); item = tree->GetNextChild(parent, cookie))
@@ -52,6 +52,8 @@ inline void TestRegistryToolbox()
             }
             if (label == wxT("或门")) orItem = item;
             if (label == wxT("常量")) constantItem = item;
+            if (label == wxT("导线")) wireItem = item;
+            if (label == wxT("时钟")) clockItem = item;
             inspect(item, depth + 1);
         }
     };
@@ -63,7 +65,11 @@ inline void TestRegistryToolbox()
     const auto firstWireChild = tree->GetFirstChild(wireCategory, wireCookie);
     require(firstWireChild.IsOk() && tree->GetItemText(firstWireChild) == wxT("导线"),
         "wire category contains the wire tool");
+    const auto secondWireChild = tree->GetNextChild(wireCategory, wireCookie);
+    require(secondWireChild.IsOk() && tree->GetItemText(secondWireChild) == wxT("时钟"),
+        "wire category also contains the clock tool");
     require(!tree->GetNextChild(wireCategory, wireCookie).IsOk(), "wire category has no other tools");
+    require(wireItem.IsOk() && clockItem.IsOk(), "wire and clock entries exist");
     require(constantItem.IsOk(), "constant is listed in the storage category");
 
     for (const auto& definition : ComponentRegistry::All())
@@ -86,4 +92,7 @@ inline void TestRegistryToolbox()
     tree->SelectItem(constantItem);
     require(toolbox->GetSelectedType() == "CONSTANT" && g_selectedType == "CONSTANT" && callbacks == 2,
         "constant selection in storage category activates the constant tool");
+    tree->SelectItem(clockItem);
+    require(toolbox->GetSelectedType() == "CLOCK" && g_selectedType == "CLOCK" && callbacks == 3,
+        "clock selection in wire category activates the clock tool");
 }

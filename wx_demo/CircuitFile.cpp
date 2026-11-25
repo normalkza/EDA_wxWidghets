@@ -252,6 +252,51 @@ void AddInt64(wxXmlNode& node, const char* name, std::int64_t value)
     node.AddAttribute(wxString::FromUTF8(name), wxString::FromUTF8(std::to_string(value)));
 }
 
+// Waveform attributes are stored as "time:level,time:level..." in integer ns.
+// Keeping them in an optional attribute preserves version=3 compatibility:
+// files written by older builds simply have no custom stimuli.
+bool ParseWaveform(const wxString& text, std::vector<WaveformEdge>& edges, wxString& error)
+{
+    edges.clear();
+    wxString value(text);
+    value.Trim(true);
+    value.Trim(false);
+    if (value.empty()) return true;
+    std::int64_t previous = -1;
+    std::size_t start = 0;
+    while (start < value.Length())
+    {
+        const std::size_t comma = value.find(wxS(','), start);
+        const wxString pair = value.Mid(start, comma == wxString::npos ? wxString::npos : comma - start);
+        const std::size_t colon = pair.find(wxS(':'));
+        long long time = 0;
+        if (colon == wxString::npos || colon == 0 || !pair.Left(colon).ToLongLong(&time) ||
+            time < 0 || time <= previous)
+            return Fail(error, wxS("波形边沿的时间或顺序无效。"));
+        const wxString level = pair.Mid(colon + 1);
+        if (level != wxS("0") && level != wxS("1"))
+            return Fail(error, wxS("波形电平只能是 0 或 1。"));
+        edges.push_back({static_cast<std::int64_t>(time), level == wxS("1")});
+        previous = time;
+        if (comma == wxString::npos) break;
+        start = comma + 1;
+    }
+    if (edges.size() > MaxWaveformEdges)
+        return Fail(error, wxS("波形边沿数量超过上限。"));
+    return true;
+}
+
+wxString FormatWaveform(const std::vector<WaveformEdge>& edges)
+{
+    wxString text;
+    for (const auto& edge : edges)
+    {
+        if (!text.empty()) text += wxS(',');
+        text += wxString::Format(wxS("%lld:%d"), static_cast<long long>(edge.timeNs), edge.high ? 1 : 0);
+    }
+    return text;
+}
+
 wxXmlNode* AddElement(wxXmlNode& parent, const wxString& name)
 {
     // 带 parent 的 wxXmlNode 构造函数会前插；这里追加以保留画布绘制顺序。
@@ -277,14 +322,14 @@ bool ParseComponents(const wxXmlNode& section, CircuitDocument& document, wxStri
             return Fail(error, wxS("此元件需要 version=3 数字时序文件格式。"));
         if (document.formatVersion >= 3 && data.type == "CLOCK")
         {
-            if (!CheckAttributes(*node, {"id", "type", "x", "y", "inputCount", "high", "clockPeriodNs", "clockHighNs", "clockStartNs"}, error, {"rotation"}) ||
+            if (!CheckAttributes(*node, {"id", "type", "x", "y", "inputCount", "high", "clockPeriodNs", "clockHighNs", "clockStartNs"}, error, {"rotation", "waveform"}) ||
                 !ReadInt64(*node, "clockPeriodNs", data.clockPeriodNs, error) ||
                 !ReadInt64(*node, "clockHighNs", data.clockHighNs, error) ||
                 !ReadInt64(*node, "clockStartNs", data.clockStartNs, error)) return false;
         }
         else if (document.formatVersion >= 3 && data.type == "DFF")
         {
-            if (!CheckAttributes(*node, {"id", "type", "x", "y", "inputCount", "high"}, error, {"rotation", "fallingEdge"})) return false;
+            if (!CheckAttributes(*node, {"id", "type", "x", "y", "inputCount", "high"}, error, {"rotation", "fallingEdge", "waveform"})) return false;
             if (node->HasAttribute(wxS("fallingEdge")))
             {
                 const wxString value = node->GetAttribute(wxS("fallingEdge"));
@@ -295,11 +340,13 @@ bool ParseComponents(const wxXmlNode& section, CircuitDocument& document, wxStri
         }
         else if (document.formatVersion >= 3 && data.type == "PROBE")
         {
-            if (!CheckAttributes(*node, {"id", "type", "x", "y", "inputCount", "high"}, error, {"rotation", "probeLabel"})) return false;
+            if (!CheckAttributes(*node, {"id", "type", "x", "y", "inputCount", "high"}, error, {"rotation", "probeLabel", "waveform"})) return false;
             data.probeLabel = node->GetAttribute(wxS("probeLabel")).ToStdString(wxConvUTF8);
         }
-        else if (!CheckAttributes(*node, { "id", "type", "x", "y", "inputCount", "high" }, error, { "rotation" })) return false;
+        else if (!CheckAttributes(*node, { "id", "type", "x", "y", "inputCount", "high" }, error, { "rotation", "waveform" })) return false;
         if (!HasNoDataChildren(*node, error)) return false;
+        if (node->HasAttribute(wxS("waveform")) &&
+            !ParseWaveform(node->GetAttribute(wxS("waveform")), data.waveform, error)) return false;
         if (!ReadInt(*node, "id", data.id, error) || !ReadInt(*node, "x", data.x, error) ||
             !ReadInt(*node, "y", data.y, error) ||
             !ReadInt(*node, "inputCount", data.inputCount, error)) return false;
@@ -468,7 +515,7 @@ bool CircuitFile::Save(const wxString& path, const CircuitDocument& document, wx
         for (const auto& data : document.components)
             if (data.type == "CLOCK" || data.type == "DFF" || data.type == "PROBE" || data.type == "BUTTON" ||
                 data.type == "LED" || data.type == "CONSTANT" || data.clockPeriodNs != 20 ||
-                data.clockHighNs != 10 || data.clockStartNs != 0 || !data.probeLabel.empty())
+                data.clockHighNs != 10 || data.clockStartNs != 0 || !data.probeLabel.empty() || !data.waveform.empty())
                 return Fail(error, wxS("保存时序元件及参数需要 version=3，请将文档升级为新格式。"));
     }
     if (document.formatVersion >= 2 && !BuildComponentIndex(document, definitions, error)) return false;
@@ -499,6 +546,8 @@ bool CircuitFile::Save(const wxString& path, const CircuitDocument& document, wx
             AddInt(*node, "fallingEdge", 1);
         if (document.formatVersion >= 3 && data.type == "PROBE" && !data.probeLabel.empty())
             node->AddAttribute(wxS("probeLabel"), wxString::FromUTF8(data.probeLabel));
+        if (document.formatVersion >= 3 && (data.type == "INPUT" || data.type == "BUTTON") && !data.waveform.empty())
+            node->AddAttribute(wxS("waveform"), FormatWaveform(data.waveform));
     }
     auto* wires = AddElement(*root, wxS("wires"));
     for (const auto& data : document.wires)

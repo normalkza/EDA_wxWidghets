@@ -22,7 +22,8 @@ namespace
             if (a.id != b.id || a.type != b.type || a.x != b.x || a.y != b.y ||
                 a.inputCount != b.inputCount || a.high != b.high || a.rotation != b.rotation ||
                 a.clockPeriodNs != b.clockPeriodNs || a.clockHighNs != b.clockHighNs ||
-                a.clockStartNs != b.clockStartNs || a.probeLabel != b.probeLabel || a.fallingEdge != b.fallingEdge)
+                a.clockStartNs != b.clockStartNs || a.probeLabel != b.probeLabel || a.fallingEdge != b.fallingEdge ||
+                a.waveform != b.waveform)
                 return false;
         }
         for (std::size_t i = 0; i < first.wires.size(); ++i)

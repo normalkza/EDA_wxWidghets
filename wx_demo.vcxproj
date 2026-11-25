@@ -45,6 +45,7 @@
     <ClCompile Include="wx_demo\TutorialManager.cpp" />
     <ClCompile Include="wx_demo\TutorialOverlay.cpp" />
     <ClCompile Include="wx_demo\WaveformPanel.cpp" />
+    <ClCompile Include="wx_demo\InputWaveformDialog.cpp" />
     <ClCompile Include="wx_demo\SimulationPanel.cpp" />
     <ClCompile Include="wx_demo\ComponentRegistry.cpp" />
     <ClCompile Include="wx_demo\TopologyRules.cpp" />
@@ -93,6 +94,7 @@
     <ClInclude Include="wx_demo\TutorialManager.h" />
     <ClInclude Include="wx_demo\TutorialOverlay.h" />
     <ClInclude Include="wx_demo\WaveformPanel.h" />
+    <ClInclude Include="wx_demo\InputWaveformDialog.h" />
     <ClInclude Include="wx_demo\SimulationPanel.h" />
     <ClInclude Include="wx_demo\SimulationConfig.h" />
     <ClInclude Include="wx_demo\TimingComponents.h" />
