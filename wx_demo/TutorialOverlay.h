@@ -38,6 +38,7 @@ public:
     }
 
     void SetNextEnabled(bool enabled);
+    void SetPreviousEnabled(bool enabled);
     void SetAutoDemoMode(bool enabled, bool paused = false);
 
     void UpdateOverlay();

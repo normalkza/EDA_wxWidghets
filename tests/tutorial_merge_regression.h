@@ -317,6 +317,48 @@ struct CanvasTutorialRegressionAccess
         g_selectedType.Clear();
     }
 
+    static void TestStepNavigation()
+    {
+        using namespace TutorialMergeRegressionDetail;
+        wxLogNull quiet;
+        MemoryClipboard clipboard;
+        auto frame = std::make_unique<MainFrame>();
+        frame->Move(-32000, -32000);
+        frame->ShowWithoutActivating();
+        frame->Layout();
+        frame->m_canvas->m_clipboard = &clipboard;
+        auto& tutorial = *frame->m_tutorialManager;
+
+        tutorial.StartTutorial(wxS("半加器 (Half Adder)"));
+        Require(tutorial.m_active && tutorial.m_stepIndex == 0,
+            "manual tutorial starts at its first step");
+
+        tutorial.PreviousStep();
+        Require(tutorial.m_stepIndex == 0, "previous is a no-op on the first step");
+
+        tutorial.NextStep();
+        Require(tutorial.m_stepIndex == 1, "next advances without repeating an operation");
+
+        tutorial.PreviousStep();
+        Require(tutorial.m_stepIndex == 0, "previous returns to the earlier step");
+
+        tutorial.NextStep();
+        Require(tutorial.m_stepIndex == 1, "next still works after going back");
+
+        // A completion queued before navigation must not double-advance the step.
+        tutorial.StartTutorial(wxS("半加器 (Half Adder)"));
+        tutorial.NotifyToolSelected("INPUT");
+        Require(tutorial.m_active && tutorial.m_currentStepCompleted && tutorial.m_stepIndex == 0,
+            "a manual completion queues its pending advance");
+        tutorial.NextStep();
+        wxTheApp->ProcessPendingEvents();
+        Require(tutorial.m_stepIndex == 1,
+            "navigation invalidates a pending completion instead of advancing twice");
+
+        tutorial.CancelTutorial();
+        g_selectedType.Clear();
+    }
+
     static void TestMainFrame()
     {
         using namespace TutorialMergeRegressionDetail;
@@ -480,6 +522,7 @@ inline void RunTutorialMergeRegression(Canvas& canvas)
 {
     CanvasTutorialRegressionAccess::TestLabel(canvas);
     CanvasTutorialRegressionAccess::TestNotifications(canvas);
+    CanvasTutorialRegressionAccess::TestStepNavigation();
     CanvasTutorialRegressionAccess::TestMainFrame();
     TutorialMergeRegressionDetail::TestExport();
 }
