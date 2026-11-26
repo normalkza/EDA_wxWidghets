@@ -23,6 +23,7 @@ namespace
                 a.inputCount != b.inputCount || a.high != b.high || a.rotation != b.rotation ||
                 a.clockPeriodNs != b.clockPeriodNs || a.clockHighNs != b.clockHighNs ||
                 a.clockStartNs != b.clockStartNs || a.probeLabel != b.probeLabel || a.fallingEdge != b.fallingEdge ||
+                a.counterMax != b.counterMax || a.counterInitial != b.counterInitial ||
                 a.waveform != b.waveform)
                 return false;
         }
@@ -378,7 +379,7 @@ bool Canvas::ReplaceDocument(const CircuitDocument& document, wxString& error, b
         if (circuit.ReplaceConnections(nodes, connections) != ConnectionResult::Added)
             throw std::runtime_error("Invalid wire connection");
         const bool hasState = std::any_of(document.components.begin(), document.components.end(),
-            [](const auto& data) { return data.type == "DFF"; });
+            [](const auto& data) { return data.type == "DFF" || data.type == "COUNTER"; });
         if (!hasState && !circuit.Evaluate(nodes)) throw std::runtime_error("Invalid circuit");
 
         // 只读几何预检使用已构建的新模型，期间不创建窗口、派发事件或通知属性面板。

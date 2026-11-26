@@ -98,6 +98,7 @@
     <ClInclude Include="wx_demo\SimulationPanel.h" />
     <ClInclude Include="wx_demo\SimulationConfig.h" />
     <ClInclude Include="wx_demo\TimingComponents.h" />
+    <ClInclude Include="wx_demo\CounterComponent.h" />
     <ClInclude Include="wx_demo\MuxComponent.h" />
     <ClInclude Include="wx_demo\ComparatorComponent.h" />
     <ClInclude Include="wx_demo\NandGate.h" />

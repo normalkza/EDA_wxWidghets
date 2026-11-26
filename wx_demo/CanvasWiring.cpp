@@ -498,7 +498,7 @@ bool Canvas::RecomputeCircuit()
     wxString error;
     const auto document = ExportDocument();
     if (std::any_of(document.components.begin(), document.components.end(),
-        [](const auto& data) { return data.type == "DFF"; }))
+        [](const auto& data) { return data.type == "DFF" || data.type == "COUNTER"; }))
     {
         DigitalSimulator simulator;
         if (!simulator.Compile(document, m_documentRevision, error))

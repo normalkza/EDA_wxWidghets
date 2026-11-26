@@ -2,6 +2,7 @@
 #include "CircuitFile.h"
 #include "CircuitLimits.h"
 #include "ComponentRegistry.h"
+#include "CounterComponent.h"
 #include "CircuitValidation.h"
 
 #include <wx/file.h>
@@ -318,7 +319,7 @@ bool ParseComponents(const wxXmlNode& section, CircuitDocument& document, wxStri
         CircuitComponentData data;
         data.type = node->GetAttribute(wxS("type")).ToStdString(wxConvUTF8);
         if (document.formatVersion < 3 && (data.type == "CLOCK" || data.type == "DFF" || data.type == "PROBE" ||
-            data.type == "BUTTON" || data.type == "LED" || data.type == "CONSTANT"))
+            data.type == "BUTTON" || data.type == "LED" || data.type == "CONSTANT" || data.type == "COUNTER"))
             return Fail(error, wxS("此元件需要 version=3 数字时序文件格式。"));
         if (document.formatVersion >= 3 && data.type == "CLOCK")
         {
@@ -337,6 +338,22 @@ bool ParseComponents(const wxXmlNode& section, CircuitDocument& document, wxStri
                     return Fail(error, wxS("DFF 的 fallingEdge 属性只能是 0 或 1。"));
                 data.fallingEdge = value == wxS("1");
             }
+        }
+        else if (document.formatVersion >= 3 && data.type == "COUNTER")
+        {
+            if (!CheckAttributes(*node, {"id", "type", "x", "y", "inputCount", "high"},
+                error, {"rotation", "fallingEdge", "counterMax", "counterInitial"})) return false;
+            if (node->HasAttribute(wxS("fallingEdge")))
+            {
+                const wxString value = node->GetAttribute(wxS("fallingEdge"));
+                if (value != wxS("0") && value != wxS("1"))
+                    return Fail(error, wxS("计数器的 fallingEdge 属性只能是 0 或 1。"));
+                data.fallingEdge = value == wxS("1");
+            }
+            if (node->HasAttribute(wxS("counterMax")) &&
+                !ReadInt(*node, "counterMax", data.counterMax, error)) return false;
+            if (node->HasAttribute(wxS("counterInitial")) &&
+                !ReadInt(*node, "counterInitial", data.counterInitial, error)) return false;
         }
         else if (document.formatVersion >= 3 && data.type == "PROBE")
         {
@@ -494,7 +511,10 @@ bool ParseTexts(const wxXmlNode& section, CircuitDocument& document, wxString& e
 std::unique_ptr<Component> CircuitFile::CreateComponent(const CircuitComponentData& data)
 {
     if (data.inputCount < 0) return nullptr;
-    return ComponentRegistry::Create(data.type, data.inputCount, data.high);
+    auto component = ComponentRegistry::Create(data.type, data.inputCount, data.high);
+    if (component && data.type == "COUNTER")
+        static_cast<CounterComponent*>(component.get())->Configure(data.counterMax, data.counterInitial);
+    return component;
 }
 
 bool CircuitFile::Validate(const CircuitDocument& document, wxString& error)
@@ -514,8 +534,10 @@ bool CircuitFile::Save(const wxString& path, const CircuitDocument& document, wx
             return Fail(error, wxS("保存仿真配置需要 version=3，请将文档升级为新格式。"));
         for (const auto& data : document.components)
             if (data.type == "CLOCK" || data.type == "DFF" || data.type == "PROBE" || data.type == "BUTTON" ||
-                data.type == "LED" || data.type == "CONSTANT" || data.clockPeriodNs != 20 ||
-                data.clockHighNs != 10 || data.clockStartNs != 0 || !data.probeLabel.empty() || !data.waveform.empty())
+                data.type == "LED" || data.type == "CONSTANT" || data.type == "COUNTER" ||
+                data.clockPeriodNs != 20 || data.clockHighNs != 10 || data.clockStartNs != 0 ||
+                !data.probeLabel.empty() || !data.waveform.empty() ||
+                data.counterMax != 15 || data.counterInitial != 0)
                 return Fail(error, wxS("保存时序元件及参数需要 version=3，请将文档升级为新格式。"));
     }
     if (document.formatVersion >= 2 && !BuildComponentIndex(document, definitions, error)) return false;
@@ -544,6 +566,12 @@ bool CircuitFile::Save(const wxString& path, const CircuitDocument& document, wx
         }
         if (document.formatVersion >= 3 && data.type == "DFF" && data.fallingEdge)
             AddInt(*node, "fallingEdge", 1);
+        if (document.formatVersion >= 3 && data.type == "COUNTER")
+        {
+            if (data.fallingEdge) AddInt(*node, "fallingEdge", 1);
+            if (data.counterMax != 15) AddInt(*node, "counterMax", data.counterMax);
+            if (data.counterInitial != 0) AddInt(*node, "counterInitial", data.counterInitial);
+        }
         if (document.formatVersion >= 3 && data.type == "PROBE" && !data.probeLabel.empty())
             node->AddAttribute(wxS("probeLabel"), wxString::FromUTF8(data.probeLabel));
         if (document.formatVersion >= 3 && (data.type == "INPUT" || data.type == "BUTTON") && !data.waveform.empty())

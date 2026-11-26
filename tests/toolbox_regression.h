@@ -37,7 +37,7 @@ inline void TestRegistryToolbox()
 
     bool hasPlaceholder = false;
     bool hasRemovedCategory = false;
-    wxTreeItemId wireCategory, storageCategory, orItem, constantItem, wireItem, clockItem;
+    wxTreeItemId wireCategory, storageCategory, orItem, constantItem, counterItem, wireItem, clockItem;
     std::function<void(wxTreeItemId, int)> inspect = [&](wxTreeItemId parent, int depth) {
         wxTreeItemIdValue cookie;
         for (auto item = tree->GetFirstChild(parent, cookie); item.IsOk(); item = tree->GetNextChild(parent, cookie))
@@ -52,6 +52,7 @@ inline void TestRegistryToolbox()
             }
             if (label == wxT("或门")) orItem = item;
             if (label == wxT("常量")) constantItem = item;
+            if (label == wxT("计数器")) counterItem = item;
             if (label == wxT("导线")) wireItem = item;
             if (label == wxT("时钟")) clockItem = item;
             inspect(item, depth + 1);
@@ -71,6 +72,7 @@ inline void TestRegistryToolbox()
     require(!tree->GetNextChild(wireCategory, wireCookie).IsOk(), "wire category has no other tools");
     require(wireItem.IsOk() && clockItem.IsOk(), "wire and clock entries exist");
     require(constantItem.IsOk(), "constant is listed in the storage category");
+    require(counterItem.IsOk(), "counter is listed in the storage category");
 
     for (const auto& definition : ComponentRegistry::All())
     {
@@ -95,4 +97,7 @@ inline void TestRegistryToolbox()
     tree->SelectItem(clockItem);
     require(toolbox->GetSelectedType() == "CLOCK" && g_selectedType == "CLOCK" && callbacks == 3,
         "clock selection in wire category activates the clock tool");
+    tree->SelectItem(counterItem);
+    require(toolbox->GetSelectedType() == "COUNTER" && g_selectedType == "COUNTER" && callbacks == 4,
+        "counter selection in storage category activates the counter tool");
 }

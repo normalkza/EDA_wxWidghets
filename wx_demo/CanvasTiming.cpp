@@ -1,5 +1,6 @@
 #include "Canvas.h"
 #include "ComponentRegistry.h"
+#include "CounterComponent.h"
 #include <wx/choice.h>
 #include <algorithm>
 
@@ -13,7 +14,7 @@ bool Canvas::CanEditTimingParameters() const
 {
     if (!HasSelectedComponent()) return false;
     const auto& type = m_components[m_selectedIndex].comp->name;
-    return ComponentRegistry::SupportsInitialLevel(type) || type == "PROBE";
+    return ComponentRegistry::SupportsInitialLevel(type) || type == "PROBE" || type == "COUNTER";
 }
 
 bool Canvas::ApplyWaveformDocument(const CircuitDocument& document, wxString& error)
@@ -94,7 +95,7 @@ bool Canvas::EditSelectedTimingParameters()
         grid->Add(initial, 1, wxEXPAND);
     }
     wxChoice* edge = nullptr;
-    if (original.type == "DFF" && original.inputCount == 3)
+    if ((original.type == "DFF" && original.inputCount == 3) || original.type == "COUNTER")
     {
         grid->Add(new wxStaticText(&dialog, wxID_ANY, wxT("触发沿")), 0, wxALIGN_CENTER_VERTICAL);
         edge = new wxChoice(&dialog, wxID_ANY);
@@ -110,9 +111,17 @@ bool Canvas::EditSelectedTimingParameters()
         high = addText(wxT("高电平时长 (ns)"), wxString::Format("%lld", static_cast<long long>(original.clockHighNs)));
         start = addText(wxT("首次跳变时间 (ns)"), wxString::Format("%lld", static_cast<long long>(original.clockStartNs)));
     }
+    wxTextCtrl *counterMax = nullptr, *counterInitial = nullptr;
+    if (original.type == "COUNTER")
+    {
+        counterMax = addText(wxT("计数上限 (1~15)"), wxString::Format("%d", original.counterMax));
+        counterInitial = addText(wxT("初始值 (0~上限)"), wxString::Format("%d", original.counterInitial));
+    }
     if (original.type == "PROBE") label = addText(wxT("波形名称"), wxString::FromUTF8(original.probeLabel));
     root->Add(grid, 1, wxEXPAND | wxALL, FromDIP(20));
-    const wxString hint = original.type == "CLOCK" ? wxT("整数纳秒；高、低电平持续时间均至少 1 ns。\n首次跳变可为 0，初值本身不产生边沿。") :
+    const wxString hint = original.type == "COUNTER" ?
+        wxT("4 位可逆计数器：CLK 上升/下降沿按 EN、DIR、LOAD 更新 Q0~Q3；CLR=1 异步清零。\nEN、DIR 悬空视为 1（计数/加计数）；到上限再加或到 0 再减时会回卷，CARRY 在到限/到 0 时为 1。") :
+        original.type == "CLOCK" ? wxT("整数纳秒；高、低电平持续时间均至少 1 ns。\n首次跳变可为 0，初值本身不产生边沿。") :
         original.type == "DFF" && original.inputCount == 2 ?
             wxT("理想 D 触发器：上升沿采样 D；Q 保持到下一次上升沿，QN 始终与 Q 互反。") :
         original.type == "DFF" && original.inputCount == 4 ?
@@ -128,14 +137,21 @@ bool Canvas::EditSelectedTimingParameters()
         CircuitComponentData edited = original;
         edited.high = initial && initial->GetSelection() == 1;
         edited.fallingEdge = edge && edge->GetSelection() == 1;
-        long long p = 0, h = 0, s = 0;
+        long long p = 0, h = 0, s = 0, maximum = 0, initial = 0;
         if (period && (!period->GetValue().ToLongLong(&p) || !high->GetValue().ToLongLong(&h) ||
             !start->GetValue().ToLongLong(&s)))
         {
             wxMessageBox(wxT("时间必须是整数纳秒。"), wxT("参数无效"), wxOK | wxICON_WARNING, &dialog);
             return;
         }
+        if (counterMax && (!counterMax->GetValue().Trim(true).Trim(false).ToLongLong(&maximum) ||
+            !counterInitial->GetValue().Trim(true).Trim(false).ToLongLong(&initial)))
+        {
+            wxMessageBox(wxT("计数上限和初始值必须是整数。"), wxT("参数无效"), wxOK | wxICON_WARNING, &dialog);
+            return;
+        }
         if (period) { edited.clockPeriodNs = p; edited.clockHighNs = h; edited.clockStartNs = s; }
+        if (counterMax) { edited.counterMax = static_cast<int>(maximum); edited.counterInitial = static_cast<int>(initial); }
         if (label) edited.probeLabel = label->GetValue().ToStdString(wxConvUTF8);
         auto candidate = ExportDocument();
         candidate.formatVersion = 3;
@@ -152,6 +168,8 @@ bool Canvas::EditSelectedTimingParameters()
         placed.initialHigh = edited.high;
         if (ComponentRegistry::SupportsInitialLevel(edited.type))
             placed.comp->outputs[0].value = edited.high ? LogicValue::High : LogicValue::Low;
+        if (edited.type == "COUNTER")
+            static_cast<CounterComponent*>(placed.comp)->Configure(edited.counterMax, edited.counterInitial);
         m_formatVersion = 3;
         MarkModified();
         RecomputeCircuit();

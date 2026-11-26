@@ -2,6 +2,7 @@
 
 #include "CircuitValidation.h"
 #include "ComponentRegistry.h"
+#include "CounterComponent.h"
 #include <algorithm>
 #include <exception>
 #include <limits>
@@ -17,7 +18,8 @@ bool IsInteractiveSource(const std::string& type)
 
 bool IsClockSource(const std::string& type)
 {
-    return type == "CLOCK" || IsInteractiveSource(type);
+    // A counter's Q/CARRY outputs may also clock a DFF or another counter.
+    return type == "CLOCK" || type == "COUNTER" || IsInteractiveSource(type);
 }
 }
 
@@ -56,6 +58,8 @@ bool DigitalSimulator::Compile(const CircuitDocument& document, std::uint64_t re
                 error = wxString::Format(wxS("时钟 %d 的高低持续时间必须至少为 1 ns，启动时间不能为负。"), data->id);
                 return false;
             }
+            if (data->type == "COUNTER")
+                static_cast<CounterComponent*>(component.get())->Configure(data->counterMax, data->counterInitial);
             Node node;
             node.design = *data;
             node.inputs.resize(component->inputs.size());
@@ -75,12 +79,27 @@ bool DigitalSimulator::Compile(const CircuitDocument& document, std::uint64_t re
             if (targetNode.design.type == "DFF" && wire.targetPin == 1 &&
                 !IsClockSource(candidate.m_nodes[source].design.type))
             {
-                error = wxString::Format(wxS("DFF %d 的 CLK 只能由 CLOCK、INPUT 或 BUTTON 直接驱动；当前源为元件 %d。"),
+                error = wxString::Format(wxS("DFF %d 的 CLK 只能由 CLOCK、INPUT、BUTTON 或 COUNTER 直接驱动；当前源为元件 %d。"),
+                    wire.targetId, wire.sourceId);
+                return false;
+            }
+            if (targetNode.design.type == "COUNTER" &&
+                wire.targetPin == CounterComponent::PinClk &&
+                !IsClockSource(candidate.m_nodes[source].design.type))
+            {
+                error = wxString::Format(wxS("计数器 %d 的 CLK 只能由 CLOCK、INPUT、BUTTON 或 COUNTER 直接驱动；当前源为元件 %d。"),
                     wire.targetId, wire.sourceId);
                 return false;
             }
             // D and CLK are sampled; only asynchronous control pins are immediate.
             if (targetNode.design.type == "DFF" && wire.targetPin < 2) continue;
+            // Counter CLK and D bits are sampled only at an active edge. EN,
+            // LOAD and DIR also affect CARRY combinationally, so they stay in
+            // the topological order; only CLR is an immediate state control.
+            if (targetNode.design.type == "COUNTER" &&
+                (wire.targetPin == CounterComponent::PinClk ||
+                 (wire.targetPin >= CounterComponent::PinD0 &&
+                  wire.targetPin <= CounterComponent::PinD3))) continue;
             outgoing[source].push_back(target);
             ++indegree[target];
         }
@@ -128,12 +147,20 @@ bool DigitalSimulator::Initialize(wxString& error)
             node.component->outputs[0].value = node.design.high ? LogicValue::High : LogicValue::Low;
         if (node.design.type == "DFF" && node.component->outputs.size() == 2)
             node.component->outputs[1].value = node.design.high ? LogicValue::Low : LogicValue::High;
+        if (node.design.type == "COUNTER")
+            static_cast<CounterComponent*>(node.component.get())->Configure(
+                node.design.counterMax, node.design.counterInitial);
         node.nextClock = node.design.type == "CLOCK" ?
             std::optional<std::int64_t>(node.design.clockStartNs) : std::nullopt;
     }
     Settle();
     for (auto& node : m_nodes)
-        if (node.design.type == "DFF") node.previousClock = node.component->inputs[1].value;
+    {
+        if (node.design.type == "DFF")
+            node.previousClock = node.component->inputs[1].value;
+        else if (node.design.type == "COUNTER")
+            node.previousClock = node.component->inputs[CounterComponent::PinClk].value;
+    }
 
     // Custom source waveforms become ordinary scheduled stimuli, so Reset and
     // Compile replay exactly the same stimuli without special UI state.
@@ -192,9 +219,11 @@ void DigitalSimulator::RefreshInputs(Node& node)
     for (std::size_t input = 0; input < node.inputs.size(); ++input)
     {
         const auto& driver = node.inputs[input];
+        const bool unconnectedCounterCount = node.design.type == "COUNTER" &&
+            !driver && (input == CounterComponent::PinEnable || input == CounterComponent::PinDirection);
         node.component->inputs[input].value = driver ?
             m_nodes[driver->node].component->outputs[driver->pin].value :
-            node.design.type == "DFF" && node.component->inputs.size() == 4 && input >= 2 ?
+            unconnectedCounterCount || (node.design.type == "DFF" && node.component->inputs.size() == 4 && input >= 2) ?
                 LogicValue::High : LogicValue::Low;
     }
 }
@@ -342,34 +371,84 @@ bool DigitalSimulator::ProcessTimeUnchecked(std::int64_t timeNs, wxString& error
     Settle();
     if (!Record(timeNs, delta, error)) return false;
 
-    std::vector<std::pair<std::size_t, LogicValue>> commits;
-    for (std::size_t index = 0; index < m_nodes.size(); ++index)
+    // State elements may clock each other within the same integer time slot.
+    // Each edge is consumed once, then the settled values are re-evaluated in
+    // the next delta until no state changes remain.
+    std::vector<bool> edgeConsumed(m_nodes.size(), false);
+    while (true)
     {
-        auto& node = m_nodes[index];
-        if (node.design.type != "DFF") continue;
-        const auto& inputs = node.component->inputs;
-        const bool rising = node.previousClock == LogicValue::Low && inputs[1].value == LogicValue::High;
-        const bool falling = node.previousClock == LogicValue::High && inputs[1].value == LogicValue::Low;
-        const bool activeEdge = node.design.fallingEdge ? falling : rising;
-        LogicValue next = node.component->outputs[0].value;
-        if (inputs.size() == 3 && inputs[2].value == LogicValue::High)
-            next = LogicValue::Low;
-        else if (inputs.size() == 4 && inputs[3].value == LogicValue::Low)
-            next = LogicValue::Low;
-        else if (inputs.size() == 4 && inputs[2].value == LogicValue::Low)
-            next = LogicValue::High;
-        else if (activeEdge)
-            next = inputs[0].value;
-        node.previousClock = inputs[1].value;
-        if (next != node.component->outputs[0].value) commits.emplace_back(index, next);
-    }
-    if (!commits.empty())
-    {
+        std::vector<std::pair<std::size_t, int>> counterCommits;
+        std::vector<std::pair<std::size_t, LogicValue>> dffCommits;
+        std::vector<bool> activeEdges(m_nodes.size(), false);
+
+        for (std::size_t index = 0; index < m_nodes.size(); ++index)
+        {
+            auto& node = m_nodes[index];
+            if (node.design.type != "COUNTER") continue;
+            auto* counter = static_cast<CounterComponent*>(node.component.get());
+            const auto& inputs = node.component->inputs;
+            const bool previous = node.previousClock == LogicValue::High;
+            const bool currentClock = inputs[CounterComponent::PinClk].value == LogicValue::High;
+            const bool activeEdge = !edgeConsumed[index] &&
+                (node.design.fallingEdge ? (previous && !currentClock) : (!previous && currentClock));
+            activeEdges[index] = activeEdge;
+            const bool clear = inputs[CounterComponent::PinClear].value == LogicValue::High;
+            const int currentValue = counter->Value();
+            int nextValue = currentValue;
+            if (clear)
+                nextValue = 0;
+            else if (activeEdge)
+            {
+                if (inputs[CounterComponent::PinLoad].value == LogicValue::High)
+                {
+                    int data = 0;
+                    for (std::size_t bit = 0; bit < CounterComponent::QBitCount; ++bit)
+                        if (inputs[CounterComponent::DataPin(bit)].value == LogicValue::High)
+                            data |= 1 << bit;
+                    const int span = node.design.counterMax + 1;
+                    nextValue = data % span;
+                }
+                else
+                {
+                    const bool enabled = !node.inputs[CounterComponent::PinEnable] ||
+                        inputs[CounterComponent::PinEnable].value == LogicValue::High;
+                    const bool up = !node.inputs[CounterComponent::PinDirection] ||
+                        inputs[CounterComponent::PinDirection].value == LogicValue::High;
+                    if (enabled)
+                        nextValue = up ? (currentValue >= node.design.counterMax ? 0 : currentValue + 1) :
+                            (currentValue <= 0 ? node.design.counterMax : currentValue - 1);
+                }
+            }
+            if (nextValue != currentValue) counterCommits.emplace_back(index, nextValue);
+        }
+
+        for (std::size_t index = 0; index < m_nodes.size(); ++index)
+        {
+            auto& node = m_nodes[index];
+            if (node.design.type != "DFF") continue;
+            const auto& inputs = node.component->inputs;
+            const bool rising = node.previousClock == LogicValue::Low && inputs[1].value == LogicValue::High;
+            const bool falling = node.previousClock == LogicValue::High && inputs[1].value == LogicValue::Low;
+            const bool activeEdge = !edgeConsumed[index] && (node.design.fallingEdge ? falling : rising);
+            activeEdges[index] = activeEdge;
+            LogicValue next = node.component->outputs[0].value;
+            if (inputs.size() == 3 && inputs[2].value == LogicValue::High)
+                next = LogicValue::Low;
+            else if (inputs.size() == 4 && inputs[3].value == LogicValue::Low)
+                next = LogicValue::Low;
+            else if (inputs.size() == 4 && inputs[2].value == LogicValue::Low)
+                next = LogicValue::High;
+            else if (activeEdge)
+                next = inputs[0].value;
+            if (next != node.component->outputs[0].value) dffCommits.emplace_back(index, next);
+        }
+
+        if (counterCommits.empty() && dffCommits.empty()) break;
         if (++delta > m_config.maxDeltaCycles)
             return Fail(wxS("同一时刻的 delta 轮次数量已达上限。"), error);
-        // Every DFF reads the same pre-commit snapshot. A chain advances one
-        // stage per edge, regardless of its component IDs or placement order.
-        for (const auto& [index, next] : commits)
+        for (const auto& [index, value] : counterCommits)
+            static_cast<CounterComponent*>(m_nodes[index].component.get())->SetState(value);
+        for (const auto& [index, next] : dffCommits)
         {
             auto& outputs = m_nodes[index].component->outputs;
             outputs[0].value = next;
@@ -381,6 +460,17 @@ bool DigitalSimulator::ProcessTimeUnchecked(std::int64_t timeNs, wxString& error
             return Fail(wxS("同一时刻的 delta 轮次数量已达上限。"), error);
         Settle();
         if (!Record(timeNs, delta, error)) return false;
+        for (std::size_t index = 0; index < m_nodes.size(); ++index)
+            if (activeEdges[index]) edgeConsumed[index] = true;
+    }
+    // Refresh edge memory from the settled state, so a state element whose
+    // clock is driven by another state element sees the edge on the next slot.
+    for (auto& node : m_nodes)
+    {
+        if (node.design.type == "DFF")
+            node.previousClock = node.component->inputs[1].value;
+        else if (node.design.type == "COUNTER")
+            node.previousClock = node.component->inputs[CounterComponent::PinClk].value;
     }
     m_nextDelta = delta + 1;
     return true;

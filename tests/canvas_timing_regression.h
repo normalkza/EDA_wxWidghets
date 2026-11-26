@@ -44,7 +44,8 @@ struct CanvasTimingRegressionAccess
         Require(actual.type == expected.type && actual.inputCount == expected.inputCount &&
             actual.high == expected.high && actual.rotation == expected.rotation &&
             actual.clockPeriodNs == expected.clockPeriodNs && actual.clockHighNs == expected.clockHighNs &&
-            actual.clockStartNs == expected.clockStartNs && actual.probeLabel == expected.probeLabel,
+            actual.clockStartNs == expected.clockStartNs && actual.probeLabel == expected.probeLabel &&
+            actual.counterMax == expected.counterMax && actual.counterInitial == expected.counterInitial,
             "component design parameters survive the view/runtime boundary");
     }
 

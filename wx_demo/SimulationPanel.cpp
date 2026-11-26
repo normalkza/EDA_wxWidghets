@@ -2,6 +2,7 @@
 #include "Canvas.h"
 #include "WaveformPanel.h"
 #include "InputWaveformDialog.h"
+#include "CounterComponent.h"
 #include <wx/choice.h>
 #include <wx/filedlg.h>
 #include <wx/filename.h>
@@ -133,6 +134,8 @@ bool SimulationPanel::Prepare()
         for (int pin = 0; pin < component.inputCount; ++pin)
         {
             if (component.type == "DFF" && (pin == 2 || pin == 3)) continue;
+            if (component.type == "COUNTER" &&
+                (pin == CounterComponent::PinEnable || pin == CounterComponent::PinDirection)) continue;
             const bool connected = std::any_of(design.wires.begin(), design.wires.end(), [&](const auto& wire) {
                 return wire.targetId == component.id && wire.targetPin == pin;
             });

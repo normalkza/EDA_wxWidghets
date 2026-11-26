@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ComponentRegistry.h"
+#include "CounterComponent.h"
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
@@ -58,6 +59,16 @@ inline void TestComponentRegistry()
         require(initialized && initialized->outputs[0].value == LogicValue::High,
             std::string(type) + " restores configured initial level");
     }
+    auto counter = ComponentRegistry::Create("COUNTER");
+    require(counter && counter->inputs.size() == 9 && counter->outputs.size() == 5 &&
+        counter->inputs[0].name == "CLK" && counter->inputs[1].name == "EN" &&
+        counter->inputs[2].name == "LOAD" && counter->inputs[3].name == "DIR" &&
+        counter->inputs[4].name == "D0" && counter->inputs[8].name == "CLR" &&
+        counter->outputs[0].name == "Q0" && counter->outputs[4].name == "CARRY",
+        "counter exposes stable Logisim-style control, data and status pins");
+    require(!counter->HasCombinationalPath(0, 0) && !counter->HasCombinationalPath(4, 0) &&
+        counter->HasCombinationalPath(8, 0) && counter->HasCombinationalPath(1, 4),
+        "counter samples CLK/data but clears asynchronously and derives carry from control pins");
     auto dff = ComponentRegistry::Create("DFF");
     auto mux = ComponentRegistry::Create("MUX");
     require(mux && mux->inputs[0].name == "A" && mux->inputs[1].name == "B" &&

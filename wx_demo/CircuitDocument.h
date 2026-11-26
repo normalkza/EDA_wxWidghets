@@ -35,6 +35,10 @@ struct CircuitComponentData
     // Custom stimuli for INPUT / BUTTON sources. Empty means no scheduled
     // waveform: the source keeps its initial level for the whole simulation.
     std::vector<WaveformEdge> waveform;
+    // COUNTER design data. The counter is 4-bit; max is 1..15 and initial is 0..max.
+    // fallingEdge above selects the active clock edge for COUNTER as well as DFF.
+    int counterMax = 15;
+    int counterInitial = 0;
 };
 
 struct CircuitWireData

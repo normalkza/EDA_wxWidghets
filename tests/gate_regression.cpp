@@ -32,6 +32,7 @@
 #include "canvas_timing_regression.h"
 #include "simulation_ui_regression.h"
 #include "waveform_regression.h"
+#include "counter_regression.h"
 #include "pcb_import_regression.h"
 #include "pcb_workspace_regression.h"
 #include "pcb_view_regression.h"
@@ -743,6 +744,7 @@ int main(int argc, char** argv)
         TestCircuit();
         SimulationUiRegressionAccess::Run();
         TestInputWaveform();
+        CounterRegression::Run();
         PcbImportRegression::Run();
         PcbWorkspaceRegressionAccess::Run();
         PcbViewRegressionAccess::Run();
@@ -765,6 +767,7 @@ int main(int argc, char** argv)
             "digital timing engine, DFF chains/divider/reset, simultaneous sampling, resource rollback, CSV/VCD; "
             "timing canvas/controller integration and shipped examples; registry, curated toolbox tree, undirected nets, shared topology and atomic bulk import, "
             "custom input waveforms with unit-aware editing, persistence and scheduled replay; "
+            "4-bit up/down counters with load, clear, carry, wrap and cascaded clocks; "
             "independent snapshots, runtime/design separation and revision rejection; "
             "truth tables, pin resizing, hit bounds, drag/resize pixels, rotated pins and pixels, rotation clipboard/undo, "
             "editable wire segments and undo, view options, properties, fanout, propagation, disconnection and cycle rejection\n";

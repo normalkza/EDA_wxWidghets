@@ -7,6 +7,7 @@
 #include "XorGate.h"
 #include "IOComponent.h"
 #include "TimingComponents.h"
+#include "CounterComponent.h"
 #include "MuxComponent.h"
 #include "ComparatorComponent.h"
 
@@ -49,7 +50,7 @@ const std::vector<ComponentDefinition>& ComponentRegistry::All()
         {"COMPARATOR", "比较器", "运算器", "comparator", 2, 2, 2, 3, FixedComponent<ComparatorComponent>},
         {"DFF", "D 触发器", "存储", "dff", 2, 2, 4, 2, VariableComponent<DffComponent>},
         {"REGISTER", "寄存器", "存储", "register", 2, 2, 2, 1},
-        {"COUNTER", "计数器", "存储", "counter", 1, 1, 1, 1}
+        {"COUNTER", "计数器", "存储", "counter", 9, 9, 9, 5, FixedComponent<CounterComponent>}
     };
     return definitions;
 }

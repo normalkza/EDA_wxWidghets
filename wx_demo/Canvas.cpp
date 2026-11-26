@@ -19,6 +19,7 @@
 
 #include "Toolbox.h"
 #include "ComponentRegistry.h"
+#include "CounterComponent.h"
 
 namespace
 {
@@ -149,7 +150,7 @@ void Canvas::OnLeftDown(wxMouseEvent& event)
     if (comp)
     {
         RecordUndo();
-        if (typeId == "CLOCK" || typeId == "DFF" || typeId == "PROBE" ||
+        if (typeId == "CLOCK" || typeId == "DFF" || typeId == "COUNTER" || typeId == "PROBE" ||
             typeId == "BUTTON" || typeId == "LED" || typeId == "CONSTANT") m_formatVersion = 3;
         const int componentId = NextComponentId();
         m_components.push_back({ comp, x, y, componentId, 0, false });
@@ -647,9 +648,9 @@ bool Canvas::PasteSelection()
         RecordUndo();
         const bool initialHigh = ComponentRegistry::SupportsInitialLevel(component->name) &&
             component->outputs[0].value == LogicValue::High;
-        if (component->name == "CLOCK" || component->name == "DFF" || component->name == "PROBE" ||
-            component->name == "BUTTON" || component->name == "LED" || component->name == "CONSTANT" ||
-            !parameters.probeLabel.empty()) m_formatVersion = 3;
+        if (component->name == "CLOCK" || component->name == "DFF" || component->name == "COUNTER" ||
+            component->name == "PROBE" || component->name == "BUTTON" || component->name == "LED" ||
+            component->name == "CONSTANT" || !parameters.probeLabel.empty()) m_formatVersion = 3;
         m_components.push_back({ component.get(), x, y, NextComponentId(), rotation, initialHigh, parameters });
         component.release();
         m_selectedIndex = static_cast<int>(m_components.size()) - 1;
@@ -856,6 +857,10 @@ Canvas::GateGeometry Canvas::GetGateGeometry(const Component& component) const
     if (type == "DFF" && component.inputs.size() == 4) return { 100, 120, 0, 110,
         { wxPoint(0, 40), wxPoint(0, 80), wxPoint(50, 0), wxPoint(50, 120) },
         { wxPoint(110, 40), wxPoint(110, 80) } };
+    if (type == "COUNTER") return { 120, 200, 0, 120,
+        { wxPoint(0, 20), wxPoint(0, 40), wxPoint(0, 60), wxPoint(0, 80),
+          wxPoint(0, 100), wxPoint(0, 120), wxPoint(0, 140), wxPoint(0, 165), wxPoint(0, 190) },
+        { wxPoint(120, 20), wxPoint(120, 50), wxPoint(120, 80), wxPoint(120, 110), wxPoint(120, 160) } };
     if (type == "CLOCK" || type == "DFF" || type == "MUX" || type == "PROBE" || type == "LED" ||
         type == "BUTTON" || type == "CONSTANT")
     {
@@ -1519,6 +1524,38 @@ void Canvas::DrawGate(wxDC& dc, const PlacedComponent& pc)
     const auto& type = pc.comp->name;
     const int x = pc.x, y = pc.y, w = geometry.width, h = geometry.height;
     const int midY = y + h / 2;
+    if (type == "COUNTER")
+    {
+        dc.SetPen(wxPen(wxColour(36, 50, 71), 2));
+        dc.SetBrush(wxBrush(wxColour(244, 248, 255)));
+        dc.DrawRoundedRectangle(x, y, w, h, 6);
+        dc.SetFont(wxFontInfo(9).Bold());
+        dc.SetTextForeground(wxColour(36, 50, 71));
+        dc.DrawLabel(wxT("COUNTER"), wxRect(x + 8, y + 2, w - 16, 18), wxALIGN_CENTER);
+        int value = 0;
+        for (std::size_t bit = 0; bit < 4; ++bit)
+            if (pc.comp->outputs[bit].value == LogicValue::High) value |= 1 << bit;
+        dc.SetFont(wxFontInfo(9).Bold());
+        dc.DrawLabel(wxString::Format(wxT("%d / %d"), value, pc.parameters.counterMax),
+            wxRect(x + 20, y + 150, w - 40, 18), wxALIGN_CENTER);
+        dc.SetFont(wxFontInfo(8));
+        for (std::size_t i = 0; i < geometry.inputs.size(); ++i)
+            dc.DrawText(wxString::FromUTF8(pc.comp->inputs[i].name), x + 7, y + geometry.inputs[i].y - 6);
+        for (std::size_t i = 0; i < geometry.outputs.size(); ++i)
+        {
+            const auto& output = pc.comp->outputs[i];
+            dc.SetTextForeground(output.value == LogicValue::High ?
+                wxColour(22, 139, 88) : wxColour(100, 116, 139));
+            dc.DrawLabel(wxString::FromUTF8(output.name) + (output.value == LogicValue::High ? wxT(" 1") : wxT(" 0")),
+                wxRect(x + w - 42, y + geometry.outputs[i].y - 8, 40, 16), wxALIGN_RIGHT);
+        }
+        dc.SetTextForeground(wxColour(36, 50, 71));
+        const int clockY = geometry.inputs[static_cast<std::size_t>(CounterComponent::PinClk)].y;
+        wxPoint triangle[]{ wxPoint(x, y + clockY - 5), wxPoint(x + 5, y + clockY), wxPoint(x, y + clockY + 5) };
+        dc.SetPen(wxPen(wxColour(36, 50, 71), 2));
+        dc.DrawLines(3, triangle);
+        return;
+    }
     const bool inverted = type == "NOT" || type == "NAND" || type == "NOR";
     const bool andShape = type == "AND" || type == "NAND";
     const int curveLeft = (type == "NOR" || type == "XOR") ? -10 : 0;

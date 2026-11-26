@@ -62,7 +62,8 @@ inline void Equal(const CircuitDocument& actual, const CircuitDocument& expected
         Require(a.id == b.id && a.type == b.type && a.x == b.x && a.y == b.y &&
             a.inputCount == b.inputCount && a.high == b.high && a.rotation == b.rotation &&
             a.clockPeriodNs == b.clockPeriodNs && a.clockHighNs == b.clockHighNs &&
-            a.clockStartNs == b.clockStartNs && a.probeLabel == b.probeLabel,
+            a.clockStartNs == b.clockStartNs && a.probeLabel == b.probeLabel &&
+            a.counterMax == b.counterMax && a.counterInitial == b.counterInitial,
             "preserve component values");
     }
     for (std::size_t index = 0; index < actual.wires.size(); ++index)
