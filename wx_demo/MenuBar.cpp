@@ -88,9 +88,15 @@ wxMenuBar* CreateMainMenuBar()
     simulationMenu->Append(ID_SIMULATE_WINDOW, wxT("在独立窗口打开仿真面板"));
     menuBar->Append(simulationMenu, wxT("仿真"));
 
+    auto* verilogMenu = new wxMenu();
+    verilogMenu->Append(ID_VERILOG_EDITOR, wxS("代码编辑器…\tCtrl+Alt+V"));
+    verilogMenu->Append(ID_VERILOG_FROM_CANVAS, wxS("从当前画布生成 Verilog…"));
+    menuBar->Append(verilogMenu, "Verilog");
+
     // 帮助菜单
     auto* helpMenu = new wxMenu();
     helpMenu->Append(ID_HELP_AI_ASSISTANT, wxT("AI 助手…"));
+    helpMenu->Append(ID_HELP_REPAIR_PET, wxS("修复桌宠依赖…"));
     helpMenu->Append(ID_START_TUTORIAL, wxT("新手教程\tCtrl+T"));
     helpMenu->AppendSeparator();
     helpMenu->Append(wxID_HELP, wxT("快捷键\tF1"));

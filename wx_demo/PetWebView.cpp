@@ -5,6 +5,7 @@
 #include <wx/ffile.h>
 #include <wx/filename.h>
 #include <wx/log.h>
+#include <wx/process.h>
 #include <wx/stdpaths.h>
 #include <wx/weakref.h>
 #include <wx/msw/wrapwin.h>
@@ -36,6 +37,15 @@ constexpr wchar_t CdnRuntimeScript[] =
     L"coreUrl:'https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js',"
     L"vendorUrl:'https://wx-demo-pet.local/vendor.js'}),writable:false,configurable:false});";
 using Clock = std::chrono::steady_clock;
+
+class PetSetupProcess final : public wxProcess
+{
+public:
+    explicit PetSetupProcess(std::function<void(int)> done) : wxProcess(), m_done(std::move(done)) {}
+    void OnTerminate(int, int status) override { m_done(status); delete this; }
+private:
+    std::function<void(int)> m_done;
+};
 
 bool ValidState(const wxString& state)
 {
@@ -118,7 +128,7 @@ struct PetWebView::State
     unsigned generation = 0, buttons = 0, probeSerial = 0;
     bool ready = false, visible = false, pageLoaded = false, creating = false;
     bool startQueued = false, hit = false, captured = false, probePending = false, pointerInside = false;
-    bool failed = false, modelReported = false;
+    bool failed = false, modelReported = false, repairing = false;
     Clock::time_point probeDeadline{}, startupDeadline{};
 
     void Notify(const wxString& text)
@@ -193,6 +203,9 @@ wxString PetWebView::FindResourceDirectory()
 
 wxString PetWebView::RuntimeDirectory()
 {
+    const auto executable = wxFileName(wxStandardPaths::Get().GetExecutablePath()).GetPath();
+    const auto portable = NormalDirectory(executable + "\\runtime\\live2d");
+    if (wxFileName(portable, "live2dcubismcore.min.js").FileExists()) return portable;
     const wxString directory = ApplicationDataDirectory();
     return directory.empty() ? wxString() : NormalDirectory(directory + "\\live2d");
 }
@@ -365,7 +378,7 @@ void PetWebView::StartBrowser()
     const wxString resources = FindResourceDirectory(), runtime = RuntimeDirectory();
     if (resources.empty())
     {
-        ShowFailure(wxS("找不到 res/pet 桌宠资源，请保留完整的 res 目录。"), "resources-missing");
+        ShowFailure(wxS("桌宠资源不完整，请重新解压完整程序目录并运行 repair-pet.cmd。"), "resources-missing");
         return;
     }
     if (runtime.empty() || !wxFileName::Mkdir(runtime, wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL))
@@ -388,8 +401,20 @@ void PetWebView::StartBrowser()
         GetProcAddress(loader, "CreateCoreWebView2EnvironmentWithOptions")) : nullptr;
     if (!create)
     {
-        ShowFailure(wxS("缺少桌宠 WebView2 加载组件，可从帮助菜单重试。"),
+        ShowFailure(wxS("缺少匹配位数的 WebView2Loader.dll，请重新下载完整发布包；详见 repair-pet.cmd。"),
             "loader-unavailable", HRESULT_FROM_WIN32(GetLastError()));
+        return;
+    }
+    using GetVersion = HRESULT(STDAPICALLTYPE*)(PCWSTR, LPWSTR*);
+    const auto getVersion = reinterpret_cast<GetVersion>(GetProcAddress(loader, "GetAvailableCoreWebView2BrowserVersionString"));
+    LPWSTR version = nullptr;
+    const HRESULT runtimeStatus = getVersion ? getVersion(nullptr, &version) : E_NOINTERFACE;
+    const bool runtimeAvailable = SUCCEEDED(runtimeStatus) && version && *version;
+    CoTaskMemFree(version);
+    if (!runtimeAvailable)
+    {
+        ShowFailure(wxS("未检测到 WebView2 Runtime，请使用“帮助 → 修复桌宠依赖”安装后重试。"),
+            "webview2-runtime-missing", FAILED(runtimeStatus) ? runtimeStatus : HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
         return;
     }
     const wxString userData = ApplicationDataDirectory() + "\\pet-webview2";
@@ -659,6 +684,38 @@ void PetWebView::StartBrowser()
     const HRESULT result = create(nullptr, userData.wc_str(), nullptr, environmentCallback.Get());
     if (FAILED(result)) ShowFailure(wxS("WebView2 环境创建失败，可从帮助菜单重试。"),
         "environment-request", result);
+}
+
+void PetWebView::RepairDependencies()
+{
+    if (m_state->repairing) { m_state->Notify(wxS("桌宠依赖正在修复，请稍候。")); return; }
+    const auto executableDirectory = wxFileName(wxStandardPaths::Get().GetExecutablePath()).GetPath();
+    wxString directory = executableDirectory, script;
+    for (int level = 0; level <= 4; ++level)
+    {
+        const auto candidate = wxFileName(directory + "\\tools", "setup-pet.ps1").GetFullPath();
+        if (wxFileExists(candidate)) { script = candidate; break; }
+        wxFileName parent = wxFileName::DirName(directory);
+        if (!parent.GetDirCount()) break;
+        parent.RemoveLastDir(); directory = parent.GetPath();
+    }
+    if (script.empty()) { m_state->Notify(wxS("缺少 tools/setup-pet.ps1，请重新下载完整程序包。")); return; }
+    m_state->repairing = true;
+    m_state->Notify(wxS("正在修复 WebView2 / Cubism Core；完成后自动重新加载桌宠。"));
+    const std::weak_ptr<State> weak = m_state;
+    auto* process = new PetSetupProcess([weak](int status) {
+        const auto state = weak.lock(); if (!state || !state->owner.get()) return;
+        state->repairing = false;
+        if (status == 0) state->owner->Reload();
+        else state->Notify(wxS("桌宠依赖修复失败，请查看 %LOCALAPPDATA%/wx_demo/pet-setup.log，或运行 repair-pet.cmd。"));
+    });
+    wxString systemRoot;
+    if (!wxGetEnv("SystemRoot", &systemRoot) || systemRoot.empty()) systemRoot = "C:\\Windows";
+    const wxString powershell = systemRoot + "\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+    const wchar_t* arguments[]{powershell.wc_str(), L"-NoProfile", L"-ExecutionPolicy", L"Bypass", L"-File", script.wc_str(),
+        L"-ExecutableDirectory", executableDirectory.wc_str(), nullptr};
+    if (wxExecute(arguments, wxEXEC_ASYNC | wxEXEC_HIDE_CONSOLE, process) <= 0)
+    { delete process; m_state->repairing = false; m_state->Notify(wxS("无法启动依赖修复工具，请运行 repair-pet.cmd。")); }
 }
 
 void PetWebView::SetActionCallback(std::function<void(const wxString&)> callback)

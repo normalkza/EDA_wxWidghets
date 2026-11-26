@@ -1,0 +1,15 @@
+{
+  "icarus": {
+    "file": "iverilog-v12-20220611-x64_setup.exe",
+    "url": "https://bleyer.org/icarus/iverilog-v12-20220611-x64_setup.exe",
+    "sha256": "a614057374dfaed5da0fe454cdeb410e54981fd85dbd28bd472f4ccb765deb84",
+    "version": "Icarus Verilog 12.0 (devel), Windows package 2022-06-11; GTKWave 3.3.100",
+    "source": "https://github.com/steveicarus/iverilog/tree/2693dd32b",
+    "licenseUrl": "https://raw.githubusercontent.com/steveicarus/iverilog/2693dd32b/COPYING"
+  },
+  "extractor": {
+    "file": "innoextract-1.9-windows.zip",
+    "url": "https://constexpr.org/innoextract/files/innoextract-1.9-windows.zip",
+    "sha256": "6989342c9b026a00a72a38f23b62a8e6a22cc5de69805cf47d68ac2fec993065"
+  }
+}

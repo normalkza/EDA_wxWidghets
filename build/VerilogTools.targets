@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="WxDemoDeployVerilogTools" AfterTargets="Build"
+          Condition="'$(OS)' == 'Windows_NT' and Exists('$(MSBuildThisFileDirectory)..\tools\iverilog\bin\iverilog.exe')">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\tools\deploy-verilog.ps1&quot; -OutputDirectory &quot;$(OutDir).&quot;" />
+  </Target>
+</Project>
