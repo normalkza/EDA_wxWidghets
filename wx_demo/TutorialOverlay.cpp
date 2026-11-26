@@ -246,6 +246,14 @@ void TutorialOverlay::SetNextEnabled(bool enabled)
     }
 }
 
+void TutorialOverlay::SetPreviousEnabled(bool enabled)
+{
+    if (m_panelFrame.get() && m_previousButton)
+    {
+        m_previousButton->Enable(enabled);
+    }
+}
+
 void TutorialOverlay::SetAutoDemoMode(bool enabled, bool paused)
 {
     m_autoDemoMode = enabled;

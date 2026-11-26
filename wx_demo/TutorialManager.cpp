@@ -494,7 +494,10 @@ void TutorialManager::ShowCurrentStep()
         targetRect
     );
 
-    m_overlay->SetNextEnabled(false);
+    // 手动教程中两个导航按钮都可用：回退到某一步后可用“下一步”前进，
+    // 不必重复刚才已完成的操作；第一步没有更早的步骤可回退。
+    m_overlay->SetPreviousEnabled(m_stepIndex > 0);
+    m_overlay->SetNextEnabled(true);
     m_overlay->UpdateOverlay();
 }
 
@@ -635,6 +638,9 @@ void TutorialManager::PreviousStep()
 
     if (m_stepIndex > 0)
     {
+        // 作废尚未执行的完成回调，避免回退后被旧回调又推进一次。
+        ++m_generation;
+        m_currentStepCompleted = false;
         --m_stepIndex;
         ShowCurrentStep();
     }
@@ -642,11 +648,28 @@ void TutorialManager::PreviousStep()
 
 void TutorialManager::NextStep()
 {
-    if (!m_active || !m_autoDemo) return;
-    m_autoPaused = !m_autoPaused;
-    if (m_autoPaused) m_autoTimer.Stop();
-    else m_autoTimer.StartOnce(AutoStepDelayMs);
-    if (auto* overlay = m_overlay.get()) overlay->SetAutoDemoMode(true, m_autoPaused);
+    if (!m_active)
+        return;
+
+    if (m_autoDemo)
+    {
+        m_autoPaused = !m_autoPaused;
+        if (m_autoPaused) m_autoTimer.Stop();
+        else m_autoTimer.StartOnce(AutoStepDelayMs);
+        if (auto* overlay = m_overlay.get()) overlay->SetAutoDemoMode(true, m_autoPaused);
+        return;
+    }
+
+    // 手动教程：下一步是可用的导航按钮。回退后若不想重复操作，可用它前进。
+    // 连线阶段必须亲手完成，不允许跳过。
+    if (m_waitingForWires || m_stepIndex < 0 ||
+        m_stepIndex >= static_cast<int>(m_steps.size()))
+        return;
+
+    ++m_generation;
+    m_currentStepCompleted = false;
+    ++m_stepIndex;
+    ShowCurrentStep();
 }
 
 void TutorialManager::NotifyWireCreated(const CircuitWireData& wire)
