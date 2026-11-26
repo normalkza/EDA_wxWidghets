@@ -13,6 +13,7 @@ class SimulationPanel;
 class wxFrame;
 class AiAssistantDialog;
 class PetWebView;
+class VerilogFrame;
 
 class MainFrame : public wxFrame
 {
@@ -42,6 +43,7 @@ private:
     void OpenAiAssistant();
     PetWebView* EnsurePetPlugin();
     void ShowShortcuts();
+    void OpenVerilog(bool fromCanvas = false);
 
     Canvas* m_canvas = nullptr;
     wxSplitterWindow* m_workspace = nullptr;
@@ -63,4 +65,5 @@ private:
     TutorialManager* m_tutorialManager = nullptr;
     wxWeakRef<PetWebView> m_petPlugin;
     wxString m_assistantPetState = "idle";
+    wxWeakRef<VerilogFrame> m_verilog;
 };

@@ -24,6 +24,7 @@
 #include <wx/arrstr.h>
 #include "KiCadNetlistExporter.h"
 #include "AiSession.h"
+#include "VerilogFrame.h"
 #include <wx/stdpaths.h>
 
 
@@ -325,6 +326,9 @@ MainFrame::MainFrame()
             wxT("关于"), wxOK | wxICON_INFORMATION, this);
         }, wxID_ABOUT);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenAiAssistant(); }, ID_HELP_AI_ASSISTANT);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) { EnsurePetPlugin()->RepairDependencies(); }, ID_HELP_REPAIR_PET);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenVerilog(); }, ID_VERILOG_EDITOR);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenVerilog(true); }, ID_VERILOG_FROM_CANVAS);
 
     auto* root = new wxBoxSizer(wxVERTICAL);
     root->Add(workspace, 1, wxEXPAND | wxALL, FromDIP(12));
@@ -389,6 +393,19 @@ MainFrame::~MainFrame()
     if (m_canvas) m_canvas->SetDocumentResetCallback({});
     delete m_tutorialManager;
     m_tutorialManager = nullptr;
+}
+
+void MainFrame::OpenVerilog(bool fromCanvas)
+{
+    if (m_aiClosePending) return;
+    if (!m_verilog.get()) m_verilog = new VerilogFrame(this);
+    if (fromCanvas)
+    {
+        wxString error;
+        if (!m_verilog->AddFromCircuit(m_canvas->ExportDocument(), error))
+            wxMessageBox(error, wxS("无法生成 Verilog"), wxOK | wxICON_INFORMATION, this);
+    }
+    m_verilog->Show(); m_verilog->Raise();
 }
 
 void MainFrame::OpenAiAssistant()
@@ -690,6 +707,11 @@ void MainFrame::OnClose(wxCloseEvent& event)
         return;
     }
     const bool wasAiClosePending = std::exchange(m_aiClosePending, false);
+    if (event.CanVeto() && m_verilog.get() && !m_verilog->PrepareClose())
+    {
+        if (wasAiClosePending && m_aiAssistant.get()) m_aiAssistant->ResumeAfterOwnerShutdown();
+        event.Veto(); return;
+    }
     if (event.CanVeto() && !ConfirmDiscardChanges())
     {
         if (wasAiClosePending && m_aiAssistant.get()) m_aiAssistant->ResumeAfterOwnerShutdown();

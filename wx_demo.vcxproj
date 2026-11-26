@@ -22,6 +22,9 @@
     <ClCompile Include="wx_demo\AiApiClient.cpp" />
     <ClCompile Include="wx_demo\AiSession.cpp" />
     <ClCompile Include="wx_demo\OfflineAssistant.cpp" />
+    <ClCompile Include="wx_demo\VerilogWorkspace.cpp" />
+    <ClCompile Include="wx_demo\VerilogRunner.cpp" />
+    <ClCompile Include="wx_demo\VerilogFrame.cpp" />
     <ClCompile Include="wx_demo\AiCircuitPatch.cpp" />
     <ClCompile Include="wx_demo\CanvasAssistant.cpp" />
     <ClCompile Include="wx_demo\StartupDialog.cpp" />
@@ -74,6 +77,9 @@
     <ClInclude Include="wx_demo\AiApiClient.h" />
     <ClInclude Include="wx_demo\AiSession.h" />
     <ClInclude Include="wx_demo\OfflineAssistant.h" />
+    <ClInclude Include="wx_demo\VerilogWorkspace.h" />
+    <ClInclude Include="wx_demo\VerilogRunner.h" />
+    <ClInclude Include="wx_demo\VerilogFrame.h" />
     <ClInclude Include="wx_demo\AiWorkspace.h" />
     <ClInclude Include="wx_demo\StartupDialog.h" />
 
@@ -312,6 +318,8 @@ xcopy /Y /E /I "$(ProjectDir)skills" "$(OutDir)skills"</Command>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="$(MSBuildThisFileDirectory)build\ExecutableIntegrity.targets" Condition="Exists('$(MSBuildThisFileDirectory)build\ExecutableIntegrity.targets')" />
+  <Import Project="$(MSBuildThisFileDirectory)build\VerilogTools.targets" Condition="Exists('$(MSBuildThisFileDirectory)build\VerilogTools.targets')" />
+  <Import Project="$(MSBuildThisFileDirectory)build\PetDeployment.targets" Condition="Exists('$(MSBuildThisFileDirectory)build\PetDeployment.targets')" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

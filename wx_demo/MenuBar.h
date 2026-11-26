@@ -53,7 +53,10 @@ enum MainMenuId
     // 新手教程入口
     ID_START_TUTORIAL,
     ID_HELP_COMPANION,
-    ID_HELP_SHORTCUTS
+    ID_HELP_SHORTCUTS,
+    ID_VERILOG_EDITOR,
+    ID_VERILOG_FROM_CANVAS,
+    ID_HELP_REPAIR_PET
 };
 
 wxMenuBar* CreateMainMenuBar();

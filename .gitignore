@@ -2,6 +2,7 @@
 x64/
 Debug/
 Release/
+!/wx_demo/res/pet/webview2/x64/
 *.obj
 *.exe
 *.pdb
@@ -26,3 +27,10 @@ Release/
 # DeepSeek 本地服务
 __pycache__/
 .env
+
+# 本地 Verilog 工具与下载缓存；用 tools/setup-verilog.ps1 恢复
+/downloads/
+/tools/iverilog/
+/tools/innoextract-1.9/
+/dist/
+/runtime/live2d/

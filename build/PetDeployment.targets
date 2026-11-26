@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="WxDemoCheckPetSource" BeforeTargets="PrepareForBuild">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\tools\check-pet.ps1&quot;" />
+  </Target>
+  <Target Name="WxDemoDeployPetSupport" AfterTargets="Build">
+    <ItemGroup>
+      <_WxDemoPetTools Include="$(MSBuildThisFileDirectory)..\tools\setup-pet.ps1" />
+      <_WxDemoPetLaunchers Include="$(MSBuildThisFileDirectory)..\repair-pet.cmd;$(MSBuildThisFileDirectory)..\start-wx-demo.cmd" />
+      <_WxDemoWebViewSetup Include="$(MSBuildThisFileDirectory)..\downloads\MicrosoftEdgeWebview2Setup.exe" Condition="Exists('$(MSBuildThisFileDirectory)..\downloads\MicrosoftEdgeWebview2Setup.exe')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_WxDemoPetTools)" DestinationFolder="$(OutDir)tools" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_WxDemoPetLaunchers)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_WxDemoWebViewSetup)" DestinationFolder="$(OutDir)downloads" SkipUnchangedFiles="true" />
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\tools\check-pet.ps1&quot; -ResourceDirectory &quot;$(OutDir)res\pet&quot;" />
+  </Target>
+</Project>

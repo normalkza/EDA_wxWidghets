@@ -102,6 +102,15 @@
     <ClCompile Include="wx_demo\OfflineAssistant.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="wx_demo\VerilogWorkspace.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\VerilogRunner.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="wx_demo\VerilogFrame.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="wx_demo\AiCircuitPatch.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -229,6 +238,15 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="wx_demo\OfflineAssistant.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\VerilogWorkspace.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\VerilogRunner.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="wx_demo\VerilogFrame.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="wx_demo\AiWorkspace.h">

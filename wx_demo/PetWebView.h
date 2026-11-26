@@ -16,6 +16,7 @@ public:
     void SetPetState(const wxString& state);
     void SetPageVisible(bool visible);
     void Reload();
+    void RepairDependencies();
     bool IsReady() const;
     void SyncBounds();
     void ReadDiagnostics(std::function<void(const wxString&)> callback);

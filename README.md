@@ -8,6 +8,30 @@
 
 需要安装 Python 3，并能运行 `py` 或 `python` 命令。程序自动在随机本地端口启动自己的 Python 服务，通过匿名管道交付密钥，使用临时令牌连接，退出程序时关闭该服务。日常使用无需单独启动下面的手动服务；编译后会把 `assistant_server.py`、`assistant_skills.py`、`assistant_winhttp.py`、`skills` 与 `res` 一起复制到输出目录。
 
+## Verilog 代码工作区
+
+通过主菜单 **Verilog → 代码编辑器**（Ctrl+Alt+V）打开独立代码窗口。支持 `.v`、`.sv`、`.vh`、`.svh` 多文件标签、Verilog/SystemVerilog 语法高亮、行号、代码折叠、空格缩进、括号匹配、Ctrl+Space 关键字补全，以及查找/替换、撤销/重做、UTF-8 文件打开和保存。新建、模板和画布生成的代码均有未保存标记；关闭文件或退出主程序时会询问保存。
+
+**模板 → 全加器与 Testbench** 会创建设计和测试两个代码标签，顶层模块为 `full_adder_tb`。Testbench 遍历八组输入、检查结果并生成 `wave.vcd`。另有组合逻辑模块、DFF 和通用 Testbench 模板。
+
+**Verilog → 从当前画布生成 Verilog** 将组合逻辑转换为一个新的 `circuit_top` 代码标签。支持 INPUT/OUTPUT、BUTTON、CONSTANT、LED/PROBE、六种基本逻辑门、MUX 和单比特 COMPARATOR。端口名按稳定元件 ID 生成为 `in_c<ID>` / `out_c<ID>`；未连接输入接常量 0。画布和代码分别保存。时钟、DFF 等时序元件需要在代码工作区中明确编写时钟与复位逻辑，暂不自动转换。
+
+编辑、模板和文件操作无需 API 或外部编译器。**F9 编译检查**和 **Ctrl+F9 运行仿真**使用本机 Icarus Verilog 的 `iverilog.exe` / `vvp.exe`；程序会检测 PATH、常见安装目录及编译器相邻目录，也可在“工具设置”中选择路径。未安装工具时会在输出区域提示，编辑和保存继续可用。
+
+本地依赖位于 `tools/iverilog`，原始包保留在 `downloads`；已部署到 `x64/Debug/tools/iverilog`，当前程序可自动识别，无需手动配置或修改 PATH。后续编译自动复制完整工具目录。换电脑或重新下载源码时，运行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\setup-verilog.ps1` 恢复；保留下载包后也可加 `-Offline` 离线恢复。版本、校验值和说明见 `tools/README.md`。附带 GTKWave 可用于打开另存的 VCD。
+
+构建默认使用 SystemVerilog 2012、全部打开的非空 `.v/.sv` 文件，也可选择仅当前文件；已打开的 `.vh/.svh` 会作为头文件快照。编译读取未保存的编辑缓冲区，在独立临时目录运行，保留相邻源目录的相对包含关系，并允许从原目录读取未打开的包含文件。顶层模块可以填写，也可留空自动选择。错误与警告双击定位代码行；代码后续更改会让旧定位失效。停止按钮和单阶段超时会终止本次创建的进程组。仿真生成的 VCD 可以通过“另存波形”保留，下一次构建或关闭工作区后临时产物会清理。
+
+检查入口：`tests/run_regression.ps1 -WithoutDebugSymbols -VerilogIntegration`；加 `-RealVerilog` 使用本地真实 Icarus 验证全加器、DFF、画布生成代码、头文件包含及诊断定位。测试覆盖原生编辑控件高亮、中文路径、UTF-8 保存、替换/撤销、画布生成、未保存头文件、异步构建与诊断、VCD、超时和取消。外部工具调用使用测试替身，不等同于真实 Icarus 的 HDL 语义验证。
+
+真实工具检查入口：`tests/run_regression.ps1 -WithoutDebugSymbols -RealVerilog`。使用本地 Icarus/VVP 实际编译并仿真全加器、DFF、画布导出的 XOR 和相对头文件，并检查 VCD 与真实报错定位。
+
+### 本地 Verilog 依赖
+
+已配置 `tools/iverilog` 便携工具目录，包含 Icarus Verilog 12.0 Windows 发行包、VVP、必需 DLL/后端及 GTKWave 3.3.100。下载来自 [Windows 发行维护页](https://bleyer.org/icarus/)，解包工具来自 [innoextract](https://constexpr.org/innoextract/)。`tools/verilog-dependencies.json` 固定下载地址和 SHA-256。原始下载包保留在本机 `downloads`。
+
+新电脑克隆后，在仓库根目录运行 `powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-verilog.ps1` 下载、校验并解包；已有下载缓存可加 `-Offline`。无需管理员权限，也不修改系统 PATH。构建时自动将整个工具目录复制到程序旁的 `tools/iverilog`，编辑器自动识别。GTKWave 位于 `tools/iverilog/gtkwave/bin/gtkwave.exe`，可以打开另存的 VCD。下载缓存和解包后的二进制目录不提交 Git，由脚本恢复。
+
 ## 无需 API 直接使用
 
 登录页点击“无需 API，直接使用”，会经过欢迎页进入主工作区。绘图、保存、导入导出、仿真和教程等本地功能直接可用，不需要填写密钥或启动 Python 助手服务。主窗口标题显示“离线模式”。
@@ -39,6 +63,16 @@ Windows 上的 DeepSeek HTTPS 请求使用系统 WinHTTP / Schannel，证书由 
 启动程序会显示 DS 鲸鱼娘 AI 悬浮插件。透明、无边框的角色直接叠在电路绘图区上，拖动角色可以改变位置，活动范围限制在本窗口的绘图区。透明处仍可操作画布；**视图 → AI 悬浮插件** 控制显示，**F1** 保留原快捷键说明。
 
 渲染、拖动、摸头、尾巴点击、动作、表情、气泡和右键控制面板复用 `dsh-pet-live2d` 的原始客户端。角色旁的 AI 入口打开原有 AI 助手；处理、完成、失败和取消会通知原互动控制器。桌宠本身不调用 DeepSeek；提交 AI 需求仍使用原有本地助手服务。
+
+### 其他电脑的桌宠部署
+
+完整发布目录必须保留程序旁的 `res/pet`、`tools/setup-pet.ps1`、`repair-pet.cmd` 和 `start-wx-demo.cmd`。源码中的 x64 `WebView2Loader.dll` 已纳入 Git；`.gitignore` 显式放行桌宠资源目录中的 x64 加载器，同时继续忽略构建输出。构建前后都会运行 `tools/check-pet.ps1` 检查模型引用、贴图、动作及两种位数的加载器。
+
+新电脑先运行 `start-wx-demo.cmd`。它检查当前用户的 Cubism Core 和 WebView2 Runtime，缺少时从 Live2D / Microsoft 官方地址取得依赖，再打开程序。也可在应用中选择 **帮助 → 修复桌宠依赖**，修复成功后自动重新加载。过程日志在 `%LOCALAPPDATA%/wx_demo/pet-setup.log`。只有缺少 WebView2 Runtime 时才启动微软安装器，默认随当前用户权限安装。
+
+Cubism Core 不提交到 Git；安装脚本从官方托管地址下载到当前用户缓存，也支持 `-CoreFile` 指定自行取得的官方 SDK 文件。程序还支持 `wx_demo.exe` 旁 `runtime/live2d/live2dcubismcore.min.js` 的便携布局。无网络时先准备 Core 文件，并在 `downloads` 放入微软官方 x64 独立安装器 `MicrosoftEdgeWebView2RuntimeInstallerX64.exe`，运行 `repair-pet.cmd -Offline -CoreFile "实际文件路径"`。小型 WebView2 bootstrapper 仍需要网络，不能代替离线安装器。
+
+GitHub 的源代码 ZIP 不含编译出的 exe。向普通用户发布时应提供完整的 Release 程序目录；不要只发 exe，也不要使用依赖开发环境的 Debug 程序。脚本和资源无需硬编码开发者的账户或桌面路径。开发者可运行 `tools/check-pet.ps1 -CheckGit` 检查必需资源是否已纳入 Git。
 
 插件使用 WebView2 Composition 与 DirectComposition 进行透明合成，不依赖 DSH 或独立服务器。资源位于 `wx_demo/res/pet`，编译后随 `res` 目录复制到程序旁。模型、贴图和 React 运行库均使用本地资源；Cubism Core 不随项目分发，优先读取 `%LOCALAPPDATA%/wx_demo/live2d/live2dcubismcore.min.js`，否则尝试 Live2D 官方运行时。启动阶段与错误记录位于 `%LOCALAPPDATA%/wx_demo/pet-plugin.log`，不记录问题或 API Key。
 
